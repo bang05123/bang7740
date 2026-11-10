@@ -1,0 +1,360 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>낙서 레이서</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Bungee&family=IBM+Plex+Sans+KR:wght@400;600&display=swap">
+<style>
+/* Layout: blueprint drafting table — one-screen editor, full-bleed run screen with HUD in the corners */
+:root{
+  --ink:#0e2036; --ink2:#15304e; --line:#23476d; --line2:#33618f;
+  --chalk:#eaf2fa; --dim:#8eaac6; --hazard:#ffc83a; --hazard-ink:#2a1d00; --danger:#ff7361;
+  --f-display:'Black Han Sans','IBM Plex Sans KR',system-ui,sans-serif;
+  --f-num:'Bungee',Impact,'Arial Black',sans-serif;
+  --f-body:'IBM Plex Sans KR',system-ui,-apple-system,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--ink);color:var(--chalk);font-family:var(--f-body);overflow:hidden;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible{outline:2px solid var(--hazard);outline-offset:2px}
+
+#edit{height:100%;display:flex;flex-direction:column;gap:12px;padding-block:14px;max-width:640px;margin:0 auto}
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+h1{font-family:var(--f-display);font-weight:400;font-size:1.9rem;margin:0;letter-spacing:.02em;line-height:1}
+h1 span{color:var(--hazard)}
+.best{font-size:.78rem;color:var(--dim);text-align:right;letter-spacing:.06em}
+.best b{display:block;font-family:var(--f-num);font-weight:400;font-size:1.1rem;color:var(--chalk);letter-spacing:0;font-variant-numeric:tabular-nums}
+.guide{margin:0;font-size:.9rem;line-height:1.55;color:var(--dim);max-width:60ch}
+.guide em{font-style:normal;color:var(--hazard);font-weight:600}
+.guide strong{color:var(--chalk);font-weight:600}
+.board{position:relative;width:min(100%,calc((100dvh - 330px)*1.5));min-width:min(100%,260px);margin:0 auto;aspect-ratio:3/2;max-width:100%}
+#ec{display:block;width:100%;height:100%;border:2px solid var(--line2);border-radius:6px;touch-action:none;background:var(--ink2)}
+.tag{position:absolute;left:10px;top:8px;font-size:.7rem;letter-spacing:.14em;color:var(--dim);pointer-events:none}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.seg{display:flex;border:2px solid var(--line2);border-radius:6px;overflow:hidden}
+.seg button{padding:9px 16px;font-weight:600;font-size:.92rem;color:var(--dim)}
+.seg button[aria-pressed="true"]{background:var(--chalk);color:var(--ink)}
+.seg button[data-mode="body"][aria-pressed="true"]{background:var(--hazard);color:var(--hazard-ink)}
+.tool{padding:9px 14px;border:2px solid var(--line2);border-radius:6px;font-size:.88rem;color:var(--chalk)}
+.tools .sp{flex:1}
+#msg{min-height:1.3em;margin:0;font-size:.85rem;color:var(--dim);font-variant-numeric:tabular-nums}
+#msg.err{color:var(--danger)}
+#go{margin-top:auto;padding:15px;border-radius:8px;background:var(--hazard);color:var(--hazard-ink);font-family:var(--f-display);font-size:1.5rem;letter-spacing:.06em;
+  background-image:repeating-linear-gradient(-45deg,transparent 0 14px,rgba(0,0,0,.08) 14px 28px)}
+#go:active{transform:translateY(2px)}
+
+#run{position:fixed;inset:0;touch-action:none}
+#gc{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hud{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;
+  padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+#dist{font-family:var(--f-num);font-size:2.4rem;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 0 var(--ink)}
+#dist small{font-size:1rem;color:var(--dim)}
+#hbest{font-size:.78rem;color:var(--dim);margin-top:6px;letter-spacing:.06em}
+#quit{pointer-events:auto;padding:8px 14px;border:2px solid var(--line2);border-radius:6px;background:var(--ink);font-size:.85rem}
+#hint{position:absolute;left:0;right:0;bottom:calc(28px + env(safe-area-inset-bottom,0px));text-align:center;pointer-events:none;font-weight:600;transition:opacity .4s}
+#hint span{display:inline-block;padding:10px 18px;border-radius:30px;background:var(--hazard);color:var(--hazard-ink)}
+#stall{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);font-family:var(--f-display);font-size:1.4rem;color:var(--danger);pointer-events:none;text-align:center}
+#over{position:absolute;inset:0;display:grid;place-items:center;background:rgba(8,20,34,.72);padding:0 max(16px,env(safe-area-inset-left,0px))}
+.card{width:min(100%,340px);background:var(--ink);border:2px solid var(--line2);border-radius:10px;padding:22px 20px;display:flex;flex-direction:column;gap:6px;text-align:center}
+.card .k{font-size:.78rem;letter-spacing:.16em;color:var(--dim)}
+#rdist{font-family:var(--f-num);font-size:3rem;line-height:1.05;font-variant-numeric:tabular-nums}
+#rnew{font-family:var(--f-display);color:var(--hazard);font-size:1.2rem}
+#rbest{color:var(--dim);font-size:.9rem}
+#rtip{font-size:.85rem;color:var(--dim);line-height:1.5;margin:6px 0 4px}
+.card .row{display:flex;gap:8px;margin-top:8px}
+.card .row button{flex:1;padding:12px 8px;border-radius:7px;font-weight:600}
+#again{background:var(--hazard);color:var(--hazard-ink)}
+#fix{border:2px solid var(--line2)}
+@media (prefers-reduced-motion:reduce){#hint{transition:none}}
+</style>
+
+<section id="edit">
+  <div class="top">
+    <h1>낙서 <span>레이서</span></h1>
+    <div class="best">최고 기록<b id="ebest">0.0 m</b></div>
+  </div>
+  <p class="guide"><em>차체</em>는 한 줄로 쭉 긋고, <strong>바퀴</strong>는 동그라미로 그리세요. 큰 바퀴는 빠르고, 찌그러진 바퀴는 덜컹거려요.</p>
+  <div class="board">
+    <canvas id="ec" aria-label="자동차 그리는 판"></canvas>
+    <div class="tag">DRAWING NO. 01 · 1칸 = 20mm</div>
+  </div>
+  <div class="tools">
+    <div class="seg" role="group" aria-label="그리기 모드">
+      <button id="mBody" data-mode="body" aria-pressed="true">차체</button>
+      <button id="mWheel" data-mode="wheel" aria-pressed="false">바퀴</button>
+    </div>
+    <span class="sp"></span>
+    <button class="tool" id="undo">되돌리기</button>
+    <button class="tool" id="clear">지우기</button>
+  </div>
+  <p id="msg"></p>
+  <button id="go">출발</button>
+</section>
+
+<section id="run" hidden>
+  <canvas id="gc"></canvas>
+  <div class="hud">
+    <div><div id="dist">0.0<small> m</small></div><div id="hbest">최고 0.0 m</div></div>
+    <button id="quit">그만하기</button>
+  </div>
+  <div id="hint"><span>화면을 누르고 있으면 가속</span></div>
+  <div id="stall" hidden></div>
+  <div id="over" hidden>
+    <div class="card">
+      <div class="k">주행 거리</div>
+      <div id="rdist">0.0</div>
+      <div id="rnew" hidden>신기록!</div>
+      <div id="rbest"></div>
+      <p id="rtip"></p>
+      <div class="row"><button id="fix">차 고치기</button><button id="again">다시 달리기</button></div>
+    </div>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+const {Engine,Body,Bodies,Composite,Constraint}=Matter;
+const $=id=>document.getElementById(id);
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const C={ink:'#0e2036',ink2:'#15304e',line:'#23476d',line2:'#33618f',chalk:'#eaf2fa',dim:'#8eaac6',hazard:'#ffc83a',danger:'#ff7361'};
+const EW=360,EH=240,PX_PER_M=40,MAXW=4;
+let best=parseFloat(store.get('doodle-racer-best2'))||0;
+
+/* ---------- geometry ---------- */
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function hull(pts){
+  const p=pts.map(q=>({x:q.x,y:q.y})).sort((a,b)=>a.x-b.x||a.y-b.y);
+  if(p.length<3)return p;
+  const cr=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);
+  const lo=[],up=[];
+  for(const q of p){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],q)<=0)lo.pop();lo.push(q)}
+  for(let i=p.length-1;i>=0;i--){const q=p[i];while(up.length>=2&&cr(up[up.length-2],up[up.length-1],q)<=0)up.pop();up.push(q)}
+  lo.pop();up.pop();let h=lo.concat(up);
+  if(h.length>18){const k=Math.ceil(h.length/18);h=h.filter((_,i)=>i%k===0)}
+  return h;
+}
+const sArea=v=>{let a=0;for(let i=0;i<v.length;i++){const p=v[i],q=v[(i+1)%v.length];a+=p.x*q.y-q.x*p.y}return a/2};
+function centroid(v){let a=sArea(v),cx=0,cy=0;for(let i=0;i<v.length;i++){const p=v[i],q=v[(i+1)%v.length],f=p.x*q.y-q.x*p.y;cx+=(p.x+q.x)*f;cy+=(p.y+q.y)*f}return{x:cx/(6*a),y:cy/(6*a)}}
+function wheelInfo(stroke){
+  let h=hull(stroke);if(h.length<3)return null;
+  if(sArea(h)<0)h.reverse();
+  const area=sArea(h),r=Math.sqrt(area/Math.PI);
+  if(r<7)return null;
+  return{hull:h,c:centroid(h),r};
+}
+function simplify(pts,min){const o=[pts[0]];for(const p of pts)if(dist(p,o[o.length-1])>=min)o.push(p);const l=pts[pts.length-1];if(o.length>1&&dist(l,o[o.length-1])>2)o.push(l);return o}
+function rdp(p,e){if(p.length<3)return p;const a=p[0],b=p[p.length-1];let mi=0,md=0;const L=Math.hypot(b.x-a.x,b.y-a.y);
+  for(let i=1;i<p.length-1;i++){const d=L>1?Math.abs((b.x-a.x)*(a.y-p[i].y)-(a.x-p[i].x)*(b.y-a.y))/L:dist(p[i],a);if(d>md){md=d;mi=i}}
+  if(md>e){const l=rdp(p.slice(0,mi+1),e),r=rdp(p.slice(mi),e);return l.slice(0,-1).concat(r)}return[a,b]}
+function clampV(b,m){const v=b.velocity,s=Math.hypot(v.x,v.y);if(s>m)Body.setVelocity(b,{x:v.x*m/s,y:v.y*m/s});if(Math.abs(b.angularVelocity)>0.5)Body.setAngularVelocity(b,Math.sign(b.angularVelocity)*0.5)}
+const pathLen=p=>{let s=0;for(let i=1;i<p.length;i++)s+=dist(p[i-1],p[i]);return s};
+
+/* ---------- editor ---------- */
+const ec=$('ec'),ex=ec.getContext('2d');
+let chassis=[],wheels=[],hist=[],mode='body',cur=null;
+function sampleCar(){
+  chassis=[[70,150],[70,122],[128,116],[150,86],[222,86],[244,116],[292,122],[292,150],[70,150]].map(([x,y])=>({x,y}));
+  const circ=(cx,cy,r)=>Array.from({length:22},(_,i)=>({x:cx+Math.cos(i/22*6.283)*r,y:cy+Math.sin(i/22*6.283)*r}));
+  wheels=[circ(108,160,27),circ(256,160,27)];
+}
+try{const s=JSON.parse(store.get('doodle-racer-car'));if(s&&s.chassis&&s.wheels){chassis=s.chassis;wheels=s.wheels}else sampleCar()}catch(e){sampleCar()}
+
+function setMode(m){mode=m;$('mBody').setAttribute('aria-pressed',m==='body');$('mWheel').setAttribute('aria-pressed',m==='wheel')}
+$('mBody').onclick=()=>setMode('body');$('mWheel').onclick=()=>setMode('wheel');
+const snap=()=>hist.push(JSON.stringify({chassis,wheels}));
+$('undo').onclick=()=>{if(!hist.length)return say('되돌릴 게 없어요');const s=JSON.parse(hist.pop());chassis=s.chassis;wheels=s.wheels;drawEditor();status()};
+$('clear').onclick=()=>{snap();chassis=[];wheels=[];setMode('body');drawEditor();say('차체부터 그려보세요')};
+
+function say(t,err){const m=$('msg');m.textContent=t;m.classList.toggle('err',!!err)}
+function status(){
+  const ws=wheels.map(wheelInfo).filter(Boolean);
+  say(`차체 ${chassis.length>1?Math.round(pathLen(chassis))+'mm':'없음'} · 바퀴 ${ws.length}/${MAXW}`+(ws.length?` · 평균 지름 ${Math.round(ws.reduce((s,w)=>s+w.r*2,0)/ws.length)}mm`:''));
+}
+function lp(e){const r=ec.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*EW,y:(e.clientY-r.top)/r.height*EH}}
+ec.addEventListener('pointerdown',e=>{e.preventDefault();ec.setPointerCapture(e.pointerId);cur=[lp(e)];drawEditor()});
+ec.addEventListener('pointermove',e=>{if(!cur)return;const p=lp(e);if(dist(p,cur[cur.length-1])>=2.5){cur.push(p);drawEditor()}});
+const endStroke=()=>{
+  if(!cur)return;const s=cur;cur=null;
+  if(mode==='body'){
+    const p=simplify(s,8);
+    if(p.length<2||pathLen(p)<40){say('차체는 좀 더 길게 그어주세요',true)}
+    else{snap();chassis=p;status();if(!wheels.length){setMode('wheel');say('좋아요. 이제 바퀴를 동그라미로 그려보세요')}}
+  }else{
+    if(!wheelInfo(s)){say('바퀴는 동그랗게, 너무 작지 않게 그려주세요',true)}
+    else{snap();wheels.push(s);if(wheels.length>MAXW){wheels.shift();status();say(`바퀴는 ${MAXW}개까지예요. 가장 먼저 그린 바퀴를 뺐어요`)}else status()}
+  }
+  drawEditor();
+};
+ec.addEventListener('pointerup',endStroke);ec.addEventListener('pointercancel',endStroke);
+
+function drawEditor(){
+  const r=ec.getBoundingClientRect(),d=devicePixelRatio||1;
+  if(ec.width!==Math.round(r.width*d)){ec.width=Math.round(r.width*d);ec.height=Math.round(r.height*d)}
+  const k=ec.width/EW;ex.setTransform(k,0,0,k,0,0);
+  ex.fillStyle=C.ink2;ex.fillRect(0,0,EW,EH);
+  for(let x=0;x<=EW;x+=10){ex.strokeStyle=x%100===0?C.line2:C.line;ex.lineWidth=x%50===0?.8:.35;ex.beginPath();ex.moveTo(x,0);ex.lineTo(x,EH);ex.stroke()}
+  for(let y=0;y<=EH;y+=10){ex.strokeStyle=y%100===0?C.line2:C.line;ex.lineWidth=y%50===0?.8:.35;ex.beginPath();ex.moveTo(0,y);ex.lineTo(EW,y);ex.stroke()}
+  ex.lineCap='round';ex.lineJoin='round';
+  const ws=wheels.map(wheelInfo).filter(Boolean);
+  // axles
+  if(chassis.length>1)for(const w of ws){let n=chassis[0];for(const p of chassis)if(dist(p,w.c)<dist(n,w.c))n=p;ex.setLineDash([3,3]);ex.strokeStyle=C.dim;ex.lineWidth=1.2;ex.beginPath();ex.moveTo(n.x,n.y);ex.lineTo(w.c.x,w.c.y);ex.stroke();ex.setLineDash([])}
+  for(const w of ws){ex.fillStyle=C.ink;ex.strokeStyle=C.chalk;ex.lineWidth=2.5;ex.beginPath();w.hull.forEach((p,i)=>i?ex.lineTo(p.x,p.y):ex.moveTo(p.x,p.y));ex.closePath();ex.fill();ex.stroke();ex.fillStyle=C.chalk;ex.beginPath();ex.arc(w.c.x,w.c.y,2.5,0,7);ex.fill()}
+  if(chassis.length>1){ex.strokeStyle=C.hazard;ex.lineWidth=5;ex.beginPath();chassis.forEach((p,i)=>i?ex.lineTo(p.x,p.y):ex.moveTo(p.x,p.y));ex.stroke()}
+  if(cur&&cur.length>1){ex.strokeStyle=mode==='body'?C.hazard:C.chalk;ex.globalAlpha=.7;ex.lineWidth=mode==='body'?5:2.5;ex.beginPath();cur.forEach((p,i)=>i?ex.lineTo(p.x,p.y):ex.moveTo(p.x,p.y));ex.stroke();ex.globalAlpha=1}
+}
+new ResizeObserver(drawEditor).observe(ec);
+
+/* ---------- world ---------- */
+const SEG=50,GROUP_T=0;
+function H(x){
+  if(x<700)return 0;
+  const d=x-700,ramp=Math.min(1,d/500),a=Math.min(30+d*0.022,300),k=Math.min(1,d/5000);
+  return ramp*a*(0.55*Math.sin(d*0.0034)+0.3*(1-Math.cos(d*0.0089))*0.8+0.16*k*Math.sin(d*0.024));
+}
+let engine,car,tPts,tBodies,tx,state;
+function addSeg(){
+  const x1=tx,x2=tx+SEG,y1=-H(x1),y2=-H(x2);
+  const v=[{x:x1,y:y1},{x:x2,y:y2},{x:x2,y:Math.max(y1,y2)+400},{x:x1,y:Math.max(y1,y2)+400}];
+  const b=Body.create({isStatic:true,position:centroid(v),vertices:v,friction:1,frictionStatic:1.5});
+  Composite.add(engine.world,b);tBodies.push(b);tPts.push({x:x2,y:y2});tx=x2;
+}
+function buildCar(){
+  const ws=wheels.map(wheelInfo).filter(Boolean);
+  let minX=1e9,maxX=-1e9,maxY=-1e9;
+  for(const p of chassis){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y)}
+  for(const w of ws)for(const p of w.hull){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y)}
+  const ox=200-(minX+maxX)/2,oy=-maxY-12,T=12;
+  const group=Body.nextGroup(true),filter={group};
+  const pts=rdp(chassis,3.5).map(p=>({x:p.x+ox,y:p.y+oy}));
+  const parts=[];
+  for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],l=dist(a,b);if(l<1)continue;
+    parts.push(Bodies.rectangle((a.x+b.x)/2,(a.y+b.y)/2,l+T*0.5,T,{angle:Math.atan2(b.y-a.y,b.x-a.x),density:0.0016,friction:0.5,collisionFilter:filter}))}
+  const body=Body.create({parts,collisionFilter:filter});
+  const local=pts.map(p=>({x:p.x-body.position.x,y:p.y-body.position.y}));
+  Composite.add(engine.world,body);
+  const wb=[];
+  for(const w of ws){
+    const v=w.hull.map(p=>({x:p.x+ox,y:p.y+oy})),c={x:w.c.x+ox,y:w.c.y+oy};
+    const b=Body.create({position:c,vertices:v,density:0.0012,friction:1.4,frictionStatic:3,restitution:0,collisionFilter:filter});
+    const con=Constraint.create({bodyA:body,pointA:{x:b.position.x-body.position.x,y:b.position.y-body.position.y},bodyB:b,pointB:{x:0,y:0},length:0,stiffness:0.6,damping:0.3});
+    Composite.add(engine.world,[b,con]);wb.push({b,con,r:w.r});
+  }
+  return{body,local,wheels:wb,startX:body.position.x};
+}
+function startRun(){
+  engine=Engine.create();engine.positionIterations=10;engine.velocityIterations=8;engine.constraintIterations=4;engine.gravity.y=1.6;
+  tPts=[{x:-900,y:0}];tBodies=[];tx=-900;
+  Composite.add(engine.world,Bodies.rectangle(-920,-600,40,1600,{isStatic:true}));
+  while(tx<3200)addSeg();
+  car=buildCar();
+  state={gas:false,started:false,bestX:car.body.position.x,stall:0,over:false,cam:{x:car.body.position.x+150,y:car.body.position.y-60},newRec:false};
+  $('edit').hidden=true;$('run').hidden=false;$('over').hidden=true;$('stall').hidden=true;$('hint').style.opacity=1;
+  $('hbest').textContent=`최고 ${best.toFixed(1)} m`;
+  fitGame();last=performance.now();acc=0;cancelAnimationFrame(raf);raf=requestAnimationFrame(frame);
+}
+const meters=()=>Math.max(0,(state.bestX-car.startX)/PX_PER_M);
+function step(){
+  if(state.gas){
+    for(const w of car.wheels){const t=Math.min(0.34,9/w.r),av=w.b.angularVelocity;Body.setAngularVelocity(w.b,av+(t-av)*0.12)}
+  }
+  Engine.update(engine,1000/60);
+  clampV(car.body,30);for(const w of car.wheels)clampV(w.b,30);
+  const x=car.body.position.x;
+  while(tx<x+3000)addSeg();
+  while(tBodies.length&&tBodies[0].bounds.max.x<x-3500){Composite.remove(engine.world,tBodies.shift());tPts.shift()}
+  if(x>state.bestX+2){state.bestX=x;state.stall=0}
+  else if(state.started)state.stall++;
+  if(car.body.position.y>H(x)*-1+2000)endRun();
+  if(state.stall>240)endRun();
+}
+function endRun(){
+  if(state.over)return;state.over=true;state.gas=false;
+  const m=meters();state.newRec=m>best;
+  if(state.newRec){best=m;store.set('doodle-racer-best2',String(best))}
+  $('rdist').textContent=m.toFixed(1)+' m';$('rnew').hidden=!state.newRec;
+  $('rbest').textContent=state.newRec?'':`최고 기록 ${best.toFixed(1)} m`;
+  const tips=['언덕에서 뒤집히면 무게 중심을 낮게, 차체를 길게 그려보세요.','큰 바퀴는 턱을 잘 넘지만 무거워서 오르막에서 힘이 빠져요.','오르막 꼭대기에선 잠깐 손을 떼면 덜 튕겨요.','바퀴를 3~4개 달면 울퉁불퉁한 길에서 안정적이에요.','차체 아래로 튀어나온 부분이 땅에 걸리면 멈춰요.'];
+  $('rtip').textContent=tips[Math.floor(Math.random()*tips.length)];
+  $('stall').hidden=true;$('over').hidden=false;$('again').focus();
+}
+
+/* ---------- render ---------- */
+const gc=$('gc'),gx=gc.getContext('2d');let W=0,Hh=0,raf=0,last=0,acc=0,hatch=null;
+function fitGame(){const d=devicePixelRatio||1;W=innerWidth;Hh=innerHeight;gc.width=Math.round(W*d);gc.height=Math.round(Hh*d)}
+addEventListener('resize',()=>{if(!$('run').hidden)fitGame()});
+function makeHatch(){const c=document.createElement('canvas');c.width=c.height=24;const x=c.getContext('2d');x.fillStyle=C.ink2;x.fillRect(0,0,24,24);x.strokeStyle=C.line;x.lineWidth=2;x.beginPath();x.moveTo(-6,30);x.lineTo(30,-6);x.moveTo(-18,18);x.lineTo(18,-18);x.moveTo(6,42);x.lineTo(42,6);x.stroke();return gx.createPattern(c,'repeat')}
+function frame(t){
+  const dt=Math.min(60,t-last);last=t;
+  if(!state.over){acc+=dt;while(acc>=1000/60){step();acc-=1000/60;if(state.over)break}}
+  render();
+  raf=requestAnimationFrame(frame);
+}
+function render(){
+  const d=devicePixelRatio||1,b=car.body;
+  const z=Math.max(0.32,Math.min(1.15,Math.min(W/820,Hh/540)));
+  state.cam.x+=(b.position.x+140/z*0.6-state.cam.x)*0.08;state.cam.y+=(b.position.y-40-state.cam.y)*0.06;
+  gx.setTransform(d,0,0,d,0,0);
+  const g=gx.createLinearGradient(0,0,0,Hh);g.addColorStop(0,'#0a1a2d');g.addColorStop(1,C.ink);gx.fillStyle=g;gx.fillRect(0,0,W,Hh);
+  // parallax blueprint grid
+  const gs=60*z,px=-(state.cam.x*z*0.4)%gs,py=-(state.cam.y*z*0.4)%gs;
+  gx.strokeStyle=C.line;gx.globalAlpha=.45;gx.lineWidth=1;gx.beginPath();
+  for(let x=px;x<W;x+=gs){gx.moveTo(x,0);gx.lineTo(x,Hh)}for(let y=py;y<Hh;y+=gs){gx.moveTo(0,y);gx.lineTo(W,y)}gx.stroke();gx.globalAlpha=1;
+
+  gx.setTransform(d*z,0,0,d*z,d*(W/2-state.cam.x*z),d*(Hh*0.55-state.cam.y*z));
+  const vx0=state.cam.x-W/2/z-60,vx1=state.cam.x+W/2/z+60;
+  // terrain
+  if(!hatch)hatch=makeHatch();
+  let i0=0;while(i0<tPts.length-1&&tPts[i0+1].x<vx0)i0++;
+  let i1=i0;while(i1<tPts.length-1&&tPts[i1].x<vx1)i1++;
+  const bottom=state.cam.y+Hh/z;
+  gx.beginPath();gx.moveTo(tPts[i0].x,bottom);for(let i=i0;i<=i1;i++)gx.lineTo(tPts[i].x,tPts[i].y);gx.lineTo(tPts[i1].x,bottom);gx.closePath();
+  gx.fillStyle=hatch;gx.fill();
+  gx.strokeStyle=C.chalk;gx.lineWidth=3/z*0.9;gx.lineJoin='round';gx.beginPath();for(let i=i0;i<=i1;i++)i===i0?gx.moveTo(tPts[i].x,tPts[i].y):gx.lineTo(tPts[i].x,tPts[i].y);gx.stroke();
+  // distance posts
+  gx.font=`${Math.round(16/z*0.8)}px Bungee, Impact, sans-serif`;gx.textAlign='center';
+  const step50=50*PX_PER_M;
+  for(let x=Math.ceil((vx0-car.startX)/step50)*step50+car.startX;x<vx1;x+=step50){
+    const m=Math.round((x-car.startX)/PX_PER_M);if(m<=0)continue;const y=-H(x);
+    gx.strokeStyle=C.dim;gx.lineWidth=2/z;gx.beginPath();gx.moveTo(x,y);gx.lineTo(x,y-90);gx.stroke();
+    gx.fillStyle=C.dim;gx.fillText(m+'m',x,y-100);
+  }
+  if(best>0){const x=car.startX+best*PX_PER_M;if(x>vx0&&x<vx1){const y=-H(x);gx.strokeStyle=C.hazard;gx.lineWidth=3/z;gx.setLineDash([12,10]);gx.beginPath();gx.moveTo(x,y);gx.lineTo(x,y-260);gx.stroke();gx.setLineDash([]);gx.fillStyle=C.hazard;gx.fillText('최고 '+best.toFixed(0)+'m',x,y-272)}}
+  // axles
+  gx.lineCap='round';gx.lineJoin='round';
+  for(const w of car.wheels){const a=w.con.pointA;gx.strokeStyle=C.dim;gx.lineWidth=4;gx.beginPath();gx.moveTo(b.position.x+a.x,b.position.y+a.y);gx.lineTo(w.b.position.x,w.b.position.y);gx.stroke()}
+  // wheels
+  for(const w of car.wheels){const v=w.b.vertices;gx.fillStyle=C.ink;gx.strokeStyle=C.chalk;gx.lineWidth=4;gx.beginPath();v.forEach((p,i)=>i?gx.lineTo(p.x,p.y):gx.moveTo(p.x,p.y));gx.closePath();gx.fill();gx.stroke();
+    gx.strokeStyle=C.hazard;gx.lineWidth=3;gx.beginPath();gx.moveTo(w.b.position.x,w.b.position.y);gx.lineTo(v[0].x,v[0].y);gx.stroke()}
+  // chassis
+  gx.save();gx.translate(b.position.x,b.position.y);gx.rotate(b.angle);
+  gx.strokeStyle=C.hazard;gx.lineWidth=9;gx.beginPath();car.local.forEach((p,i)=>i?gx.lineTo(p.x,p.y):gx.moveTo(p.x,p.y));gx.stroke();gx.restore();
+
+  // HUD
+  const m=meters();$('dist').firstChild.nodeValue=m.toFixed(1);
+  const st=$('stall');
+  if(!state.over&&state.stall>60){st.hidden=false;st.textContent=`멈췄어요… ${Math.ceil((240-state.stall)/60)}`}else st.hidden=true;
+}
+
+/* ---------- input ---------- */
+const run=$('run');
+run.addEventListener('pointerdown',e=>{if(e.target.closest('button')||state.over)return;state.gas=true;state.started=true;$('hint').style.opacity=0});
+const off=()=>{if(state)state.gas=false};
+run.addEventListener('pointerup',off);run.addEventListener('pointercancel',off);run.addEventListener('pointerleave',off);
+addEventListener('keydown',e=>{if(!state||run.hidden||state.over)return;if(e.key===' '||e.key==='ArrowRight'){e.preventDefault();state.gas=true;state.started=true;$('hint').style.opacity=0}});
+addEventListener('keyup',e=>{if(e.key===' '||e.key==='ArrowRight')off()});
+$('quit').onclick=()=>endRun();
+$('again').onclick=()=>startRun();
+$('fix').onclick=()=>{cancelAnimationFrame(raf);$('run').hidden=true;$('edit').hidden=false;$('ebest').textContent=best.toFixed(1)+' m';drawEditor();status()};
+$('go').onclick=()=>{
+  if(chassis.length<2)return say('차체를 먼저 그려주세요',true);
+  if(!wheels.map(wheelInfo).filter(Boolean).length){setMode('wheel');return say('바퀴를 하나 이상 그려주세요',true)}
+  store.set('doodle-racer-car',JSON.stringify({chassis,wheels}));startRun();
+};
+
+$('ebest').textContent=best.toFixed(1)+' m';
+drawEditor();status();
+</script>
+
+</body></html>

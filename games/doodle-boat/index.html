@@ -1,0 +1,418 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>낙서 보트</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Bungee&family=IBM+Plex+Sans+KR:wght@400;600&display=swap">
+<style>
+/* Layout: nautical chart table — one-screen drafting board, full-bleed sea with HUD in the corners */
+:root{
+  --deep:#08203a; --sea:#0d2f52; --grid:#1d4670; --grid2:#2c5e8e;
+  --foam:#eef6fb; --dim:#8fb2cf; --signal:#ff7a3d; --signal-ink:#2b1000; --danger:#ff5f5f;
+  --f-display:'Black Han Sans','IBM Plex Sans KR',system-ui,sans-serif;
+  --f-num:'Bungee',Impact,'Arial Black',sans-serif;
+  --f-body:'IBM Plex Sans KR',system-ui,-apple-system,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--deep);color:var(--foam);font-family:var(--f-body);overflow:hidden;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+#edit{height:100%;display:flex;flex-direction:column;gap:12px;padding-block:14px;max-width:640px;margin:0 auto}
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+h1{font-family:var(--f-display);font-weight:400;font-size:1.9rem;margin:0;letter-spacing:.02em;line-height:1}
+h1 span{color:var(--signal)}
+.best{font-size:.78rem;color:var(--dim);text-align:right;letter-spacing:.06em}
+.best b{display:block;font-family:var(--f-num);font-weight:400;font-size:1.1rem;color:var(--foam);letter-spacing:0;font-variant-numeric:tabular-nums}
+.guide{margin:0;font-size:.9rem;line-height:1.55;color:var(--dim);max-width:60ch}
+.guide em{font-style:normal;color:var(--signal);font-weight:600}
+.guide strong{color:var(--foam);font-weight:600}
+.board{position:relative;width:min(100%,calc((100dvh - 330px)*1.5));min-width:min(100%,260px);margin:0 auto;aspect-ratio:3/2;max-width:100%}
+#ec{display:block;width:100%;height:100%;border:2px solid var(--grid2);border-radius:6px;touch-action:none;background:var(--sea)}
+.tag{position:absolute;left:10px;top:8px;font-size:.7rem;letter-spacing:.14em;color:var(--dim);pointer-events:none}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.seg{display:flex;border:2px solid var(--grid2);border-radius:6px;overflow:hidden}
+.seg button{padding:9px 14px;font-weight:600;font-size:.9rem;color:var(--dim)}
+.seg button[aria-pressed="true"]{background:var(--foam);color:var(--deep)}
+.seg button[data-mode="hull"][aria-pressed="true"]{background:var(--signal);color:var(--signal-ink)}
+.tool{padding:9px 13px;border:2px solid var(--grid2);border-radius:6px;font-size:.88rem}
+.tools .sp{flex:1}
+#msg{min-height:1.3em;margin:0;font-size:.85rem;color:var(--dim);font-variant-numeric:tabular-nums}
+#msg.err{color:var(--danger)}
+#go{margin-top:auto;padding:15px;border-radius:8px;background:var(--signal);color:var(--signal-ink);font-family:var(--f-display);font-size:1.5rem;letter-spacing:.06em}
+#go:active{transform:translateY(2px)}
+
+#run{position:fixed;inset:0;touch-action:none}
+#gc{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hud{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;
+  padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+.hud{color:var(--deep)}
+#dist{font-family:var(--f-num);font-size:2.4rem;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 0 rgba(255,255,255,.55)}
+#spd{font-family:var(--f-num);font-size:1.15rem;margin-top:4px;font-variant-numeric:tabular-nums;color:#c2410c}
+#dist small{font-size:1rem;color:#2a5a85}
+#hbest{font-size:.78rem;color:#2a5a85;margin-top:4px;letter-spacing:.06em;font-weight:600}
+#quit{pointer-events:auto;padding:8px 14px;border:2px solid var(--grid2);border-radius:6px;background:var(--deep);color:var(--foam);font-size:.85rem}
+#warn{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);font-family:var(--f-display);font-size:1.4rem;color:var(--danger);pointer-events:none;text-align:center;text-shadow:0 2px 0 var(--deep)}
+#over{position:absolute;inset:0;display:grid;place-items:center;background:rgba(4,16,30,.72);padding:0 max(16px,env(safe-area-inset-left,0px))}
+.card{width:min(100%,340px);background:var(--deep);border:2px solid var(--grid2);border-radius:10px;padding:22px 20px;display:flex;flex-direction:column;gap:6px;text-align:center}
+.card .k{font-size:.78rem;letter-spacing:.16em;color:var(--dim)}
+#rwhy{font-family:var(--f-display);font-size:1.3rem;color:var(--danger)}
+#rdist{font-family:var(--f-num);font-size:3rem;line-height:1.05;font-variant-numeric:tabular-nums}
+#rnew{font-family:var(--f-display);color:var(--signal);font-size:1.2rem}
+#rbest{color:var(--dim);font-size:.9rem}
+#rtip{font-size:.85rem;color:var(--dim);line-height:1.5;margin:6px 0 4px}
+.card .row{display:flex;gap:8px;margin-top:8px}
+.card .row button{flex:1;padding:12px 8px;border-radius:7px;font-weight:600}
+#again{background:var(--signal);color:var(--signal-ink)}
+#fix{border:2px solid var(--grid2)}
+</style>
+
+<section id="edit">
+  <div class="top">
+    <h1>낙서 <span>보트</span></h1>
+    <div class="best">최고 기록<b id="ebest">0.0 m</b></div>
+  </div>
+  <p class="guide"><em>선체</em>는 배 바닥처럼 U자로 그리세요. 그린 선 그대로 배가 돼요. <strong>구조물</strong>(선실·돛대)은 무게만 더해서, 높이 쌓을수록 잘 뒤집혀요. 점선이 물에 잠기는 높이예요.</p>
+  <div class="board">
+    <canvas id="ec" aria-label="보트 그리는 판"></canvas>
+    <div class="tag">CHART NO. 02 · 1칸 = 0.25m</div>
+  </div>
+  <div class="tools">
+    <div class="seg" role="group" aria-label="그리기 모드">
+      <button id="mHull" data-mode="hull" aria-pressed="true">선체</button>
+      <button id="mDeck" data-mode="deck" aria-pressed="false">구조물</button>
+    </div>
+    <span class="sp"></span>
+    <button class="tool" id="undo">되돌리기</button>
+    <button class="tool" id="clear">지우기</button>
+  </div>
+  <p id="msg"></p>
+  <button id="go">출항</button>
+</section>
+
+<section id="run" hidden>
+  <canvas id="gc"></canvas>
+  <div class="hud">
+    <div><div id="dist">0.0<small> m</small></div><div id="spd">0 km/h</div><div id="hbest">최고 0.0 m</div></div>
+    <button id="quit">그만하기</button>
+  </div>
+  <div id="warn" hidden></div>
+  <div id="over" hidden>
+    <div class="card">
+      <div id="rwhy">전복</div>
+      <div class="k">항해 거리</div>
+      <div id="rdist">0.0</div>
+      <div id="rnew" hidden>신기록!</div>
+      <div id="rbest"></div>
+      <p id="rtip"></p>
+      <div class="row"><button id="fix">보트 고치기</button><button id="again">다시 출항</button></div>
+    </div>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+const {Engine,Body,Bodies,Composite}=Matter;
+const $=id=>document.getElementById(id);
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const C={deep:'#08203a',sea:'#0d2f52',grid:'#1d4670',grid2:'#2c5e8e',foam:'#eef6fb',dim:'#8fb2cf',signal:'#ff7a3d',danger:'#ff5f5f',wood:'#c99a5b',barrel:'#d94b3d'};
+const EW=360,EH=240,PX_PER_M=40,MAXDECK=4,HULL_DEN=0.00045,DECK_DEN=0.0012,RHO=0.001,T=10;
+let best=parseFloat(store.get('doodle-boat-best'))||0;
+
+/* ---------- geometry ---------- */
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const sArea=v=>{let a=0;for(let i=0;i<v.length;i++){const p=v[i],q=v[(i+1)%v.length];a+=p.x*q.y-q.x*p.y}return a/2};
+function centroid(v){let a=sArea(v),cx=0,cy=0;for(let i=0;i<v.length;i++){const p=v[i],q=v[(i+1)%v.length],f=p.x*q.y-q.x*p.y;cx+=(p.x+q.x)*f;cy+=(p.y+q.y)*f}return{x:cx/(6*a),y:cy/(6*a)}}
+function rdp(p,e){if(p.length<3)return p;const a=p[0],b=p[p.length-1];let mi=0,md=0;const L=Math.hypot(b.x-a.x,b.y-a.y);
+  for(let i=1;i<p.length-1;i++){const d=L>1?Math.abs((b.x-a.x)*(a.y-p[i].y)-(a.x-p[i].x)*(b.y-a.y))/L:dist(p[i],a);if(d>md){md=d;mi=i}}
+  if(md>e){const l=rdp(p.slice(0,mi+1),e),r=rdp(p.slice(mi),e);return l.slice(0,-1).concat(r)}return[a,b]}
+const pathLen=p=>{let s=0;for(let i=1;i<p.length;i++)s+=dist(p[i-1],p[i]);return s};
+function clipUnder(poly,surf){
+  const out=[],n=poly.length;
+  for(let i=0;i<n;i++){const a=poly[i],b=poly[(i+1)%n],da=a.y-surf(a.x),db=b.y-surf(b.x);
+    if(da>=0)out.push(a);
+    if((da>=0)!==(db>=0)){const t=da/(da-db);out.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t})}}
+  return out;
+}
+function prepHull(stroke){
+  let p=rdp(stroke,3);if(p.length>2&&dist(p[0],p[p.length-1])<15)p[p.length-1]={...p[0]};
+  if(p.length<3)return null;
+  if(sArea(p)<0)p.reverse();
+  const A=sArea(p);if(A<900)return null;
+  return p;
+}
+function stats(){
+  if(!hull)return null;
+  const A=sArea(hull),deckMass=deck.reduce((s,d)=>s+pathLen(d)*T,0)*DECK_DEN;
+  const mass=A*HULL_DEN+deckMass,need=mass/RHO;
+  let lo=-50,hi=EH+50,line=null;
+  if(need<A){for(let i=0;i<30;i++){const m=(lo+hi)/2,a=Math.abs(sArea(clipUnder(hull,()=>m)));if(a>need)lo=m;else hi=m}line=(lo+hi)/2}
+  return{A,mass,line,ratio:need/A};
+}
+
+/* ---------- editor ---------- */
+const ec=$('ec'),ex=ec.getContext('2d');
+let hull=null,deck=[],hist=[],mode='hull',cur=null;
+function sample(){
+  hull=prepHull([[52,112],[74,146],[104,166],[262,166],[292,146],[306,112]].map(([x,y])=>({x,y})));
+  deck=[[[128,118],[128,96],[196,96],[212,118]],[[168,96],[168,62]]].map(s=>s.map(([x,y])=>({x,y})));
+}
+try{const s=JSON.parse(store.get('doodle-boat-design2'));if(s&&s.hull){hull=s.hull;deck=s.deck||[]}else sample()}catch(e){sample()}
+
+function setMode(m){mode=m;$('mHull').setAttribute('aria-pressed',m==='hull');$('mDeck').setAttribute('aria-pressed',m==='deck')}
+$('mHull').onclick=()=>setMode('hull');$('mDeck').onclick=()=>setMode('deck');
+const snap=()=>hist.push(JSON.stringify({hull,deck}));
+$('undo').onclick=()=>{if(!hist.length)return say('되돌릴 게 없어요');const s=JSON.parse(hist.pop());hull=s.hull;deck=s.deck;drawEditor();status()};
+$('clear').onclick=()=>{snap();hull=null;deck=[];setMode('hull');drawEditor();say('선체부터 그려보세요')};
+function say(t,err){const m=$('msg');m.textContent=t;m.classList.toggle('err',!!err)}
+function status(){
+  const s=stats();if(!s)return say('선체를 그려주세요');
+  if(s.line===null)return say('이대로면 가라앉아요. 선체를 키우거나 구조물을 줄이세요',true);
+  say(`길이 ${(hullW()/40).toFixed(1)}m · 잠기는 비율 ${Math.round(s.ratio*100)}% · 구조물 ${deck.length}/${MAXDECK}`);
+}
+const hullW=()=>{let a=1e9,b=-1e9;for(const p of hull){a=Math.min(a,p.x);b=Math.max(b,p.x)}return b-a};
+function lp(e){const r=ec.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*EW,y:(e.clientY-r.top)/r.height*EH}}
+ec.addEventListener('pointerdown',e=>{e.preventDefault();ec.setPointerCapture(e.pointerId);cur=[lp(e)];drawEditor()});
+ec.addEventListener('pointermove',e=>{if(!cur)return;const p=lp(e);if(dist(p,cur[cur.length-1])>=2.5){cur.push(p);drawEditor()}});
+const endStroke=()=>{
+  if(!cur)return;const s=cur;cur=null;
+  if(mode==='hull'){
+    const h=prepHull(s);
+    if(!h)say('선체는 U자처럼 오목하게, 크게 그려주세요',true);
+    else{snap();hull=h;status();}
+  }else{
+    const p=rdp(s,3);
+    if(p.length<2||pathLen(p)<12)say('구조물 선이 너무 짧아요',true);
+    else if(!hull)say('선체를 먼저 그려주세요',true);
+    else{snap();deck.push(p);if(deck.length>MAXDECK){deck.shift();status();say(`구조물은 ${MAXDECK}개까지예요. 처음 그린 걸 뺐어요`)}else status()}
+  }
+  drawEditor();
+};
+ec.addEventListener('pointerup',endStroke);ec.addEventListener('pointercancel',endStroke);
+
+function drawEditor(){
+  const r=ec.getBoundingClientRect(),d=devicePixelRatio||1;
+  if(ec.width!==Math.round(r.width*d)){ec.width=Math.round(r.width*d);ec.height=Math.round(r.height*d)}
+  const k=ec.width/EW;ex.setTransform(k,0,0,k,0,0);
+  ex.fillStyle=C.sea;ex.fillRect(0,0,EW,EH);
+  for(let x=0;x<=EW;x+=10){ex.strokeStyle=x%100===0?C.grid2:C.grid;ex.lineWidth=x%50===0?.8:.35;ex.beginPath();ex.moveTo(x,0);ex.lineTo(x,EH);ex.stroke()}
+  for(let y=0;y<=EH;y+=10){ex.strokeStyle=y%100===0?C.grid2:C.grid;ex.lineWidth=y%50===0?.8:.35;ex.beginPath();ex.moveTo(0,y);ex.lineTo(EW,y);ex.stroke()}
+  ex.lineCap='round';ex.lineJoin='round';
+  const s=stats();
+  if(hull){
+    ex.strokeStyle=C.signal;ex.lineWidth=5;ex.beginPath();hull.forEach((p,i)=>i?ex.lineTo(p.x,p.y):ex.moveTo(p.x,p.y));ex.stroke();
+  }
+  ex.strokeStyle=C.foam;ex.lineWidth=4;
+  for(const dk of deck){ex.beginPath();dk.forEach((p,i)=>i?ex.lineTo(p.x,p.y):ex.moveTo(p.x,p.y));ex.stroke()}
+  if(s&&s.line!==null){ex.fillStyle='rgba(60,150,220,.28)';ex.fillRect(0,s.line,EW,EH-s.line);ex.setLineDash([6,5]);ex.strokeStyle='#7cc4f2';ex.lineWidth=1.5;ex.beginPath();ex.moveTo(0,s.line);ex.lineTo(EW,s.line);ex.stroke();ex.setLineDash([])}
+  if(cur&&cur.length>1){ex.strokeStyle=mode==='hull'?C.signal:C.foam;ex.globalAlpha=.75;ex.lineWidth=mode==='hull'?5:4;ex.beginPath();cur.forEach((p,i)=>i?ex.lineTo(p.x,p.y):ex.moveTo(p.x,p.y));ex.stroke();ex.globalAlpha=1}
+}
+new ResizeObserver(drawEditor).observe(ec);
+
+/* ---------- world ---------- */
+function rng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+let engine,boat,debris,rogues,tick,rand,state,SX=0;
+function surf(x){
+  const d=Math.max(0,(x-SX)/PX_PER_M),a=5+d*0.05;
+  let y=a*Math.sin(x*0.0062-tick*0.035)+a*0.45*Math.sin(x*0.0141+tick*0.021+1.7);
+  for(const r of rogues){const u=(x-r.x)/r.w;if(u>-3&&u<3)y-=r.a*Math.exp(-u*u)}
+  return y;
+}
+function buildBoat(){
+  const sx=200,minY=Math.min(...hull.map(p=>p.y)),maxY=Math.max(...hull.map(p=>p.y)),mx=hull.reduce((s,p)=>s+p.x,0)/hull.length;
+  const s=stats(),wl=s.line??maxY;
+  const ox=sx-mx,oy=-wl+2;
+  const filter={group:Body.nextGroup(true)};
+  const hw=hull.map(p=>({x:p.x+ox,y:p.y+oy}));
+  const A=sArea(hw);
+  let rectA=0;const segs=[];
+  for(let i=1;i<hw.length;i++){const a=hw[i-1],b=hw[i],l=dist(a,b);if(l<1)continue;segs.push([a,b,l]);rectA+=(l+T*0.5)*T}
+  const hden=A*HULL_DEN/rectA;
+  const parts=segs.map(([a,b,l])=>Bodies.rectangle((a.x+b.x)/2,(a.y+b.y)/2,l+T*0.5,T,{angle:Math.atan2(b.y-a.y,b.x-a.x),density:hden,friction:0.3,collisionFilter:filter}));
+  const dw=deck.map(dk=>dk.map(p=>({x:p.x+ox,y:p.y+oy})));
+  for(const dk of dw)for(let i=1;i<dk.length;i++){const a=dk[i-1],b=dk[i],l=dist(a,b);if(l<1)continue;
+    parts.push(Bodies.rectangle((a.x+b.x)/2,(a.y+b.y)/2,l+T*0.5,T,{angle:Math.atan2(b.y-a.y,b.x-a.x),density:DECK_DEN,friction:0.3,collisionFilter:filter}))}
+  const body=Body.create({parts,collisionFilter:filter,frictionAir:0});
+  const c=body.position;
+  Composite.add(engine.world,body);
+  const lp=hw.map(p=>({x:p.x-c.x,y:p.y-c.y}));let bow=lp[0],stern=lp[0];for(const q of lp){if(q.x>bow.x)bow=q;if(q.x<stern.x)stern=q}
+  return{bow,stern,body,poly:lp,deck:dw.map(dk=>dk.map(p=>({x:p.x-c.x,y:p.y-c.y}))),A,startX:c.x,h:maxY-minY};
+}
+const worldPoly=(b,local)=>{const c=Math.cos(b.angle),s=Math.sin(b.angle);return local.map(p=>({x:b.position.x+p.x*c-p.y*s,y:b.position.y+p.x*s+p.y*c}))};
+function float(b,poly,A,current,drag){
+  const sub=clipUnder(poly,surf);if(sub.length<3)return 0;
+  const a=Math.abs(sArea(sub));if(a<1)return 0;
+  const cen=centroid(sub),g=engine.gravity.y*engine.gravity.scale,F=RHO*a*g,frac=Math.min(1,a/A);
+  const slope=(surf(cen.x+6)-surf(cen.x-6))/12;
+  Body.applyForce(b,cen,{x:slope*F*0.6,y:-F});
+  const v=b.velocity;
+  Body.setVelocity(b,{x:v.x-(v.x-current)*drag*frac,y:v.y*(1-0.07*frac)});
+  Body.setAngularVelocity(b,b.angularVelocity*(1-0.05*frac));
+  return frac;
+}
+function spawnDebris(x){
+  const r=rand(),d=meters(),y=surf(x)-40,opt={friction:0.4,restitution:0.1};
+  let b,kind;
+  if(r<0.45){const rad=14+rand()*12;b=Bodies.circle(x,y,rad,{...opt,density:0.00055},12);kind='barrel'}
+  else if(r<0.8||d<60){const w=60+rand()*Math.min(160,40+d*0.6);b=Bodies.rectangle(x,y,w,18,{...opt,density:0.0006,angle:(rand()-.5)*0.4});kind='log'}
+  else{const s=34+rand()*26;b=Bodies.rectangle(x,y,s,s,{...opt,density:0.00045,angle:rand()});kind='crate'}
+  Composite.add(engine.world,b);
+  const area=b.area;debris.push({b,kind,A:area});
+}
+const meters=()=>boat&&state?Math.max(0,(state.maxX-boat.startX)/PX_PER_M):0;
+function makeClouds(){
+  const out=[];for(let i=0;i<16;i++){const p=0.06+Math.random()*0.3,sc=0.5+p*2.2+Math.random()*0.5,blobs=[];const n=4+Math.floor(Math.random()*4);
+    for(let j=0;j<n;j++)blobs.push({dx:(j-(n-1)/2)*34*sc+(Math.random()-.5)*14*sc,dy:-Math.random()*22*sc,r:(22+Math.random()*20)*sc});
+    out.push({x:Math.random()*4000,y:0.05+Math.random()*0.32,p,sc,blobs})}
+  return out.sort((a,b)=>a.p-b.p);
+}
+function startRun(){
+  engine=Engine.create();engine.positionIterations=10;engine.velocityIterations=8;engine.gravity.y=1.2;
+  debris=[];rogues=[];tick=0;rand=rng(20261027);SX=200;
+  boat=buildBoat();
+  state={fx:[],wake:[],lines:[],z:0,clouds:makeClouds(),over:false,cap:0,sink:0,stall:0,maxX:boat.body.position.x,next:200,nextRogue:900,cam:{x:boat.body.position.x+150,y:-40},newRec:false};
+  $('edit').hidden=true;$('run').hidden=false;$('over').hidden=true;$('warn').hidden=true;
+  $('hbest').textContent=`최고 ${best.toFixed(1)} m`;
+  fitGame();last=performance.now();acc=0;cancelAnimationFrame(raf);raf=requestAnimationFrame(frame);
+}
+function clampV(b,m){const v=b.velocity,s=Math.hypot(v.x,v.y);if(s>m)Body.setVelocity(b,{x:v.x*m/s,y:v.y*m/s});if(Math.abs(b.angularVelocity)>0.4)Body.setAngularVelocity(b,Math.sign(b.angularVelocity)*0.4)}
+function step(){
+  tick++;
+  const b=boat.body,m=meters();
+  const frac=float(b,worldPoly(b,boat.poly),boat.A,0,0.012);
+  const V=9+m*0.012;
+  if(frac>0.02)Body.setVelocity(b,{x:b.velocity.x+(V-b.velocity.x)*0.08*Math.min(1,frac*4),y:b.velocity.y});
+  const ca=Math.cos(b.angle),sa=Math.sin(b.angle),toW=q=>({x:b.position.x+q.x*ca-q.y*sa,y:b.position.y+q.x*sa+q.y*ca});
+  const vx=Math.max(0,b.velocity.x),lv=Math.min(vx,16);
+  if(frac>0.02&&b.angle>-0.32)Body.applyForce(b,toW(boat.bow),{x:0,y:-b.mass*1.7e-6*lv*lv*Math.min(1,frac*3)});
+  // spray, rooster tail and wake
+  if(frac>0.02&&vx>3){
+    const st=toW(boat.stern),sy=surf(st.x),k=Math.min(1.6,vx/15);
+    if(st.y>sy-25)for(let i=0;i<3;i++)state.fx.push({x:st.x+Math.random()*10,y:sy,vx:-vx*0.35+(Math.random()-.5)*3,vy:-(2+Math.random()*7)*k,life:26+Math.random()*16,r:3+Math.random()*5});
+    const sub=clipUnder(worldPoly(b,boat.poly),surf);let fx=-1e9;for(const q of sub)if(q.x>fx)fx=q.x;
+    if(sub.length>2)for(let i=0;i<2;i++)state.fx.push({x:fx,y:surf(fx)-2,vx:vx*0.25+Math.random()*2,vy:-(1.5+Math.random()*5)*k,life:18+Math.random()*12,r:2+Math.random()*4});
+    if(tick%2===0)state.wake.push({x:st.x,life:110});
+  }
+  for(const q of state.fx){q.x+=q.vx;q.y+=q.vy;q.vy+=0.38;q.vx*=0.98;q.life--}
+  state.fx=state.fx.filter(q=>q.life>0&&q.y<surf(q.x)+6);
+  for(const w of state.wake)w.life--;
+  state.wake=state.wake.filter(w=>w.life>0);
+  for(const d of debris){float(d.b,d.b.vertices,d.A,-0.3,0.03);if(Matter.Bounds.overlaps(d.b.bounds,b.bounds))d.touch=(d.touch||0)+1}
+  for(const r of rogues)r.x-=r.v;
+  rogues=rogues.filter(r=>r.x>b.position.x-1500);
+  if(tick>=state.next){spawnDebris(b.position.x+1700+rand()*400+Math.min(2500,vx*60));state.next=tick+Math.max(45,120-m*0.06)*(0.7+rand()*0.6)}
+  if(m>60&&tick>=state.nextRogue){rogues.push({x:b.position.x+2600,w:110+rand()*90,a:(30+m*0.15)*(0.6+rand()*0.5),v:2.2});state.nextRogue=tick+Math.max(200,520-m*0.4)*(0.7+rand()*0.6)}
+  Engine.update(engine,1000/60);
+  clampV(b,90);for(const d of debris)clampV(d.b,40);
+  debris=debris.filter(d=>{if(d.b.position.x<b.position.x-1400||d.touch>35){Composite.remove(engine.world,d.b);return false}return true});
+  if(b.position.x>state.maxX+1){state.maxX=b.position.x;state.stall=0}else state.stall++;
+  const up=Math.cos(b.angle);
+  if(up<-0.1)state.cap++;else state.cap=Math.max(0,state.cap-2);
+  if(frac>0.97)state.sink++;else state.sink=Math.max(0,state.sink-2);
+  if(state.cap>80)endRun('전복');
+  else if(state.stall>420)endRun('멈춤');
+  else if(state.sink>150||b.position.y>surf(b.position.x)+600)endRun('침몰');
+}
+function endRun(why){
+  if(state.over)return;state.over=true;
+  const m=meters();state.newRec=m>best;
+  if(state.newRec){best=m;store.set('doodle-boat-best',String(best))}
+  $('rwhy').textContent=why;
+  $('rdist').textContent=m.toFixed(1)+' m';$('rnew').hidden=!state.newRec;
+  $('rbest').textContent=state.newRec?'':`최고 기록 ${best.toFixed(1)} m`;
+  const tips=why==='멈춤'?['통나무에 막혔어요. 뱃머리를 위로 올려 그리면 타고 넘어가요.','바닥이 평평하면 장애물을 밀기만 해요. 앞쪽을 비스듬히 깎아보세요.']:why==='침몰'?['선체를 더 크게 그리면 부력이 커져요.','구조물이 무거우면 물에 깊이 잠겨요.']
+    :['선체 바닥을 넓고 평평하게 그리면 덜 뒤집혀요.','돛대처럼 높은 구조물은 큰 파도에서 배를 넘어뜨려요.','길쭉한 선체는 파도를 타고 넘기 좋아요.','앞쪽을 높게 올리면 통나무를 타고 넘어가요.'];
+  $('rtip').textContent=tips[Math.floor(Math.random()*tips.length)];
+  $('warn').hidden=true;$('over').hidden=false;$('again').focus();
+}
+
+/* ---------- render ---------- */
+const gc=$('gc'),gx=gc.getContext('2d');let W=0,Hh=0,raf=0,last=0,acc=0;
+function fitGame(){const d=devicePixelRatio||1;W=innerWidth;Hh=innerHeight;gc.width=Math.round(W*d);gc.height=Math.round(Hh*d)}
+addEventListener('resize',()=>{if(!$('run').hidden)fitGame()});
+function frame(t){
+  const dt=Math.min(60,t-last);last=t;
+  if(!state.over){acc+=dt;while(acc>=1000/60){step();acc-=1000/60;if(state.over)break}}
+  render();raf=requestAnimationFrame(frame);
+}
+function path(pts,close){gx.beginPath();pts.forEach((p,i)=>i?gx.lineTo(p.x,p.y):gx.moveTo(p.x,p.y));if(close)gx.closePath()}
+function render(){
+  const d=devicePixelRatio||1,b=boat.body,vx=Math.max(0,b.velocity.x),sp=Math.min(1,vx/30);
+  const z0=Math.max(0.3,Math.min(1.1,Math.min(W/1100,Hh/650))),zt=z0*(1-0.16*sp);
+  state.z=state.z?state.z+(zt-state.z)*0.03:zt;const z=state.z;
+  state.cam.x+=(b.position.x+(160+220*sp)-state.cam.x)*0.2;state.cam.y+=((b.position.y-60)*0.5-state.cam.y)*0.05;
+  gx.setTransform(d,0,0,d,0,0);
+  const hy=Hh*0.5-state.cam.y*z;
+  const g=gx.createLinearGradient(0,0,0,Math.max(40,hy));g.addColorStop(0,'#2f8fe0');g.addColorStop(0.65,'#79c3f2');g.addColorStop(1,'#cfeefc');
+  gx.fillStyle=g;gx.fillRect(0,0,W,Hh);
+  // clouds (parallax)
+  const span=W+700;
+  for(const c of state.clouds){
+    const sx=(((c.x-state.cam.x*c.p)%span)+span)%span-350,sy=c.y*Hh;
+    gx.fillStyle='rgba(255,255,255,'+(0.55+c.p*1.2)+')';
+    for(const bl of c.blobs){gx.beginPath();gx.arc(sx+bl.dx,sy+bl.dy,bl.r,0,7);gx.fill()}
+    gx.fillStyle='rgba(205,228,246,.7)';gx.beginPath();gx.ellipse(sx,sy+6*c.sc,c.blobs.length*17*c.sc,9*c.sc,0,0,7);gx.fill();
+  }
+  // far sea
+  gx.fillStyle='#2c80c4';gx.fillRect(0,hy-26*z,W,Hh);
+  gx.fillStyle='rgba(255,255,255,.35)';gx.fillRect(0,hy-26*z,W,2);
+  // speed lines
+  if(!state.over&&vx>5&&Math.random()<sp*0.9)state.lines.push({x:W+20,y:Math.random()*Math.max(60,hy-40),l:60+Math.random()*160*sp,v:28+40*sp});
+  gx.strokeStyle='rgba(255,255,255,.7)';gx.lineWidth=2;gx.beginPath();
+  for(const L of state.lines){L.x-=L.v;gx.moveTo(L.x,L.y);gx.lineTo(L.x+L.l,L.y)}gx.stroke();
+  state.lines=state.lines.filter(L=>L.x+L.l>0);
+
+  gx.setTransform(d*z,0,0,d*z,d*(W/2-state.cam.x*z),d*(Hh*0.5-state.cam.y*z));
+  const vx0=state.cam.x-W/2/z-40,vx1=state.cam.x+W/2/z+40,bottom=state.cam.y+Hh/z;
+  gx.lineCap='round';gx.lineJoin='round';
+  // distance buoys and best line
+  gx.font=`${Math.round(14/z*0.8)}px Bungee, Impact, sans-serif`;gx.textAlign='center';
+  const s25=25*PX_PER_M;
+  for(let x=Math.ceil((vx0-boat.startX)/s25)*s25+boat.startX;x<vx1;x+=s25){const m=Math.round((x-boat.startX)/PX_PER_M);if(m<=0)continue;const y=surf(x);
+    gx.fillStyle='#e8433a';gx.fillRect(x-9,y-34,18,40);gx.fillStyle='#fff';gx.fillRect(x-9,y-22,18,9);
+    gx.strokeStyle='#123';gx.lineWidth=3;gx.beginPath();gx.moveTo(x,y-34);gx.lineTo(x,y-60);gx.stroke();
+    gx.fillStyle='#0b3a63';gx.fillText(m+'m',x,y-70)}
+  if(best>0){const x=boat.startX+best*PX_PER_M;if(x>vx0&&x<vx1){const y=surf(x);gx.strokeStyle='#c2410c';gx.lineWidth=3/z;gx.setLineDash([12,10]);gx.beginPath();gx.moveTo(x,y+20);gx.lineTo(x,y-240);gx.stroke();gx.setLineDash([]);gx.fillStyle='#c2410c';gx.fillText('최고 '+best.toFixed(0)+'m',x,y-252)}}
+  // debris
+  for(const db of debris){const v=db.b.vertices;path(v,true);gx.fillStyle=db.kind==='barrel'?C.barrel:C.wood;gx.fill();gx.strokeStyle='#1a1208';gx.lineWidth=3;gx.stroke();
+    if(db.kind==='barrel'){gx.strokeStyle='#f3d9a0';gx.lineWidth=2.5;gx.beginPath();gx.arc(db.b.position.x,db.b.position.y,db.b.circleRadius*0.6,db.b.angle,db.b.angle+Math.PI);gx.stroke()}}
+  // boat
+  const wp=worldPoly(b,boat.poly);
+  path(wp,false);gx.strokeStyle=C.signal;gx.lineWidth=11;gx.stroke();
+  gx.strokeStyle='#123';gx.lineWidth=7;for(const dk of boat.deck){path(worldPoly(b,dk),false);gx.stroke()}
+  // water
+  gx.beginPath();gx.moveTo(vx0,bottom);for(let x=vx0;x<=vx1;x+=10)gx.lineTo(x,surf(x));gx.lineTo(vx1,bottom);gx.closePath();
+  const wg=gx.createLinearGradient(0,state.cam.y-60,0,bottom);wg.addColorStop(0,'rgba(30,140,215,.78)');wg.addColorStop(1,'rgba(10,60,120,.95)');
+  gx.fillStyle=wg;gx.fill();
+  // wake foam
+  for(const w of state.wake){if(w.x<vx0||w.x>vx1)continue;const a=w.life/110,y=surf(w.x);gx.strokeStyle='rgba(255,255,255,'+(a*0.8)+')';gx.lineWidth=(10*a+3);gx.beginPath();gx.moveTo(w.x-14,y+2);gx.lineTo(w.x+14,y+2);gx.stroke()}
+  gx.strokeStyle='#fff';gx.lineWidth=3/z*0.9;gx.beginPath();for(let x=vx0;x<=vx1;x+=10)x===vx0?gx.moveTo(x,surf(x)):gx.lineTo(x,surf(x));gx.stroke();
+  // spray
+  for(const q of state.fx){gx.fillStyle='rgba(255,255,255,'+Math.min(1,q.life/20)+')';gx.beginPath();gx.arc(q.x,q.y,q.r,0,7);gx.fill()}
+  $('spd').textContent=Math.round(vx*60/PX_PER_M*3.6*2.2)+' km/h';
+  // HUD
+  $('dist').firstChild.nodeValue=meters().toFixed(1);
+  const w=$('warn');
+  if(state.over)w.hidden=true;
+  else if(state.cap>10){w.hidden=false;w.textContent='뒤집히는 중!'}
+  else if(Math.abs(Math.sin(b.angle))>0.75&&Math.cos(b.angle)>-0.1){w.hidden=false;w.textContent='기울어짐!'}
+  else if(state.sink>40){w.hidden=false;w.textContent='가라앉는 중!'}
+  else w.hidden=true;
+}
+
+/* ---------- controls ---------- */
+$('quit').onclick=()=>endRun('항해 중단');
+$('again').onclick=()=>startRun();
+$('fix').onclick=()=>{cancelAnimationFrame(raf);$('run').hidden=true;$('edit').hidden=false;$('ebest').textContent=best.toFixed(1)+' m';drawEditor();status()};
+$('go').onclick=()=>{
+  if(!hull)return say('선체를 먼저 그려주세요',true);
+  const s=stats();if(s.line===null)return say('이대로면 가라앉아요. 선체를 키우거나 구조물을 줄이세요',true);
+  store.set('doodle-boat-design2',JSON.stringify({hull,deck}));startRun();
+};
+$('ebest').textContent=best.toFixed(1)+' m';
+drawEditor();status();
+</script>
+
+</body></html>

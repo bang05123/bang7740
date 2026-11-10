@@ -1,0 +1,2181 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>IRON VECTOR</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&family=Saira+Stencil+One&display=swap">
+<style>
+/* 레이아웃: 상단 단계 내비 + 4개 화면(격납고 / 출격 준비 / 전장 / 결과). 전장은 좌 시트 · 중앙 육각 맵 · 우 시트 + 하단 로그. */
+:root {
+  color-scheme: dark;
+  --ground: #101416;
+  --ground-2: #151b1d;
+  --panel: #1a2124;
+  --panel-2: #222b2e;
+  --line: #34403f;
+  --line-2: #4b5c58;
+  --ink: #dde2d4;
+  --ink-dim: #8f9c95;
+  --signal: #e3a72f;
+  --signal-ink: #1b1405;
+  --ally: #5fbad0;
+  --foe: #e2674f;
+  --ok: #9cc153;
+  --warn: #e3a72f;
+  --bad: #e2674f;
+  --f-display: 'Saira Stencil One', 'Barlow Condensed', 'Noto Sans KR', sans-serif;
+  --f-label: 'Barlow Condensed', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --f-body: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 14px;
+  line-height: 1.5;
+  padding-inline: 16px;
+  padding-block: 0 28px;
+  background-image:
+    linear-gradient(var(--ground-2) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ground-2) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+h1, h2, h3, p { margin: 0; }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.dim { color: var(--ink-dim); }
+
+/* ---------- 상단 ---------- */
+.top { max-width: 1480px; margin: 0 auto; padding-block: 14px 12px; display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); position: relative; }
+.top::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 4px; background: repeating-linear-gradient(-45deg, var(--signal) 0 8px, #15191a 8px 16px); opacity: .85; }
+.brand { font-family: var(--f-display); font-size: 26px; letter-spacing: .06em; line-height: 1; }
+.brand small { font-family: var(--f-label); font-size: 12px; letter-spacing: .22em; color: var(--ink-dim); display: block; margin-top: 4px; font-weight: 500; }
+.steps { display: flex; flex-wrap: wrap; gap: 6px; }
+.step { background: transparent; border: 1px solid var(--line); padding: 5px 12px; font-family: var(--f-label); font-size: 15px; font-weight: 600; letter-spacing: .06em; color: var(--ink-dim); border-radius: 2px; }
+.step b { font-family: var(--f-mono); font-weight: 500; margin-right: 6px; color: var(--ink-dim); }
+.step:hover:not(:disabled) { border-color: var(--line-2); color: var(--ink); }
+.step.on { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); }
+.step.on b { color: var(--signal-ink); }
+.step:disabled { opacity: .35; cursor: not-allowed; }
+
+main { max-width: 1480px; margin: 0 auto; padding-top: 18px; }
+
+/* ---------- 패널 / 공용 ---------- */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 2px; min-width: 0; }
+.ph { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 8px 12px; border-bottom: 1px dashed var(--line); font-family: var(--f-label); font-size: 14px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.ph .ser { font-family: var(--f-mono); font-weight: 400; font-size: 11px; letter-spacing: .06em; color: var(--ink-dim); }
+.pb { padding: 12px; }
+.stack { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 2px; padding: 7px 14px; font-family: var(--f-label); font-size: 15px; font-weight: 600; letter-spacing: .05em; line-height: 1.2; }
+.btn:hover:not(:disabled) { border-color: var(--signal); }
+.btn:disabled { opacity: .38; cursor: not-allowed; }
+.btn.primary { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); font-weight: 700; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn.warn { border-color: var(--bad); color: var(--bad); }
+.btn.sm { padding: 3px 9px; font-size: 14px; }
+.btn.tiny { padding: 1px 7px; font-size: 13px; min-width: 28px; }
+.banner { padding: 8px 12px; border: 1px solid var(--line-2); border-radius: 2px; font-size: 13px; }
+.banner.ok { border-color: var(--ok); color: var(--ok); }
+.banner.bad { border-color: var(--bad); color: var(--bad); }
+.tag { display: inline-block; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .04em; padding: 0 5px; border: 1px solid var(--line-2); border-radius: 2px; color: var(--ink-dim); line-height: 1.5; }
+.tag.MG { color: #d6c27a; border-color: #6e6430; }
+.tag.MSL { color: #e59a6c; border-color: #7a4a30; }
+.tag.BEAM { color: #7dd0e0; border-color: #2f6a77; }
+.tag.HMR { color: #d98c9a; border-color: #763a47; }
+.tag.off { opacity: .45; text-decoration: line-through; }
+.tabular { font-variant-numeric: tabular-nums; }
+#toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #0c0f10; border: 1px solid var(--signal); color: var(--ink); padding: 8px 16px; border-radius: 2px; font-size: 13px; z-index: 50; max-width: 90vw; }
+
+/* ---------- 격납고 ---------- */
+.hangar { display: grid; grid-template-columns: minmax(250px, 310px) minmax(300px, 1fr) minmax(290px, 370px); gap: 14px; align-items: start; }
+.massnum { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--f-mono); }
+.massnum big { font-size: 30px; font-weight: 600; line-height: 1; }
+.massnum.over big { color: var(--bad); }
+.massbar { display: flex; height: 16px; margin: 10px 0 8px; border: 1px solid var(--line-2); background: repeating-linear-gradient(-45deg, #1d2427 0 5px, #232c30 5px 10px); overflow: hidden; }
+.massbar i { display: block; height: 100%; min-width: 0; }
+.seg-frame { background: #56676a; } .seg-drive { background: #7b8c88; } .seg-weap { background: var(--signal); }
+.seg-cool { background: var(--ally); } .seg-armor { background: var(--ok); }
+.legend { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; font-size: 13px; }
+.legend span.k { display: flex; align-items: center; gap: 7px; }
+.legend span.k::before { content: ''; width: 10px; height: 10px; background: var(--c, #888); }
+.legend .tot { border-top: 1px solid var(--line); padding-top: 4px; margin-top: 3px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-family: var(--f-label); font-size: 12px; letter-spacing: .14em; color: var(--ink-dim); text-transform: uppercase; }
+.field input { background: #0f1415; border: 1px solid var(--line-2); border-radius: 2px; padding: 6px 9px; color: var(--ink); font-family: var(--f-label); font-size: 17px; font-weight: 600; width: 100%; }
+.errs { display: flex; flex-direction: column; gap: 4px; }
+
+.schem { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.part { text-align: left; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 2px; padding: 8px 9px; min-width: 0; position: relative; display: flex; flex-direction: column; gap: 4px; }
+.part:hover { border-color: var(--ink-dim); }
+.part.sel { border-color: var(--signal); box-shadow: 0 0 0 1px var(--signal) inset; }
+.part .code { font-family: var(--f-mono); font-size: 11px; color: var(--ink-dim); letter-spacing: .08em; }
+.part .pname { font-family: var(--f-label); font-size: 15px; font-weight: 700; line-height: 1.1; }
+.part .nums { font-family: var(--f-mono); font-size: 12px; }
+.part .chips { display: flex; flex-wrap: wrap; gap: 3px; min-height: 18px; }
+.pos-HD { grid-column: 3; } .pos-LA { grid-column: 1; grid-row: 2; } .pos-LT { grid-column: 2; grid-row: 2; }
+.pos-CT { grid-column: 3; grid-row: 2; } .pos-RT { grid-column: 4; grid-row: 2; } .pos-RA { grid-column: 5; grid-row: 2; }
+.pos-LL { grid-column: 2 / span 1; grid-row: 3; } .pos-RL { grid-column: 4; grid-row: 3; }
+.pos-HD { grid-row: 1; }
+.bar { height: 6px; background: #0e1213; border: 1px solid var(--line); position: relative; overflow: hidden; }
+.bar > i { position: absolute; inset: 0 auto 0 0; background: var(--ok); }
+.bar.st > i { background: var(--ally); }
+.bar.low > i { background: var(--bad); } .bar.mid > i { background: var(--warn); }
+
+.ed-armor { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ed-armor .val { font-family: var(--f-mono); font-size: 22px; min-width: 70px; text-align: center; }
+.mlist { display: flex; flex-direction: column; gap: 6px; }
+.mrow { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 6px 8px; border: 1px solid var(--line); background: var(--panel-2); }
+.mrow .nm { font-weight: 500; min-width: 0; }
+.mrow .sub { font-size: 12px; color: var(--ink-dim); }
+.cat { display: flex; flex-direction: column; gap: 8px; }
+.cat .w { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 8px; border: 1px solid var(--line); background: var(--panel-2); }
+.cat .w .stats { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px 12px; font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-dim); }
+.gobar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-top: 14px; }
+
+/* ---------- 출격 준비 ---------- */
+.brief { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.brief .panel.ally .ph { color: var(--ally); } .brief .panel.foe .ph { color: var(--foe); }
+.kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.kv div { border: 1px solid var(--line); padding: 6px 8px; background: var(--panel-2); }
+.kv span { display: block; font-size: 11px; color: var(--ink-dim); letter-spacing: .1em; font-family: var(--f-label); text-transform: uppercase; }
+.kv b { font-family: var(--f-mono); font-size: 17px; font-weight: 500; }
+table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.t th { text-align: left; font-family: var(--f-label); font-size: 12px; letter-spacing: .1em; color: var(--ink-dim); font-weight: 600; padding: 3px 6px; border-bottom: 1px solid var(--line); }
+table.t td { padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.t td.n { font-family: var(--f-mono); }
+.pick { display: flex; flex-wrap: wrap; gap: 8px; }
+.pick .btn.on { background: var(--foe); border-color: var(--foe); color: #1c0905; }
+.scroll-x { overflow-x: auto; }
+
+/* ---------- 전장 ---------- */
+.battle { display: grid; grid-template-columns: minmax(260px, 330px) minmax(0, 1fr) minmax(260px, 330px); gap: 14px; align-items: start; grid-template-areas: "pl mid en" "log log log"; }
+.a-pl { grid-area: pl; } .a-mid { grid-area: mid; } .a-en { grid-area: en; } .a-log { grid-area: log; }
+.status { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; padding: 8px 12px; }
+.status .big { font-family: var(--f-display); font-size: 20px; letter-spacing: .05em; }
+.chip { font-family: var(--f-label); font-weight: 700; font-size: 13px; letter-spacing: .12em; padding: 2px 9px; border: 1px solid var(--line-2); border-radius: 2px; color: var(--ink-dim); }
+.chip.ally { color: var(--ally); border-color: var(--ally); } .chip.foe { color: var(--foe); border-color: var(--foe); }
+.chip.on { background: var(--signal); color: var(--signal-ink); border-color: var(--signal); }
+.mapwrap { padding: 8px; }
+svg.hex { width: 100%; height: auto; max-height: 72vh; display: block; }
+.hx { fill: #1e282a; stroke: #3b4a48; stroke-width: 1; }
+.hx.rub { fill: url(#rubble); stroke: #6a5b3a; }
+.hx.rng { fill: #263433; }
+.hx.rub.rng { fill: url(#rubble); }
+.hx.reach { fill: #3a3217; stroke: var(--signal); stroke-width: 2; cursor: pointer; }
+.hx.reach:hover { fill: #54461b; }
+.hxt { font-family: var(--f-mono); font-size: 8.5px; fill: #596866; pointer-events: none; }
+.hxc { font-family: var(--f-mono); font-size: 12px; fill: var(--signal); pointer-events: none; font-weight: 600; }
+.tok-base { stroke-width: 2.5; }
+.tok.ally .tok-base { fill: #15343c; stroke: var(--ally); } .tok.foe .tok-base { fill: #40201a; stroke: var(--foe); }
+.tok.ally .tok-arrow { fill: var(--ally); } .tok.foe .tok-arrow { fill: var(--foe); }
+.tok-text { font-family: var(--f-mono); font-size: 11px; font-weight: 600; fill: var(--ink); text-anchor: middle; pointer-events: none; }
+.tok-hp { fill: #0c1011; stroke: #44524f; stroke-width: .8; } .tok-hpv { fill: var(--ok); }
+.tok.dead .tok-base { fill: #222; stroke: #555; } .tok.dead .tok-text, .tok.dead .tok-arrow { fill: #666; }
+.ring { fill: none; stroke: var(--foe); stroke-width: 2; stroke-dasharray: 5 4; }
+.legendmap { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--ink-dim); padding: 0 4px 4px; }
+.actbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 10px 12px; }
+.hint { font-size: 13px; color: var(--ink-dim); flex: 1 1 220px; min-width: 0; }
+.endbanner { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: center; }
+
+.sheet .pb { display: flex; flex-direction: column; gap: 12px; }
+.doll { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.dp { background: var(--panel-2); border: 1px solid var(--line-2); padding: 4px 4px 5px; min-width: 0; position: relative; display: flex; flex-direction: column; gap: 2px; }
+.dp .cd { font-family: var(--f-mono); font-size: 10px; color: var(--ink-dim); display: flex; justify-content: space-between; }
+.dp .n { font-family: var(--f-mono); font-size: 10.5px; line-height: 1.25; }
+.dp .chips { display: flex; flex-wrap: wrap; gap: 2px; min-height: 15px; }
+.dp.hit { animation: flash .9s ease-out 1; }
+.dp.dead { border-color: var(--bad); background: repeating-linear-gradient(-45deg, #2a1815 0 5px, #1d1210 5px 10px); }
+.dp.dead::after { content: '파괴'; position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--f-label); font-weight: 700; font-size: 13px; letter-spacing: .1em; color: var(--bad); background: rgba(16, 10, 9, .55); }
+@keyframes flash { 0% { background: #7a2f22; } 100% { background: var(--panel-2); } }
+.heat { display: flex; flex-direction: column; gap: 4px; }
+.heat .hb { height: 12px; position: relative; background: #0e1213; border: 1px solid var(--line-2); }
+.heat .hb i { position: absolute; inset: 0 auto 0 0; background: var(--ok); }
+.heat .hb i.mid { background: var(--warn); } .heat .hb i.hot { background: var(--bad); }
+.heat .hb u { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); }
+.heat .hl { display: flex; justify-content: space-between; font-size: 12px; font-family: var(--f-mono); }
+.wlist { display: flex; flex-direction: column; gap: 5px; }
+.wrow { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 8px; align-items: center; padding: 5px 7px; border: 1px solid var(--line); background: var(--panel-2); font-size: 12.5px; }
+.wrow.pickable { cursor: pointer; }
+.wrow.pickable:hover { border-color: var(--ink-dim); }
+.wrow.picked { border-color: var(--signal); box-shadow: 0 0 0 1px var(--signal) inset; }
+.wrow.dis { opacity: .5; cursor: not-allowed; }
+.wrow .a { font-family: var(--f-mono); font-size: 12px; text-align: right; }
+.wrow .s2 { grid-column: 2 / -1; font-size: 11.5px; color: var(--ink-dim); font-family: var(--f-mono); }
+.wrow input { accent-color: var(--signal); width: 16px; height: 16px; margin: 0; }
+
+.dice { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.shot { border: 1px solid var(--line); background: var(--panel-2); padding: 8px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.shot .who { flex: 1 1 150px; min-width: 0; font-weight: 500; }
+.shot .who small { display: block; font-family: var(--f-mono); font-size: 11px; color: var(--ink-dim); font-weight: 400; }
+.dg { display: flex; align-items: center; gap: 5px; font-family: var(--f-mono); font-size: 12.5px; }
+.die { width: 30px; height: 30px; border-radius: 5px; background: #e6e9dc; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 4px; gap: 1px; animation: tumble .55s ease-out 1; }
+.die i { border-radius: 50%; } .die i.on { background: #151a1c; }
+.die.loc { background: #cfd9db; }
+@keyframes tumble { 0% { transform: rotate(-200deg) scale(.5); opacity: .2; } 70% { transform: rotate(12deg) scale(1.08); opacity: 1; } 100% { transform: none; } }
+.res { font-family: var(--f-label); font-weight: 700; letter-spacing: .08em; font-size: 15px; padding: 1px 8px; border: 1px solid currentColor; }
+.res.hit { color: var(--ok); } .res.miss { color: var(--ink-dim); }
+.steps2 { flex-basis: 100%; font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-dim); display: flex; flex-direction: column; gap: 1px; }
+.steps2 .k { color: var(--bad); }
+
+.log { height: 260px; overflow-y: auto; padding: 8px 12px; font-family: var(--f-mono); font-size: 12px; line-height: 1.55; display: flex; flex-direction: column; }
+.log p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.log .sys { color: var(--signal); margin-top: 6px; }
+.log .move { color: var(--ink-dim); }
+.log .roll { color: var(--ink); }
+.log .hit { color: var(--ok); } .log .miss { color: var(--ink-dim); }
+.log .dmg { color: #c9b9a6; }
+.log .crit, .log .kill { color: var(--bad); }
+.log .team-player.roll:first-of-type { color: var(--ally); }
+
+/* ---------- 결과 ---------- */
+.result { display: flex; flex-direction: column; gap: 14px; }
+.verdict { padding: 22px 18px; text-align: center; border: 1px solid var(--line-2); background: repeating-linear-gradient(-45deg, var(--panel) 0 14px, #1d2528 14px 28px); }
+.verdict h2 { font-family: var(--f-display); font-size: clamp(34px, 7vw, 64px); letter-spacing: .06em; line-height: 1.05; }
+.verdict.win h2 { color: var(--ok); } .verdict.lose h2 { color: var(--bad); } .verdict.draw h2 { color: var(--warn); }
+.verdict p { color: var(--ink-dim); margin-top: 6px; }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+
+/* ---------- 반응형 ---------- */
+@media (max-width: 1100px) {
+  .hangar { grid-template-columns: minmax(0, 1fr); }
+  .battle { grid-template-columns: minmax(0, 1fr); grid-template-areas: "mid" "pl" "en" "log"; }
+}
+@media (max-width: 760px) {
+  .brief, .two { grid-template-columns: minmax(0, 1fr); }
+  .schem { gap: 5px; }
+  .part { padding: 5px; }
+  .part .pname { font-size: 13px; }
+  .part .nums { font-size: 10.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .die, .dp.hit { animation: none; }
+}
+
+/* ---------- v2: 메카 그래픽 / 효과 / 정밀 사격 ---------- */
+.tok { pointer-events: none; }                       /* 메카 그래픽이 타일 클릭을 가로막지 않는다 */
+.tok .mp.aimable { pointer-events: all; cursor: crosshair; }
+.tok-shadow { fill: #000; opacity: .35; }
+.tok.dead .tok-shadow { opacity: .55; }
+.tok-text { font-family: var(--f-mono); font-size: 9px; font-weight: 600; fill: var(--ink-dim); text-anchor: middle; }
+.tok-hp { fill: #0c1011; stroke: #44524f; stroke-width: .8; }
+.tok-hpv { fill: var(--ok); }
+.tok.ally .tok-text { fill: var(--ally); } .tok.foe .tok-text { fill: var(--foe); }
+.mechrot { transition: transform .25s ease-out; }
+.mp.aimable:hover { filter: brightness(1.35) drop-shadow(0 0 2px var(--signal)); }
+.mp.aimed { filter: drop-shadow(0 0 2.5px var(--signal)) brightness(1.25); }
+.mp:focus-visible { outline: none; filter: drop-shadow(0 0 3px #fff); }
+.wp[data-lost="1"] { opacity: .9; }
+.lens { animation: lens 1.6s ease-in-out infinite alternate; }
+@keyframes lens { from { opacity: .65; } to { opacity: 1; } }
+.spark { fill: #ffd27a; animation: spk .6s steps(2, end) infinite; }
+@keyframes spk { 0% { opacity: 1; } 50% { opacity: .1; } 100% { opacity: 1; } }
+.smoke { fill: #8d9391; opacity: 0; transform-box: fill-box; transform-origin: center; animation: smk 2.4s linear infinite; }
+@keyframes smk { 0% { opacity: 0; transform: translate(0, 0) scale(.5); } 15% { opacity: .55; } 100% { opacity: 0; transform: translate(2px, -16px) scale(2.1); } }
+.flame { fill: #ff8a2b; opacity: .9; transform-box: fill-box; transform-origin: 50% 100%; animation: flk .32s ease-in-out infinite alternate; }
+@keyframes flk { from { transform: scaleY(.75) scaleX(.9); } to { transform: scaleY(1.2) scaleX(1.05); } }
+.reticle circle { fill: none; stroke: var(--signal); stroke-width: 1.4; stroke-dasharray: 4 3; transform-box: fill-box; transform-origin: center; animation: spin 4s linear infinite; }
+.reticle path { fill: none; stroke: var(--signal); stroke-width: 1.6; stroke-linecap: round; }
+@keyframes spin { to { transform: rotate(360deg); } }
+body.noanim .smoke, body.noanim .flame, body.noanim .spark, body.noanim .lens, body.noanim .reticle circle { animation: none; }
+body.noanim .smoke { opacity: .35; }
+body.noanim .mechrot { transition: none; }
+@media (prefers-reduced-motion: reduce) { .smoke, .flame, .spark, .lens, .reticle circle { animation: none; } .smoke { opacity: .35; } }
+
+.btn.on { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); }
+.step.fxt { margin-left: 6px; }
+.dp.aimable { cursor: pointer; }
+.dp.aimable:hover { border-color: var(--signal); }
+.dp.aim { outline: 2px solid var(--signal); outline-offset: -1px; background: #2c2a1c; }
+.dp.dead.aimable { cursor: not-allowed; }
+.aiminfo { border: 1px dashed var(--signal); padding: 6px 9px; font-size: 12.5px; color: var(--ink); }
+.aiminfo b { color: var(--signal); }
+table.plan td.m { font-family: var(--f-mono); font-size: 11px; color: var(--ink-dim); min-width: 200px; }
+table.plan tr.sel td { background: #2c2a1c; }
+table.plan tr.off td { opacity: .5; }
+.pv { display: block; width: min(180px, 52%); height: auto; margin: 0 auto 2px; background: radial-gradient(circle, #202a2c 0%, transparent 70%); }
+.pvcap { text-align: center; font-size: 12px; margin-bottom: 10px; }
+
+.tok.dead .mp { filter: grayscale(.85) brightness(.6); }
+.tok.dead .lens, .tok.dead .spark { animation: none; }
+
+/* ===== v3: 2대2 전투 ===== */
+.roster { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.ru { background: var(--panel); border: 1px solid var(--line-2); border-left-width: 4px; padding: 5px 7px 6px; min-width: 0; cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
+.ru.ally { border-left-color: var(--ally); } .ru.foe { border-left-color: var(--foe); }
+.ru:hover { background: var(--panel-2); }
+.ru.sel { outline: 2px solid var(--signal); outline-offset: -2px; }
+.ru.tgt { background: #2b1f1b; }
+.ru .rn { font-family: var(--f-label); font-weight: 700; font-size: 13.5px; letter-spacing: .03em; display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+.ru.ally .rn b { color: var(--ally); } .ru.foe .rn b { color: var(--foe); }
+.ru .rs { margin-left: auto; font-size: 11px; letter-spacing: .08em; padding: 0 5px; border: 1px solid var(--line-2); color: var(--ink-dim); border-radius: 2px; white-space: nowrap; }
+.ru.st-wait .rs { color: var(--ink); } .ru.st-mv .rs { color: var(--signal); border-color: var(--signal); }
+.ru.st-act .rs { background: var(--signal); color: var(--signal-ink); border-color: var(--signal); }
+.ru.st-done .rs { color: var(--ok); border-color: var(--ok); }
+.ru.st-dead { opacity: .6; } .ru.st-dead .rs { color: var(--bad); border-color: var(--bad); }
+.ru .rm { font-family: var(--f-mono); font-size: 10.5px; color: var(--ink-dim); line-height: 1.35; }
+.ru .rm b { color: var(--ink); } .ru .rm em { color: var(--bad); font-style: normal; }
+.selhit { fill: transparent; pointer-events: all; cursor: pointer; }
+.selhit:focus-visible { stroke: var(--signal); stroke-width: 2; outline: none; }
+.tgtring { fill: none; stroke: var(--signal); stroke-width: 2.2; }
+.actring { fill: none; stroke: #fff; stroke-width: 1.6; stroke-dasharray: 3 3; animation: actspin 1.6s linear infinite; transform-origin: center; }
+@keyframes actspin { to { stroke-dashoffset: -12; } }
+.tok.fin .spr, .tok.fin .mechrot { opacity: .62; }
+.tok.aiunit .tok-text { fill: #a9c0ff; }
+body.noanim .actring { animation: none; }
+@media (max-width: 1100px) { .roster { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .roster { grid-template-columns: minmax(0, 1fr); } }
+
+</style>
+<header class="top">
+  <div class="brand">IRON VECTOR<small>TACTICAL MECH COMMAND · 턴제 메카 전술</small></div>
+  <nav class="steps" id="steps" aria-label="화면 이동"></nav>
+</header>
+<main>
+  <section id="v-hangar" class="view"></section>
+  <section id="v-brief" class="view" hidden></section>
+  <section id="v-battle" class="view" hidden></section>
+  <section id="v-result" class="view" hidden></section>
+</main>
+<script>
+/* =====================================================================
+   IRON VECTOR — rules.js
+   화면(DOM)과 완전히 분리된 전투 규칙. 수치는 전부 CONFIG / WEAPONS / PART_INFO 에서 수정.
+   ===================================================================== */
+const IV = (function () {
+'use strict';
+
+/* ---------- 1. 데이터 (여기 숫자만 바꾸면 밸런스가 바뀝니다) ---------- */
+const CONFIG = {
+  MAX_MASS: 50,          // 최대 질량(t)
+  FRAME_MASS: 7,         // 기본 프레임(t)
+  DRIVE_MASS: 9,         // 구동부(t)
+  ARMOR_PER_TON: 12,     // 장갑 1t = 12점 (총 장갑 질량은 0.5t 단위로 올림)
+  BASE_COOLING: 4,       // 기본 방열량 / 라운드
+  COOLER_MASS: 1,        // 냉각 장치 1기 질량(t)
+  COOLER_POWER: 2,       // 냉각 장치 1기당 추가 방열량
+  MAX_COOLERS: 6,
+  WALK_MP: 4,            // 이동력
+  RUBBLE_COST: 2,        // 잔해 지대 진입 비용
+  MOVE_HEAT: 1,          // 이동 시 열
+  BASE_TARGET: 7,        // 기본 명중 목표치
+  LONG_RANGE_MOD: 2,     // 장거리 사격
+  MOVED_MOD: 1,          // 이동 후 사격
+  COVER_MOD: 1,          // 적이 엄폐 중
+  AIM_MOD: -1,           // 조준 보너스 (이동하지 않고 사격)
+  PRECISE_MOD: { HD: 3, LA: 2, RA: 2, LL: 2, RL: 2, CT: 1, LT: 1, RT: 1 }, // 정밀 사격: 지정 부위별 명중 페널티
+  MIN_TARGET: 4,
+  MAX_TARGET: 12,
+  HEAT_LIMIT: 8,         // 이 값을 넘으면 4점마다 명중 페널티 +1 (최대 +3)
+  CRIT_ROLL_MIN: 10,     // 구조 피해 시 치명타 판정(2D6) 이 값 이상이면 장비 1개 파괴
+  AI_HEAT_CAP: 13,       // 적 AI가 한 번의 사격 후 허용하는 최대 열
+  GRID: 9,
+  MAX_ROUNDS: 40,
+  START_PLAYER: { c: 4, r: 8 },
+  START_ENEMY: { c: 4, r: 0 },
+  START_2V2: { player: [{ c: 3, r: 8 }, { c: 5, r: 8 }], enemy: [{ c: 3, r: 0 }, { c: 5, r: 0 }] }, // [조종 기체, 아군 AI] / [적1, 적2]
+  RUBBLE: [[2, 2], [6, 2], [4, 3], [1, 4], [7, 4], [4, 5], [2, 6], [6, 6]]
+};
+
+const PARTS = ['HD', 'CT', 'LT', 'RT', 'LA', 'RA', 'LL', 'RL'];
+const PART_INFO = {
+  HD: { name: '머리',        internal: 3,  maxArmor: 9,  slots: 1 },
+  CT: { name: '중앙 몸통',   internal: 16, maxArmor: 32, slots: 2 },
+  LT: { name: '왼쪽 몸통',   internal: 12, maxArmor: 24, slots: 3 },
+  RT: { name: '오른쪽 몸통', internal: 12, maxArmor: 24, slots: 3 },
+  LA: { name: '왼팔',        internal: 8,  maxArmor: 16, slots: 2 },
+  RA: { name: '오른팔',      internal: 8,  maxArmor: 16, slots: 2 },
+  LL: { name: '왼쪽 다리',   internal: 12, maxArmor: 24, slots: 0 },
+  RL: { name: '오른쪽 다리', internal: 12, maxArmor: 24, slots: 0 }
+};
+// 이미 파괴된 부위를 맞거나 초과 피해가 남으면 안쪽 부위로 이어진다.
+const TRANSFER = { LT: 'CT', RT: 'CT', LA: 'LT', RA: 'RT', LL: 'LT', RL: 'RT' };
+const FATAL = ['HD', 'CT'];
+
+const WEAPONS = {
+  MG: {
+    id: 'MG', name: 'RV-8 리벳 기관포', short: '기관포', tag: 'MG',
+    mass: 4, range: 6, shortRange: 3, damage: 6, heat: 1, ammo: 18, toHitMod: 0, toHitLabel: '',
+    slots: ['LA', 'RA', 'LT', 'RT', 'CT'],
+    desc: '중간 피해, 낮은 열, 탄약 18발.'
+  },
+  MSL: {
+    id: 'MSL', name: 'HP-6 하이브 미사일 포드', short: '미사일 포드', tag: 'MSL',
+    mass: 5, range: 7, shortRange: 3, damage: 11, heat: 2, ammo: 6, toHitMod: 0, toHitLabel: '',
+    slots: ['LT', 'RT', 'CT'],
+    desc: '높은 피해, 탄약 6발. 몸통에만 장착.'
+  },
+  BEAM: {
+    id: 'BEAM', name: 'ARC-9 선형 빔', short: '에너지 빔', tag: 'BEAM',
+    mass: 5, range: 6, shortRange: 3, damage: 8, heat: 6, ammo: null, toHitMod: -1, toHitLabel: '빔 안정 조준',
+    slots: ['LA', 'RA', 'LT', 'RT', 'CT', 'HD'],
+    desc: '명중 -1, 탄약 없음, 열 6.'
+  },
+  HAMMER: {
+    id: 'HAMMER', name: 'BR-2 파쇄 해머', short: '충격 해머', tag: 'HMR',
+    mass: 3, range: 1, shortRange: 1, damage: 16, heat: 1, ammo: null, toHitMod: 0, toHitLabel: '',
+    slots: ['LA', 'RA'],
+    desc: '인접한 적에게 16 피해. 팔에만 장착.'
+  }
+};
+
+/* ---------- 2. 난수 (주사위 표시와 계산은 같은 값을 쓴다) ---------- */
+let rng = Math.random;
+function setRng(fn) { rng = fn || Math.random; }
+function d6() { return 1 + Math.floor(rng() * 6); }
+function roll2d6() { const a = d6(), b = d6(); return { dice: [a, b], sum: a + b }; }
+function hitLocation(sum) {
+  if (sum <= 2) return 'HD';
+  if (sum === 3) return 'LA';
+  if (sum === 4) return 'RA';
+  if (sum <= 6) return 'LT';
+  if (sum <= 8) return 'CT';
+  if (sum <= 10) return 'RT';
+  if (sum === 11) return 'LL';
+  return 'RL';
+}
+const SUM_COUNTS = { 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 5, 9: 4, 10: 3, 11: 2, 12: 1 };
+function hitChance(target) { // 2D6 >= target 인 확률
+  let n = 0;
+  for (let s = 2; s <= 12; s++) if (s >= target) n += SUM_COUNTS[s];
+  return n / 36;
+}
+
+/* ---------- 3. 설계: 질량과 유효성 ---------- */
+function makeDesign(name, armor, coolers, weapons) {
+  return { name, armor: Object.assign({}, armor), coolers, weapons: weapons.map(w => ({ type: w[0], loc: w[1] })) };
+}
+function cloneDesign(d) { return JSON.parse(JSON.stringify(d)); }
+
+function armorTotal(d) { return PARTS.reduce((s, p) => s + (d.armor[p] || 0), 0); }
+function designMass(d) {
+  const half = CONFIG.ARMOR_PER_TON / 2;
+  const armor = Math.ceil(armorTotal(d) / half - 1e-9) / 2;
+  const weapons = d.weapons.reduce((s, w) => s + WEAPONS[w.type].mass, 0);
+  const coolers = d.coolers * CONFIG.COOLER_MASS;
+  const total = CONFIG.FRAME_MASS + CONFIG.DRIVE_MASS + weapons + coolers + armor;
+  return { frame: CONFIG.FRAME_MASS, drive: CONFIG.DRIVE_MASS, weapons, coolers, armor, total, remaining: CONFIG.MAX_MASS - total };
+}
+function slotsUsed(d, loc) { return d.weapons.filter(w => w.loc === loc).length; }
+function canMount(d, type, loc) {
+  const w = WEAPONS[type];
+  if (!w || !PART_INFO[loc]) return { ok: false, reason: '알 수 없는 무기/부위' };
+  if (!w.slots.includes(loc)) return { ok: false, reason: w.short + '은(는) ' + PART_INFO[loc].name + '에 장착할 수 없음' };
+  if (slotsUsed(d, loc) >= PART_INFO[loc].slots) return { ok: false, reason: PART_INFO[loc].name + ' 슬롯 부족' };
+  return { ok: true };
+}
+function validateDesign(d) {
+  const errors = [];
+  const m = designMass(d);
+  if (m.total > CONFIG.MAX_MASS + 1e-9) errors.push('최대 질량 초과 (' + m.total.toFixed(1) + 't / ' + CONFIG.MAX_MASS + 't)');
+  if (d.weapons.length < 1) errors.push('무기가 최소 1개 필요함');
+  if (!(d.coolers >= 0 && d.coolers <= CONFIG.MAX_COOLERS && Number.isInteger(d.coolers))) errors.push('냉각 장치 수가 올바르지 않음');
+  PARTS.forEach(p => {
+    const a = d.armor[p];
+    if (!Number.isInteger(a) || a < 0 || a > PART_INFO[p].maxArmor) errors.push(PART_INFO[p].name + ' 장갑 값이 올바르지 않음');
+    if (slotsUsed(d, p) > PART_INFO[p].slots) errors.push(PART_INFO[p].name + ' 슬롯 초과');
+  });
+  d.weapons.forEach(w => {
+    if (!WEAPONS[w.type] || !WEAPONS[w.type].slots.includes(w.loc)) errors.push('잘못된 무기 장착: ' + w.type + ' → ' + w.loc);
+  });
+  return { ok: errors.length === 0, errors };
+}
+
+const PRESETS = {
+  VANGUARD: makeDesign('VG-50 뱅가드', { HD: 9, CT: 30, LT: 18, RT: 18, LA: 10, RA: 10, LL: 18, RL: 19 }, 2,
+    [['MG', 'LA'], ['HAMMER', 'RA'], ['MSL', 'LT'], ['BEAM', 'RT'], ['MG', 'CT']]),
+  SKIRMISHER: makeDesign('SK-45 스커미셔', { HD: 9, CT: 26, LT: 14, RT: 14, LA: 8, RA: 8, LL: 20, RL: 21 }, 4,
+    [['BEAM', 'LA'], ['BEAM', 'RA'], ['MSL', 'LT'], ['MSL', 'RT']]),
+  BRAWLER: makeDesign('BR-50 브롤러', { HD: 9, CT: 32, LT: 24, RT: 24, LA: 14, RA: 14, LL: 24, RL: 24 }, 1,
+    [['HAMMER', 'LA'], ['HAMMER', 'RA'], ['MG', 'LT'], ['MG', 'RT'], ['MSL', 'CT']])
+};
+
+/* ---------- 4. 육각 좌표 (pointy-top, odd-r 오프셋) ---------- */
+// 방향: 0=동 1=북동 2=북서 3=서 4=남서 5=남동
+function key(c, r) { return c + ',' + r; }
+function inGrid(c, r) { return c >= 0 && r >= 0 && c < CONFIG.GRID && r < CONFIG.GRID; }
+function toCube(c, r) { const x = c - (r - (r & 1)) / 2; return { x, y: -x - r, z: r }; }
+function hexDist(a, b) {
+  const A = toCube(a.c, a.r), B = toCube(b.c, b.r);
+  return Math.max(Math.abs(A.x - B.x), Math.abs(A.y - B.y), Math.abs(A.z - B.z));
+}
+const DIRS_EVEN = [[1, 0], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1]];
+const DIRS_ODD = [[1, 0], [1, -1], [0, -1], [-1, 0], [0, 1], [1, 1]];
+function neighbors(c, r) {
+  const D = (r & 1) ? DIRS_ODD : DIRS_EVEN;
+  const out = [];
+  D.forEach((d, i) => { const nc = c + d[0], nr = r + d[1]; if (inGrid(nc, nr)) out.push({ c: nc, r: nr, dir: i }); });
+  return out;
+}
+function pixel(c, r) { return { x: Math.sqrt(3) * (c + 0.5 * (r & 1)), y: 1.5 * r }; }
+function facingToward(a, b) {
+  const pa = pixel(a.c, a.r), pb = pixel(b.c, b.r);
+  let ang = Math.atan2(-(pb.y - pa.y), pb.x - pa.x) * 180 / Math.PI;
+  if (ang < 0) ang += 360;
+  return Math.round(ang / 60) % 6;
+}
+// 확장용: 공격이 피격 메카의 어느 방향에서 왔는가 (현재는 규칙 효과 없음, 로그/데이터용)
+function hitArc(target, fromPos) {
+  const diff = (facingToward(target.pos, fromPos) - target.facing + 6) % 6;
+  if (diff === 0 || diff === 1 || diff === 5) return 'front';
+  if (diff === 3) return 'rear';
+  return 'side';
+}
+
+/* ---------- 5. 메카 / 전투 상태 ---------- */
+function createMech(design, team, pos, o) {
+  o = o || {};
+  const id = o.id || team; // 1대1에서는 id = team 이므로 무기 uid 가 기존과 같다 ('player-w0' ...)
+  const parts = {};
+  PARTS.forEach(p => {
+    parts[p] = { armor: design.armor[p], armorMax: design.armor[p], structure: PART_INFO[p].internal, structureMax: PART_INFO[p].internal, destroyed: false };
+  });
+  return {
+    id, team, role: o.role || team, control: o.control || (team === 'player' ? 'player' : 'ai'), tag: o.tag || null,
+    name: design.name, parts,
+    weapons: design.weapons.map((w, i) => ({ uid: id + '-w' + i, type: w.type, loc: w.loc, ammo: WEAPONS[w.type].ammo, destroyed: false, lostReason: '' })),
+    coolers: design.coolers, heat: 0, pos: { c: pos.c, r: pos.r }, facing: 0, alive: true,
+    hasMoved: false, hasAttacked: false, movedThisTurn: false, done: false
+  };
+}
+// opts.mode === '2v2' 이면 opts.allyDesign(아군 AI), opts.enemy2Design(적 2번 기체)가 더 필요하다.
+function createBattle(playerDesign, enemyDesign, opts) {
+  opts = opts || {};
+  const two = opts.mode === '2v2';
+  const pd = cloneDesign(playerDesign), ed = cloneDesign(enemyDesign);
+  const v1 = validateDesign(pd), v2 = validateDesign(ed);
+  if (!v1.ok) throw new Error('플레이어 설계 오류: ' + v1.errors.join(', '));
+  if (!v2.ok) throw new Error('적 설계 오류: ' + v2.errors.join(', '));
+  let ad = null, e2 = null;
+  if (two) {
+    if (!opts.allyDesign || !opts.enemy2Design) throw new Error('2대2 전투에는 아군 AI와 적 2번 기체 설계가 필요함');
+    ad = cloneDesign(opts.allyDesign); e2 = cloneDesign(opts.enemy2Design);
+    const v3 = validateDesign(ad), v4 = validateDesign(e2);
+    if (!v3.ok) throw new Error('아군 AI 설계 오류: ' + v3.errors.join(', '));
+    if (!v4.ok) throw new Error('적 2번 설계 오류: ' + v4.errors.join(', '));
+  }
+  const rubble = {};
+  CONFIG.RUBBLE.forEach(t => { rubble[key(t[0], t[1])] = true; });
+  const sp = CONFIG.START_2V2;
+  const b = {
+    mode: two ? '2v2' : '1v1',
+    round: 1, turn: 'player', over: false, winner: null, rubble, log: [],
+    player: createMech(pd, 'player', two ? sp.player[0] : CONFIG.START_PLAYER, { id: 'player', role: 'player', control: 'player', tag: two ? '[나]' : null }),
+    enemy: createMech(ed, 'enemy', two ? sp.enemy[0] : CONFIG.START_ENEMY, { id: 'enemy', role: 'enemy', control: 'ai', tag: two ? '[적1]' : null }),
+    stats: {
+      player: { shots: 0, hits: 0, damage: 0, partsLost: [] },
+      enemy: { shots: 0, hits: 0, damage: 0, partsLost: [] }
+    }
+  };
+  b.mechs = [b.player, b.enemy];
+  if (two) {
+    b.ally = createMech(ad, 'player', sp.player[1], { id: 'ally', role: 'ally', control: 'ai', tag: '[아군AI]' });
+    b.enemy2 = createMech(e2, 'enemy', sp.enemy[1], { id: 'enemy2', role: 'enemy', control: 'ai', tag: '[적2]' });
+    b.mechs = [b.player, b.ally, b.enemy, b.enemy2]; // 표시/행동 순서: 조종 기체, 아군 AI, 적1, 적2
+  }
+  b.mechs.forEach(m => { const f = nearestFoe(b, m); if (f) m.facing = facingToward(m.pos, f.pos); });
+  log(b, 'system', 'sys', '── 라운드 1 시작 ──');
+  if (two) log(b, 'system', 'sys', '2대2 전투: ' + b.mechs.map(m => ident(m) + (m.control === 'player' ? '(직접 조종)' : '')).join(' / '));
+  return b;
+}
+function log(b, team, cls, text) { b.log.push({ round: b.round, team, cls, text }); }
+function teamName(t) { return t === 'player' ? '아군' : '적'; }
+function ident(m) { return m.tag ? m.tag + ' ' + m.name : teamName(m.team) + ' ' + m.name; } // 로그에 쓰는 기체 이름 (2대2에서는 [나]/[아군AI]/[적1]/[적2] 꼬리표)
+function teamUnits(b, team) { return b.mechs.filter(m => m.team === team); }
+function foesOf(b, mech) { return b.mechs.filter(m => m.team !== mech.team && m.alive); }
+function nearestFoe(b, mech) {
+  const fs = b.mechs.filter(m => m.team !== mech.team);
+  const al = fs.filter(m => m.alive), pool = al.length ? al : fs;
+  let best = null, bd = Infinity;
+  pool.forEach(f => { const d = hexDist(mech.pos, f.pos); if (d < bd) { bd = d; best = f; } });
+  return best;
+}
+// 1대1에서는 기존과 같이 "상대 기체". 2대2에서는 가장 가까운 생존 적(없으면 가장 가까운 적).
+function foeOf(b, mech) { return nearestFoe(b, mech); }
+function isRubble(b, pos) { return !!b.rubble[key(pos.c, pos.r)]; }
+
+/* ---------- 6. 무기 상태 / 이동 ---------- */
+function weaponStatus(mech, w, dist) {
+  const def = WEAPONS[w.type];
+  if (w.destroyed || mech.parts[w.loc].destroyed) return { ok: false, reason: '파괴됨' };
+  if (def.ammo !== null && w.ammo <= 0) return { ok: false, reason: '탄약 없음' };
+  if (dist !== undefined && dist > def.range) return { ok: false, reason: '사거리 밖' };
+  return { ok: true, reason: '' };
+}
+function movePoints(mech) {
+  const lost = (mech.parts.LL.destroyed ? 1 : 0) + (mech.parts.RL.destroyed ? 1 : 0);
+  if (lost === 0) return CONFIG.WALK_MP;
+  if (lost === 1) return Math.max(1, Math.floor(CONFIG.WALK_MP / 2));
+  return 0;
+}
+function heatPenalty(heat) { return heat <= CONFIG.HEAT_LIMIT ? 0 : Math.min(3, Math.ceil((heat - CONFIG.HEAT_LIMIT) / 4)); }
+function dissipation(mech) { return CONFIG.BASE_COOLING + CONFIG.COOLER_POWER * mech.coolers; }
+
+function reachable(b, mech) {
+  const mp = movePoints(mech);
+  const blocks = n => b.mechs.some(o => o !== mech && (o.alive || b.mode === '2v2') && o.pos.c === n.c && o.pos.r === n.r); // 다른 기체(2대2에서는 잔해 기체도)가 있는 칸은 지나갈 수 없다
+  const best = {}, prev = {};
+  best[key(mech.pos.c, mech.pos.r)] = 0;
+  const open = [{ c: mech.pos.c, r: mech.pos.r, cost: 0 }];
+  while (open.length) {
+    open.sort((x, y) => x.cost - y.cost);
+    const cur = open.shift();
+    if (cur.cost > best[key(cur.c, cur.r)]) continue;
+    for (const n of neighbors(cur.c, cur.r)) {
+      if (blocks(n)) continue;
+      const cost = cur.cost + (isRubble(b, n) ? CONFIG.RUBBLE_COST : 1);
+      if (cost > mp) continue;
+      const k = key(n.c, n.r);
+      if (best[k] === undefined || cost < best[k]) { best[k] = cost; prev[k] = key(cur.c, cur.r); open.push({ c: n.c, r: n.r, cost }); }
+    }
+  }
+  return { mp, best, prev };
+}
+function reachableTiles(b, mech) {
+  const res = reachable(b, mech), out = [];
+  Object.keys(res.best).forEach(k => {
+    const [c, r] = k.split(',').map(Number);
+    if (!(c === mech.pos.c && r === mech.pos.r)) out.push({ c, r, cost: res.best[k] });
+  });
+  return out;
+}
+function moveMech(b, mech, dest) {
+  if (b.over) return { ok: false, reason: '전투 종료' };
+  if (!mech.alive) return { ok: false, reason: '전투 불능 기체' };
+  if (b.mode === '2v2' && b.turn !== mech.team) return { ok: false, reason: '지금은 이 팀의 턴이 아님' };
+  if (mech.hasMoved) return { ok: false, reason: '이미 이동함' };
+  const res = reachable(b, mech), k = key(dest.c, dest.r);
+  if (res.best[k] === undefined || (dest.c === mech.pos.c && dest.r === mech.pos.r)) return { ok: false, reason: '이동할 수 없는 타일' };
+  const pk = res.prev[k].split(',').map(Number);
+  const from = { c: mech.pos.c, r: mech.pos.r };
+  mech.facing = facingToward({ c: pk[0], r: pk[1] }, dest);
+  mech.pos = { c: dest.c, r: dest.r };
+  mech.hasMoved = true; mech.movedThisTurn = true;
+  mech.heat += CONFIG.MOVE_HEAT;
+  const rub = isRubble(b, dest) ? ' (잔해 지대: 엄폐)' : '';
+  log(b, mech.team, 'move', ident(mech) + ' 이동 ' + key(from.c, from.r) + ' → ' + key(dest.c, dest.r) + ' (이동력 ' + res.best[k] + '/' + res.mp + ', 열 +' + CONFIG.MOVE_HEAT + ')' + rub);
+  return { ok: true, from, cost: res.best[k] };
+}
+function skipMove(b, mech) {
+  if (mech.hasMoved || !mech.alive) return;
+  mech.hasMoved = true;
+  log(b, mech.team, 'move', ident(mech) + ' 제자리 유지 (조준 보너스 가능)');
+}
+
+/* ---------- 7. 명중 판정 ---------- */
+function computeToHit(b, attacker, target, w, o) {
+  o = o || {};
+  const def = WEAPONS[w.type];
+  const from = o.from || attacker.pos;
+  const moved = o.moved !== undefined ? o.moved : attacker.movedThisTurn;
+  const heat = o.heat !== undefined ? o.heat : attacker.heat;
+  const dist = hexDist(from, target.pos);
+  const mods = [{ label: '기본', value: CONFIG.BASE_TARGET, base: true }];
+  if (dist > def.shortRange) mods.push({ label: '장거리 사격', value: CONFIG.LONG_RANGE_MOD });
+  if (moved) mods.push({ label: '이동 후 사격', value: CONFIG.MOVED_MOD });
+  else mods.push({ label: '조준 보너스', value: CONFIG.AIM_MOD });
+  if (isRubble(b, target.pos)) mods.push({ label: '적 엄폐 중', value: CONFIG.COVER_MOD });
+  if (def.toHitMod) mods.push({ label: def.toHitLabel || '무기 보정', value: def.toHitMod });
+  if (o.aim) mods.push({ label: '정밀 사격(' + PART_INFO[o.aim].name + ')', value: CONFIG.PRECISE_MOD[o.aim] });
+  const hp = heatPenalty(heat);
+  if (hp) mods.push({ label: '과열 페널티(열 ' + heat + ')', value: hp });
+  const raw = mods.reduce((s, m) => s + m.value, 0);
+  const final = Math.max(CONFIG.MIN_TARGET, Math.min(CONFIG.MAX_TARGET, raw));
+  const text = mods.map((m, i) => (i === 0 ? m.label + ' ' + m.value : m.label + ' ' + (m.value > 0 ? '+' : '') + m.value)).join(', ')
+    + ' = ' + raw + (raw !== final ? ' → 제한 ' + final : '');
+  return { mods, raw, target: final, dist, text, chance: hitChance(final) };
+}
+
+/* ---------- 8. 피해 처리 ---------- */
+function applyDamage(b, target, loc, dmg, srcTeam, opts) {
+  const noTransfer = !!(opts && opts.noTransfer);
+  const steps = [];
+  let remaining = dmg, cur = loc;
+  const st = b.stats[srcTeam];
+  while (remaining > 0 && cur) {
+    const p = target.parts[cur], name = PART_INFO[cur].name;
+    if (p.destroyed) {
+      const nxt = TRANSFER[cur] || null;
+      const s = { type: 'transfer', from: cur, to: nxt, amount: remaining };
+      steps.push(s);
+      log(b, srcTeam, 'dmg', '  · ' + name + '은(는) 이미 파괴됨 → 피해 ' + remaining + '이(가) ' + (nxt ? PART_INFO[nxt].name + '(으)로 이어짐' : '소멸'));
+      cur = nxt;
+      continue;
+    }
+    const aAbs = Math.min(p.armor, remaining);
+    if (aAbs > 0) {
+      const before = p.armor;
+      p.armor -= aAbs; remaining -= aAbs; st.damage += aAbs;
+      steps.push({ type: 'armor', loc: cur, amount: aAbs, left: p.armor });
+      log(b, srcTeam, 'dmg', '  · ' + name + ' 장갑 −' + aAbs + ' (' + before + ' → ' + p.armor + ')' + (p.armor === 0 ? ' 장갑 소진' : ''));
+    }
+    if (remaining > 0) {
+      const sAbs = Math.min(p.structure, remaining);
+      const before = p.structure;
+      p.structure -= sAbs; remaining -= sAbs; st.damage += sAbs;
+      steps.push({ type: 'structure', loc: cur, amount: sAbs, left: p.structure });
+      log(b, srcTeam, 'dmg', '  · ' + name + ' 내부 구조 −' + sAbs + ' (' + before + ' → ' + p.structure + ')');
+      if (p.structure > 0) {
+        const cr = roll2d6();
+        const live = target.weapons.filter(w => w.loc === cur && !w.destroyed);
+        if (cr.sum >= CONFIG.CRIT_ROLL_MIN && live.length) {
+          const w = live[Math.floor(rng() * live.length)];
+          w.destroyed = true; w.lostReason = '치명타';
+          steps.push({ type: 'crit', loc: cur, dice: cr.dice, weapon: w.uid });
+          log(b, srcTeam, 'crit', '  · 치명타 판정 2D6 [' + cr.dice.join(',') + ']=' + cr.sum + ' ≥ ' + CONFIG.CRIT_ROLL_MIN + ' → ' + WEAPONS[w.type].short + ' 파괴!');
+        } else {
+          steps.push({ type: 'critMiss', loc: cur, dice: cr.dice });
+          log(b, srcTeam, 'dmg', '  · 치명타 판정 2D6 [' + cr.dice.join(',') + ']=' + cr.sum + (cr.sum >= CONFIG.CRIT_ROLL_MIN ? ' → 파괴할 장비 없음' : ' → 장비 이상 없음'));
+        }
+      }
+      if (p.structure <= 0) {
+        p.destroyed = true;
+        st.partsLost.push(name);
+        steps.push({ type: 'destroyed', loc: cur });
+        log(b, srcTeam, 'kill', '  ★ ' + (target.tag || teamName(target.team)) + ' ' + name + ' 파괴!');
+        target.weapons.forEach(w => {
+          if (w.loc === cur && !w.destroyed) {
+            w.destroyed = true; w.lostReason = '부위 파괴';
+            steps.push({ type: 'weaponLost', loc: cur, weapon: w.uid });
+            log(b, srcTeam, 'kill', '  ★ ' + WEAPONS[w.type].short + ' 사용 불가 (장착 부위 파괴)');
+          }
+        });
+        if (cur === 'LL' || cur === 'RL') log(b, srcTeam, 'kill', '  ★ 다리 파괴: 이동력 ' + movePoints(target));
+        if (FATAL.includes(cur)) {
+          target.alive = false;
+          steps.push({ type: 'mechDestroyed', loc: cur });
+          log(b, srcTeam, 'kill', '  ★★ ' + ident(target) + ' 격파! (' + name + ' 파괴)');
+          return { steps, mechDestroyed: true };
+        }
+      }
+      if (remaining > 0) {
+        const nxt = noTransfer ? null : (TRANSFER[cur] || null);
+        steps.push({ type: 'transfer', from: cur, to: nxt, amount: remaining });
+        log(b, srcTeam, 'dmg', '  · 초과 피해 ' + remaining + '이(가) ' + (nxt ? PART_INFO[nxt].name + '(으)로 이어짐' : '소멸'));
+        cur = nxt;
+      }
+    }
+  }
+  return { steps, mechDestroyed: !target.alive };
+}
+
+/* ---------- 9. 사격 (한 번의 공격 행동 = 선택한 무기 일제 사격) ---------- */
+function fireWeapon(b, attacker, target, w, volleyHeat, moved, aim) {
+  const def = WEAPONS[w.type], team = attacker.team;
+  const dist = hexDist(attacker.pos, target.pos);
+  const st = b.stats[team];
+  const status = weaponStatus(attacker, w, dist);
+  if (!status.ok) {
+    log(b, team, 'miss', def.short + ' 발사 불가: ' + status.reason);
+    return { uid: w.uid, name: def.name, fired: false, reason: status.reason };
+  }
+  if (aim && target.parts[aim].destroyed) { // 정밀 사격: 지정 부위가 이미 파괴됨 → 발사하지 않음(자원 소모 없음)
+    log(b, team, 'miss', def.short + ' 발사 취소: 지정 부위(' + PART_INFO[aim].name + ')가 이미 파괴됨');
+    return { uid: w.uid, name: def.name, fired: false, reason: '지정 부위 파괴됨' };
+  }
+  const th = computeToHit(b, attacker, target, w, { heat: volleyHeat, moved, aim });
+  // 자원 소모
+  if (def.ammo !== null) w.ammo -= 1;
+  attacker.heat += def.heat;
+  st.shots += 1;
+  const atk = roll2d6();
+  const hit = atk.sum >= th.target;
+  const res = { uid: w.uid, name: def.name, short: def.short, fired: true, dist, toHit: th, attackRoll: atk, hit, loc: null, locRoll: null, damage: 0, steps: [], mechDestroyed: false, arc: hitArc(target, attacker.pos), mode: aim ? 'precise' : 'normal', aimPart: aim || null };
+  log(b, team, 'roll', (attacker.tag || teamName(team)) + ' ' + def.short + (b.mode === '2v2' ? ' → ' + ident(target) + ' · 거리 ' : ' → 거리 ') + dist + ', 열 +' + def.heat + (def.ammo !== null ? ', 탄약 ' + w.ammo + '/' + def.ammo : ''));
+  log(b, team, 'roll', '  목표치: ' + th.text);
+  log(b, team, hit ? 'hit' : 'miss', '  명중 판정 2D6 [' + atk.dice.join(',') + ']=' + atk.sum + ' vs 목표 ' + th.target + ' → ' + (hit ? '명중!' : '빗나감'));
+  if (hit) {
+    st.hits += 1;
+    res.damage = def.damage;
+    if (aim) { // 정밀 사격: 피격 부위 주사위 없이 지정 부위에만 피해
+      res.loc = aim;
+      log(b, team, 'hit', '  ' + (b.mode === '2v2' ? ident(target) + ' ' : '') + '지정 부위 ' + PART_INFO[aim].name + ' 명중 (피격 부위 주사위 없음, 피해 ' + def.damage + ')');
+    } else {
+      const lr = roll2d6();
+      res.locRoll = lr; res.loc = hitLocation(lr.sum);
+      log(b, team, 'hit', '  ' + (b.mode === '2v2' ? ident(target) + ' ' : '') + '피격 부위 2D6 [' + lr.dice.join(',') + ']=' + lr.sum + ' → ' + PART_INFO[res.loc].name + ' (피해 ' + def.damage + ')');
+    }
+    const dr = applyDamage(b, target, res.loc, def.damage, team, aim ? { noTransfer: true } : undefined);
+    res.steps = dr.steps; res.mechDestroyed = dr.mechDestroyed;
+  }
+  return res;
+}
+function attack(b, attacker, uids, opts) {
+  if (b.over) return { ok: false, reason: '전투 종료' };
+  if (!attacker.alive) return { ok: false, reason: '전투 불능 기체는 행동할 수 없음' };
+  if (b.mode === '2v2' && b.turn !== attacker.team) return { ok: false, reason: '지금은 이 팀의 턴이 아님' };
+  if (!attacker.hasMoved) return { ok: false, reason: '먼저 이동 단계를 마쳐야 함' };
+  if (attacker.hasAttacked) return { ok: false, reason: '이미 공격함' };
+  let target = foeOf(b, attacker);
+  if (opts && opts.target) { // 2대2: 공격 대상 지정 (기체 객체 또는 id)
+    target = typeof opts.target === 'string' ? b.mechs.find(m => m.id === opts.target) : opts.target;
+    if (!target || !b.mechs.includes(target)) return { ok: false, reason: '알 수 없는 공격 대상' };
+    if (target.team === attacker.team) return { ok: false, reason: '같은 팀 기체는 공격할 수 없음' };
+  }
+  if (!target || !target.alive) return { ok: false, reason: '이미 격파된 기체는 공격할 수 없음' };
+  let aim = null;
+  if (opts && opts.mode === 'precise') {
+    if (!opts.part || !PART_INFO[opts.part]) return { ok: false, reason: '정밀 사격할 부위를 지정해야 함' };
+    if (target.parts[opts.part].destroyed) return { ok: false, reason: PART_INFO[opts.part].name + '은(는) 이미 파괴되어 선택할 수 없음' };
+    aim = opts.part;
+  }
+  attacker.facing = facingToward(attacker.pos, target.pos); // 정면 공격: 사격 시 대상 쪽으로 자동 정렬
+  const volleyHeat = attacker.heat, moved = attacker.movedThisTurn;
+  attacker.hasAttacked = true;
+  log(b, attacker.team, 'sys', '▶ ' + ident(attacker) + (b.mode === '2v2' ? ' → ' + ident(target) : '') + (aim ? ' 정밀 사격 → ' + PART_INFO[aim].name : ' 일반 사격') + ' (' + uids.length + '정)');
+  const shots = [];
+  for (const uid of uids) {
+    if (!target.alive) break;
+    const w = attacker.weapons.find(x => x.uid === uid);
+    if (!w) continue;
+    shots.push(fireWeapon(b, attacker, target, w, volleyHeat, moved, aim));
+  }
+  if (!b.mechs.some(m => m.team !== attacker.team && m.alive)) { // 상대 팀 전멸
+    b.over = true; b.winner = attacker.team;
+    log(b, 'system', 'sys', '── 전투 종료: ' + (attacker.team === 'player' ? '승리' : '패배') + ' ──');
+  }
+  return { ok: true, shots, target };
+}
+
+/* ---------- 10. 턴 / 라운드 진행 ---------- */
+function resetFlags(m) { m.hasMoved = false; m.hasAttacked = false; m.movedThisTurn = false; m.done = !m.alive; } // 전투 불능 기체는 처음부터 '행동 끝'
+// 한 기체의 이번 턴 행동을 마친다 (이동을 안 했으면 제자리 유지, 공격은 더 못 함)
+function endUnit(b, mech) {
+  if (!mech.alive || mech.done) return false;
+  if (!mech.hasMoved) skipMove(b, mech);
+  mech.hasAttacked = true; mech.done = true;
+  return true;
+}
+function pendingUnits(b) { return b.mechs.filter(m => m.team === b.turn && m.alive && !m.done); }
+function endTurn(b) {
+  if (b.over) return;
+  if (b.mode === '2v2' && pendingUnits(b).length) return; // 2대2: 팀의 모든 기체가 행동을 마쳐야 다음 팀으로 넘어간다
+  if (b.turn === 'player') {
+    b.turn = 'enemy'; teamUnits(b, 'enemy').forEach(resetFlags);
+    log(b, 'system', 'sys', '── 적 턴 ──');
+  } else {
+    b.mechs.forEach(m => {
+      if (!m.alive) return;
+      const d = dissipation(m), before = m.heat;
+      m.heat = Math.max(0, m.heat - d);
+      log(b, 'system', 'sys', (m.tag || teamName(m.team)) + ' 냉각: 열 ' + before + ' → ' + m.heat + ' (방열 ' + d + ')');
+    });
+    b.round += 1;
+    if (b.round > CONFIG.MAX_ROUNDS) {
+      b.over = true; b.winner = 'draw';
+      log(b, 'system', 'sys', '── 라운드 제한 도달: 무승부 ──');
+      return;
+    }
+    b.turn = 'player'; teamUnits(b, 'player').forEach(resetFlags);
+    log(b, 'system', 'sys', '── 라운드 ' + b.round + ' 시작 ──');
+  }
+}
+
+/* ---------- 11. AI (플레이어와 같은 함수/규칙만 사용. 아군 AI와 적 AI가 같은 코드를 쓴다) ---------- */
+function expectedDamage(b, mech, foe, from, moved, heat) {
+  let sum = 0;
+  mech.weapons.forEach(w => {
+    const d = hexDist(from, foe.pos);
+    if (!weaponStatus(mech, w, d).ok) return;
+    const th = computeToHit(b, mech, foe, w, { from, moved, heat });
+    sum += th.chance * WEAPONS[w.type].damage;
+  });
+  return sum;
+}
+function healthFrac(m) { // 남은 장갑+구조 비율
+  let cur = 0, max = 0;
+  PARTS.forEach(p => { cur += m.parts[p].armor + m.parts[p].structure; max += m.parts[p].armorMax + m.parts[p].structureMax; });
+  return cur / max;
+}
+// 2대2 표적 가중치 (표적이 한 기체뿐이면 쓰이지 않는다 → 1대1 AI 는 기존과 같다)
+//  · 위협도: 그 적이 나를 때릴 때의 예상 피해
+//  · 약한 적/급소 노출: 이미 많이 부서진 적, 머리·중앙 몸통 장갑이 벗겨진 적을 우선
+//  · 아군 AI: 집중 사격(이미 손상된 적 가중치↑)과 조종 기체 보호(조종 기체를 위협하는 적 가중치↑)
+function aiBias(b, mech, foe) {
+  if (b.mechs.filter(m => m.team !== mech.team && m.alive).length < 2) return 0;
+  const threat = expectedDamage(b, foe, mech, foe.pos, false, foe.heat);
+  const weak = (1 - healthFrac(foe)) * (mech.role === 'ally' ? 8 : 4);
+  const exposed = FATAL.filter(p => foe.parts[p].armor === 0).length * 2;
+  let bias = threat * 0.25 + weak + exposed;
+  if (mech.role === 'ally' && b.player.alive) bias += expectedDamage(b, foe, b.player, foe.pos, false, foe.heat) * 0.3;
+  return bias;
+}
+function aiChooseMove(b, mech) {
+  const foes = foesOf(b, mech);
+  const res = reachable(b, mech);
+  if (!foes.length) return { c: mech.pos.c, r: mech.pos.r, stay: true };
+  const bias = foes.map(f => aiBias(b, mech, f));
+  const escort = mech.role === 'ally' && b.player.alive && b.mode === '2v2';
+  let bestTile = null, bestScore = -Infinity;
+  Object.keys(res.best).forEach(k => {
+    const [c, r] = k.split(',').map(Number);
+    const stay = (c === mech.pos.c && r === mech.pos.r);
+    const from = { c, r };
+    const heat = mech.heat + (stay ? 0 : CONFIG.MOVE_HEAT);
+    let score = -Infinity;
+    foes.forEach((foe, i) => {
+      const exp = expectedDamage(b, mech, foe, from, !stay, heat);
+      const dist = hexDist(from, foe.pos);
+      let sc = exp * 10 - dist * 0.5 - res.best[k] * 0.05;
+      if (isRubble(b, from)) sc += 3; // 엄폐 선호
+      if (exp === 0) sc = -dist * 10 - res.best[k] * 0.05; // 사거리 밖이면 가까워지기
+      else sc += bias[i];
+      if (sc > score) score = sc;
+    });
+    if (escort) score -= Math.max(0, hexDist(from, b.player.pos) - 3) * 0.6; // 아군 AI: 조종 기체와 너무 떨어지지 않기
+    if (score > bestScore) { bestScore = score; bestTile = { c, r, stay }; }
+  });
+  return bestTile;
+}
+function aiChooseWeapons(b, mech, foe) {
+  foe = foe || foeOf(b, mech);
+  const dist = hexDist(mech.pos, foe.pos);
+  const cand = [];
+  mech.weapons.forEach(w => {
+    if (!weaponStatus(mech, w, dist).ok) return;
+    const th = computeToHit(b, mech, foe, w);
+    if (mech.role === 'ally' && th.chance < 0.08) return; // 아군 AI: 맞을 가망이 거의 없는 무기에 열·탄약을 쓰지 않는다
+    const def = WEAPONS[w.type];
+    cand.push({ uid: w.uid, heat: def.heat, exp: th.chance * def.damage });
+  });
+  cand.sort((a, c) => (c.exp / (1 + c.heat)) - (a.exp / (1 + a.heat)));
+  const picked = []; let heat = mech.heat, exp = 0;
+  cand.forEach(c => { if (heat + c.heat <= CONFIG.AI_HEAT_CAP) { picked.push(c.uid); heat += c.heat; exp += c.exp; } });
+  picked.exp = exp;
+  return picked;
+}
+// 이동이 끝난 뒤: 살아 있는 적 중 (예상 피해 + 표적 가중치)가 가장 높은 적과 그에게 쏠 무기를 고른다. 쏠 수 있는 적이 없으면 null
+function aiPickAttack(b, mech) {
+  let best = null;
+  foesOf(b, mech).forEach(foe => {
+    const uids = aiChooseWeapons(b, mech, foe);
+    if (!uids.length) return;
+    const score = uids.exp + aiBias(b, mech, foe);
+    if (!best || score > best.score) best = { foe, uids, score };
+  });
+  return best;
+}
+// AI 기체 한 대의 한 턴 (이동 → 공격 → 행동 종료). 한 번에 전부 실행 (테스트/편의용)
+function aiRunUnit(b, m) {
+  if (b.over || !m.alive || m.done) return false;
+  const mv = aiChooseMove(b, m);
+  if (mv && !mv.stay) moveMech(b, m, mv); else skipMove(b, m);
+  const pick = aiPickAttack(b, m);
+  if (pick) attack(b, m, pick.uids, { target: pick.foe });
+  else { m.hasAttacked = true; log(b, m.team, 'sys', ident(m) + ' 사격 가능한 무기 없음'); }
+  endUnit(b, m);
+  return true;
+}
+function aiRunTurn(b) { // 현재 턴의 팀(1대1에서는 적)을 전부 AI 로 실행하고 턴을 넘긴다
+  const units = b.mode === '2v2' ? teamUnits(b, b.turn) : [b.enemy];
+  units.forEach(m => aiRunUnit(b, m));
+  if (!b.over) endTurn(b);
+}
+
+const api = {
+  CONFIG, PARTS, PART_INFO, WEAPONS, TRANSFER, FATAL, PRESETS,
+  setRng, d6, roll2d6, hitLocation, hitChance,
+  makeDesign, cloneDesign, designMass, validateDesign, canMount, slotsUsed, armorTotal,
+  hexDist, neighbors, facingToward, hitArc, pixel, key, isRubble,
+  createBattle, createMech, weaponStatus, movePoints, heatPenalty, dissipation,
+  reachable, reachableTiles, moveMech, skipMove, computeToHit, applyDamage, attack, endTurn, endUnit, pendingUnits,
+  aiChooseMove, aiChooseWeapons, aiPickAttack, aiRunUnit, aiRunTurn, foeOf, foesOf, teamUnits, ident, healthFrac, log
+};
+return api;
+})();
+
+/* =====================================================================
+   IRON VECTOR — app1.js : 공용 도우미, 격납고(설계) 화면, 출격 준비 화면
+   ===================================================================== */
+const W = IV.WEAPONS, P = IV.PART_INFO, C = IV.CONFIG;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const f1 = n => (Math.round(n * 10) / 10).toFixed(1);
+const SAVE_KEY = 'ironvector.design.v1';
+const PART_ORDER = ['HD', 'LA', 'LT', 'CT', 'RT', 'RA', 'LL', 'RL'];
+
+function loadDesign() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (d && d.armor && Array.isArray(d.weapons) && IV.validateDesign(d).ok) return d;
+  } catch (e) { /* 저장소를 못 쓰면 기본 설계 사용 */ }
+  return null;
+}
+function saveDesign() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S.design)); } catch (e) { /* 무시 */ } }
+
+function loadAnim() {
+  try { const v = localStorage.getItem('ironvector.fx'); if (v === '0') return false; if (v === '1') return true; } catch (e) { /* 무시 */ }
+  try { return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return true; }
+}
+function saveAnim(v) { try { localStorage.setItem('ironvector.fx', v ? '1' : '0'); } catch (e) { /* 무시 */ } }
+
+const S = {
+  view: 'hangar',
+  design: loadDesign() || IV.cloneDesign(IV.PRESETS.VANGUARD),
+  sel: 'CT',
+  mode: '1v1',          // '1v1' 기존 전투 | '2v2' (조종 기체 + 아군 AI 대 적 AI 2기)
+  enemyKey: 'SKIRMISHER',
+  allyKey: 'BRAWLER',   // 2대2: 아군 AI 기체
+  enemy2Key: 'BRAWLER', // 2대2: 적 2번 기체
+  target: null,         // 2대2: 사격 대상 적의 id
+  inspect: null,        // 2대2: 기록지를 보고 있는 기체의 id (없으면 사격 대상)
+  actor: null,          // 지금 행동 중인 AI 기체의 id
+  battle: null,
+  picks: new Set(),
+  busy: false,
+  volley: null,
+  hitFlash: {},
+  confirmAbort: false,
+  fireMode: 'normal',   // 'normal' 일반 사격 | 'precise' 정밀 사격
+  aimPart: null,        // 정밀 사격으로 노리는 적의 부위
+  fxBusy: false,        // 연출 재생 중에는 입력을 막는다
+  pre: null,            // 사격 연출 동안 보여 줄 '사격 직전' 상태
+  anim: loadAnim()      // 연출 효과 켜기/끄기
+};
+
+let toastTimer = null;
+function toast(msg) {
+  let t = $('#toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
+}
+
+/* ---------- 공용 조각 ---------- */
+function wTag(type, off) { return '<span class="tag ' + W[type].tag + (off ? ' off' : '') + '">' + W[type].tag + '</span>'; }
+function wStats(type) {
+  const w = W[type];
+  return w.mass + 't · 사거리 ' + w.range + ' · 피해 ' + w.damage + ' · 열 ' + w.heat + ' · 탄약 ' + (w.ammo === null ? '∞' : w.ammo);
+}
+function pct(a, b) { return b <= 0 ? 0 : Math.max(0, Math.min(100, a / b * 100)); }
+function barCls(a, b) { const p = pct(a, b); return p <= 25 ? 'low' : p <= 55 ? 'mid' : ''; }
+
+/* ---------- 1. 격납고 ---------- */
+function massSegments(m) {
+  const den = Math.max(C.MAX_MASS, m.total);
+  const seg = (cls, v) => '<i class="' + cls + '" style="width:' + (v / den * 100) + '%"></i>';
+  return seg('seg-frame', m.frame) + seg('seg-drive', m.drive) + seg('seg-weap', m.weapons) + seg('seg-cool', m.coolers) + seg('seg-armor', m.armor);
+}
+function previewHTML(d) { // 현재 설계를 그대로 그린 미리보기 (무기·장갑 변경이 즉시 반영됨)
+  const m = IV.createMech(d, 'player', { c: 0, r: 0 });
+  return '<svg class="pv tok ally" viewBox="-40 -40 80 80" role="img" aria-label="현재 설계 미리보기">' + mechSVG(m, {}) + '</svg>'
+    + '<div class="pvcap dim">설계 미리보기 · 장착한 무기와 장갑 상태가 그대로 그려집니다 (방향: 동쪽)</div>';
+}
+function renderHangar() {
+  const d = S.design, m = IV.designMass(d), v = IV.validateDesign(d);
+  const over = m.total > C.MAX_MASS + 1e-9;
+  const leg = (c, k, val) => '<span class="k" style="--c:' + c + '">' + k + '</span><span class="mono">' + val + '</span>';
+  const left = '<div class="panel"><div class="ph"><span>질량 배분</span><span class="ser">PL-01</span></div><div class="pb stack">'
+    + '<div class="field"><label for="mechName">기체 이름</label><input id="mechName" type="text" maxlength="24" value="' + esc(d.name) + '" autocomplete="off"></div>'
+    + '<div><div class="massnum' + (over ? ' over' : '') + '"><span class="dim">총 질량</span><span><big>' + f1(m.total) + '</big> / ' + C.MAX_MASS + 't</span></div>'
+    + '<div class="massbar" role="img" aria-label="질량 배분 막대">' + massSegments(m) + '</div>'
+    + '<div class="legend">' + leg('#56676a', '기본 프레임', m.frame + 't') + leg('#7b8c88', '구동부', m.drive + 't')
+    + leg('var(--signal)', '무기 ' + d.weapons.length + '정', f1(m.weapons) + 't') + leg('var(--ally)', '냉각 장치 ' + d.coolers + '기', f1(m.coolers) + 't')
+    + leg('var(--ok)', '장갑 ' + IV.armorTotal(d) + '점', f1(m.armor) + 't')
+    + '<span class="k tot">남은 질량</span><span class="mono tot" style="color:' + (over ? 'var(--bad)' : 'var(--ink)') + '">' + (m.remaining >= 0 ? '' : '−') + f1(Math.abs(m.remaining)) + 't</span></div></div>'
+    + (v.ok ? '<div class="banner ok">출격 가능한 설계입니다.</div>' : '<div class="banner bad errs">' + v.errors.map(e => '<span>⚠ ' + esc(e) + '</span>').join('') + '</div>')
+    + '<div class="field"><label>기본 설계 불러오기</label><div class="row">'
+    + Object.keys(IV.PRESETS).map(k => '<button class="btn sm" data-act="preset" data-key="' + k + '">' + esc(IV.PRESETS[k].name) + '</button>').join('') + '</div></div>'
+    + '<div class="field"><label>장갑 도구</label><div class="row"><button class="btn sm" data-act="autoArmor">남은 질량으로 자동 배분</button><button class="btn sm" data-act="clearArmor">장갑 비우기</button></div></div>'
+    + '</div></div>';
+
+  const parts = PART_ORDER.map(p => {
+    const chips = d.weapons.filter(w => w.loc === p).map(w => wTag(w.type)).join('');
+    return '<button class="part pos-' + p + (S.sel === p ? ' sel' : '') + '" data-act="selpart" data-loc="' + p + '" aria-pressed="' + (S.sel === p) + '">'
+      + '<span class="code">' + p + ' · 슬롯 ' + IV.slotsUsed(d, p) + '/' + P[p].slots + '</span><span class="pname">' + P[p].name + '</span>'
+      + '<span class="nums">장갑 ' + d.armor[p] + '/' + P[p].maxArmor + '<br>구조 ' + P[p].internal + '</span>'
+      + '<span class="bar"><i style="width:' + pct(d.armor[p], P[p].maxArmor) + '%"></i></span>'
+      + '<span class="chips">' + chips + '</span></button>';
+  }).join('');
+  const mid = '<div class="panel"><div class="ph"><span>기체 도해</span><span class="ser">PL-02 · 부위를 선택</span></div><div class="pb">' + previewHTML(d) + '<div class="schem">' + parts + '</div>'
+    + '<p class="dim" style="margin-top:12px;font-size:13px">부위를 눌러 장갑과 무기를 편집합니다. 무기가 장착된 부위가 파괴되면 그 무기는 쓸 수 없고, 머리나 중앙 몸통의 내부 구조가 0이 되면 기체가 격파됩니다.</p></div></div>';
+
+  const sel = S.sel, info = P[sel];
+  const mounted = d.weapons.map((w, i) => ({ w, i })).filter(x => x.w.loc === sel);
+  const right = '<div class="stack"><div class="panel"><div class="ph"><span>' + info.name + '</span><span class="ser">' + sel + ' · 내부 구조 ' + info.internal + '</span></div><div class="pb stack">'
+    + '<div class="field"><label>장갑 (1t = ' + C.ARMOR_PER_TON + '점)</label><div class="ed-armor">'
+    + '<button class="btn tiny" data-act="armor" data-d="-5" aria-label="장갑 5 감소">−5</button><button class="btn tiny" data-act="armor" data-d="-1" aria-label="장갑 1 감소">−1</button>'
+    + '<span class="val">' + d.armor[sel] + '<span class="dim" style="font-size:13px"> / ' + info.maxArmor + '</span></span>'
+    + '<button class="btn tiny" data-act="armor" data-d="1" aria-label="장갑 1 증가">+1</button><button class="btn tiny" data-act="armor" data-d="5" aria-label="장갑 5 증가">+5</button>'
+    + '<button class="btn tiny" data-act="armor" data-d="max">최대</button></div></div>'
+    + '<div class="field"><label>장착 무기 (슬롯 ' + mounted.length + '/' + info.slots + ')</label><div class="mlist">'
+    + (mounted.length ? mounted.map(x => '<div class="mrow"><div class="nm">' + wTag(x.w.type) + ' ' + esc(W[x.w.type].name) + '<div class="sub">' + wStats(x.w.type) + '</div></div><button class="btn sm warn" data-act="unmount" data-i="' + x.i + '">해제</button></div>').join('')
+      : '<div class="dim" style="font-size:13px">' + (info.slots ? '장착된 무기가 없습니다.' : '다리에는 무기를 장착할 수 없습니다.') + '</div>') + '</div></div>'
+    + '</div></div>'
+    + '<div class="panel"><div class="ph"><span>무기 장착</span><span class="ser">' + info.name + '에 장착</span></div><div class="pb cat">'
+    + Object.keys(W).map(k => {
+      const w = W[k], ok = IV.canMount(d, k, sel);
+      return '<div class="w"><div class="nm">' + wTag(k) + ' <b>' + esc(w.name) + '</b></div><button class="btn sm" data-act="mount" data-type="' + k + '"' + (ok.ok ? '' : ' disabled title="' + esc(ok.reason) + '"') + '>장착</button>'
+        + '<div class="stats"><span>' + wStats(k) + '</span><span>장착: ' + w.slots.join(' ') + '</span></div></div>';
+    }).join('') + '</div></div>'
+    + '<div class="panel"><div class="ph"><span>냉각 장치</span><span class="ser">PL-04</span></div><div class="pb"><div class="row" style="justify-content:space-between">'
+    + '<div><b class="mono">' + d.coolers + '</b> 기 <span class="dim">(' + f1(d.coolers * C.COOLER_MASS) + 't)</span><div class="dim" style="font-size:12px">방열 ' + (C.BASE_COOLING + C.COOLER_POWER * d.coolers) + ' / 라운드</div></div>'
+    + '<div class="row"><button class="btn tiny" data-act="cooler" data-d="-1" aria-label="냉각 장치 감소">−</button><button class="btn tiny" data-act="cooler" data-d="1" aria-label="냉각 장치 증가">+</button></div></div></div></div></div>';
+
+  $('#v-hangar').innerHTML = '<div class="hangar">' + left + mid + right + '</div>'
+    + '<div class="gobar"><span class="dim">설계는 이 브라우저에 자동 저장됩니다.</span><button class="btn primary" data-act="goBrief"' + (v.ok ? '' : ' disabled') + '>출격 준비 →</button></div>';
+}
+
+/* 설계 편집 동작 */
+function setArmor(loc, val) {
+  val = Math.max(0, Math.min(P[loc].maxArmor, Math.round(val)));
+  const old = S.design.armor[loc];
+  S.design.armor[loc] = val;
+  return old;
+}
+function autoArmor() {
+  const d = S.design;
+  let guard = 400;
+  while (guard-- > 0) {
+    let best = null, ratio = 2;
+    IV.PARTS.forEach(p => {
+      if (d.armor[p] >= P[p].maxArmor) return;
+      const r = d.armor[p] / P[p].maxArmor + (p === 'HD' ? 0.05 : 0);
+      if (r < ratio) { ratio = r; best = p; }
+    });
+    if (!best) break;
+    const step = Math.min(2, P[best].maxArmor - d.armor[best]);
+    d.armor[best] += step;
+    if (IV.designMass(d).total > C.MAX_MASS + 1e-9) { d.armor[best] -= step; break; }
+  }
+}
+const HANGAR_ACTS = {
+  selpart(el) { S.sel = el.dataset.loc; },
+  preset(el) { S.design = IV.cloneDesign(IV.PRESETS[el.dataset.key]); },
+  armor(el) {
+    const loc = S.sel, a = el.dataset.d;
+    const old = S.design.armor[loc];
+    setArmor(loc, a === 'max' ? P[loc].maxArmor : old + Number(a));
+    if (IV.designMass(S.design).total > C.MAX_MASS + 1e-9) toast('최대 질량을 초과했습니다. 다른 부분을 줄여야 출격할 수 있습니다.');
+  },
+  mount(el) {
+    const r = IV.canMount(S.design, el.dataset.type, S.sel);
+    if (!r.ok) return toast(r.reason);
+    S.design.weapons.push({ type: el.dataset.type, loc: S.sel });
+    if (IV.designMass(S.design).total > C.MAX_MASS + 1e-9) toast('최대 질량을 초과했습니다. 장갑이나 무기를 줄여 주세요.');
+  },
+  unmount(el) { S.design.weapons.splice(Number(el.dataset.i), 1); },
+  cooler(el) {
+    const n = S.design.coolers + Number(el.dataset.d);
+    if (n < 0 || n > C.MAX_COOLERS) return toast('냉각 장치는 0~' + C.MAX_COOLERS + '기까지입니다.');
+    S.design.coolers = n;
+    if (IV.designMass(S.design).total > C.MAX_MASS + 1e-9) toast('최대 질량을 초과했습니다.');
+  },
+  autoArmor() { autoArmor(); },
+  clearArmor() { IV.PARTS.forEach(p => { S.design.armor[p] = 0; }); }
+};
+
+/* ---------- 2. 출격 준비 ---------- */
+function summaryPanel(design, cls, title, ser) {
+  const m = IV.designMass(design), v = IV.validateDesign(design);
+  const mech = IV.createMech(design, 'x', { c: 0, r: 0 });
+  const rows = design.weapons.map(w => {
+    const d = W[w.type];
+    return '<tr><td>' + wTag(w.type) + ' ' + esc(d.short) + '</td><td>' + w.loc + '</td><td class="n">' + d.damage + '</td><td class="n">' + d.range + '</td><td class="n">' + d.heat + '</td><td class="n">' + (d.ammo === null ? '∞' : d.ammo) + '</td></tr>';
+  }).join('');
+  const armorLine = IV.PARTS.map(p => '<span class="mono" style="font-size:12px">' + p + ' ' + design.armor[p] + '</span>').join(' · ');
+  return '<div class="panel ' + cls + '"><div class="ph"><span>' + title + ' — ' + esc(design.name) + '</span><span class="ser">' + ser + '</span></div><div class="pb stack">'
+    + '<div class="kv"><div><span>질량</span><b>' + f1(m.total) + 't</b></div><div><span>장갑 합계</span><b>' + IV.armorTotal(design) + '</b></div><div><span>이동력</span><b>' + IV.movePoints(mech) + '</b></div>'
+    + '<div><span>방열/라운드</span><b>' + IV.dissipation(mech) + '</b></div><div><span>냉각 장치</span><b>' + design.coolers + '</b></div><div><span>무기</span><b>' + design.weapons.length + '정</b></div></div>'
+    + '<div class="scroll-x"><table class="t"><thead><tr><th>무기</th><th>부위</th><th>피해</th><th>사거리</th><th>열</th><th>탄약</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+    + '<div style="line-height:1.8">' + armorLine + '</div>'
+    + (v.ok ? '' : '<div class="banner bad">' + v.errors.map(esc).join('<br>') + '</div>') + '</div></div>';
+}
+function renderBrief() {
+  const two = S.mode === '2v2';
+  const ed = IV.PRESETS[S.enemyKey], pv = IV.validateDesign(S.design);
+  const rules = '<div class="panel"><div class="ph"><span>전투 규칙 요약</span><span class="ser">PL-05</span></div><div class="pb"><div class="two" style="gap:10px 24px">'
+    + '<div><b>명중 판정</b><div class="dim" style="font-size:13px">2D6 합계가 목표치 이상이면 명중. 기본 목표치 ' + C.BASE_TARGET + ', 장거리 +' + C.LONG_RANGE_MOD + ', 이동 후 사격 +' + C.MOVED_MOD + ', 적이 잔해 지대 엄폐 +' + C.COVER_MOD + ', 이동 없이 사격(조준) ' + C.AIM_MOD + ', 과열 시 페널티. 최종 ' + C.MIN_TARGET + '~' + C.MAX_TARGET + '.</div></div>'
+    + '<div><b>피해 처리</b><div class="dim" style="font-size:13px">명중하면 별도의 2D6으로 피격 부위를 정합니다. 피해는 장갑 → 내부 구조 순서로 들어가고, 내부 구조가 0이면 부위가 파괴되어 장착 무기를 잃습니다. 이미 파괴된 부위를 맞으면 피해가 안쪽 부위로 이어집니다.</div></div>'
+    + '<div><b>턴 진행</b><div class="dim" style="font-size:13px">라운드마다 아군 → 적 순서로 이동 1회 + 공격 1회. 공격 한 번에 여러 무기를 함께 발사할 수 있습니다. 라운드 끝에 열이 방열량만큼 줄어듭니다. 열이 ' + C.HEAT_LIMIT + '을 넘으면 명중 페널티가 붙습니다.</div></div>'
+    + '<div><b>전장</b><div class="dim" style="font-size:13px">9×9 육각 타일. 빗금 타일은 잔해 지대로, 진입 비용이 ' + C.RUBBLE_COST + '이며 그 위의 기체는 엄폐를 받습니다. 한쪽 다리를 잃으면 이동력이 절반, 양쪽을 잃으면 이동 불가.</div></div>'
+    + (two ? '<div><b>2대2 전투</b><div class="dim" style="font-size:13px">내가 조종하는 기체 1기 + 아군 AI 1기 대 적 AI 2기. 아군 턴에는 내 기체가 먼저 행동하고 [턴 종료]를 누르면 아군 AI가 행동하며, 적 턴에는 적1 → 적2 순서로 AI가 행동합니다. 기체마다 이동 1회 + 공격 1회이며 열·탄약·부위 피해는 기체별로 따로 관리됩니다. 한 팀이 전멸하면 전투가 끝납니다. 공격할 적은 전장의 적 기체나 상단 명단에서 고릅니다.</div></div>' : '') + '</div></div></div>';
+  const pickRow = (act, cur) => '<div class="pick">' + Object.keys(IV.PRESETS).map(k => '<button class="btn' + (k === cur ? ' on' : '') + '" data-act="' + act + '" data-key="' + k + '">' + esc(IV.PRESETS[k].name) + '</button>').join('') + '</div>';
+  const modeRow = '<div class="panel"><div class="ph"><span>전투 방식</span><span class="ser">PL-04</span></div><div class="pb"><div class="pick" role="group" aria-label="전투 방식">'
+    + '<button class="btn' + (!two ? ' on' : '') + '" data-act="mode" data-mode="1v1" aria-pressed="' + !two + '">1 대 1</button>'
+    + '<button class="btn' + (two ? ' on' : '') + '" data-act="mode" data-mode="2v2" aria-pressed="' + two + '">2 대 2 (아군 AI 1기 + 적 2기)</button></div></div></div>';
+  const panels = two
+    ? summaryPanel(S.design, 'ally', '내 기체', 'UNIT-A') + summaryPanel(ed, 'foe', '적1', 'UNIT-B') + summaryPanel(IV.PRESETS[S.allyKey], 'ally', '아군 AI', 'UNIT-C') + summaryPanel(IV.PRESETS[S.enemy2Key], 'foe', '적2', 'UNIT-D')
+    : summaryPanel(S.design, 'ally', '아군', 'UNIT-A') + summaryPanel(ed, 'foe', '적', 'UNIT-B');
+  const picks = '<div class="panel"><div class="ph"><span>' + (two ? '적1 기체 선택' : '적 기체 선택') + '</span><span class="ser">PL-06</span></div><div class="pb stack">' + pickRow('enemy', S.enemyKey) + '</div></div>'
+    + (two ? '<div class="panel"><div class="ph"><span>아군 AI 기체 선택</span><span class="ser">PL-06B</span></div><div class="pb stack">' + pickRow('ally', S.allyKey) + '</div></div>'
+      + '<div class="panel"><div class="ph"><span>적2 기체 선택</span><span class="ser">PL-06C</span></div><div class="pb stack">' + pickRow('enemy2', S.enemy2Key) + '</div></div>' : '');
+  $('#v-brief').innerHTML = '<div class="stack">' + modeRow
+    + '<div class="brief">' + panels + '</div>'
+    + picks + rules
+    + '<div class="gobar"><button class="btn" data-act="goHangar">← 설계로 돌아가기</button><button class="btn primary" data-act="start"' + (pv.ok ? '' : ' disabled') + '>전투 시작 ▶</button></div></div>';
+}
+
+/* =====================================================================
+   IRON VECTOR — mech.js : SVG 인간형 이족보행 메카 (서 있는 정면 실루엣)
+   - 머리·몸통·좌우 어깨 장갑/몸통·좌우 팔·좌우 다리를 각각 별도 그룹(.mp)으로 그린다.
+   - 모든 모양은 메카 객체의 실제 데이터(부위 장갑/구조/파괴, 장착 무기)에서 만든다.
+   - 좌표는 '왼쪽' 부위를 기준으로 그리고, 오른쪽 부위는 그룹 전체를 좌우 반전(scale(-1,1))해서 그린다.
+   - 방향: 바닥의 화살표가 6방향 그대로 회전한다. 북쪽 계열(1,2)은 뒷모습(바이저 대신 환기구),
+     동쪽/서쪽 계열은 머리가 그쪽으로 살짝 돌아간다. 좌우 반전은 하지 않는다: 왼쪽 부위(L)는 항상 화면 왼쪽이라
+     피해 기록지(LA가 왼쪽)와 같은 배치로 읽힌다.
+   ===================================================================== */
+const MECH = {
+  SCALE: 1, DY: -3,
+  PAL: {
+    player: { armor: '#4a98a8', armor2: '#2f6674', edge: '#a9edf7', glow: '#8ff6ff', dark: '#1b2326' },
+    enemy: { armor: '#b9523a', armor2: '#6e2c1f', edge: '#ffc397', glow: '#ff9a55', dark: '#241413' },
+    // 2대2 전용: 아군 AI(푸른 강철색), 적 2번 기체(호박색)
+    ally: { armor: '#6a86c9', armor2: '#3b5189', edge: '#cfdcff', glow: '#a9c0ff', dark: '#171c27' },
+    enemy2: { armor: '#c98a33', armor2: '#7a4c14', edge: '#ffdca3', glow: '#ffc25e', dark: '#241b10' }
+  },
+  HAZARD: '#e3a72f',
+  BOX: { HD: [-5, -27, 5, -17], CT: [-9, -14, 9, 4], LT: [-24, -20, -9, 2], RT: [-24, -20, -9, 2], LA: [-24, -9, -16, 10], RA: [-24, -9, -16, 10], LL: [-12, 6, -4, 25], RL: [-12, 6, -4, 25] },
+  CEN: { HD: [0, -22], CT: [0, -6], LT: [-16, -9], RT: [16, -9], LA: [-20.5, 2], RA: [20.5, 2], LL: [-8, 16], RL: [8, 16] }
+};
+
+function mixHex(a, b, t) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ch = sh => Math.round(((pa >> sh) & 255) * (1 - t) + ((pb >> sh) & 255) * t);
+  return '#' + [16, 8, 0].map(sh => ch(sh).toString(16).padStart(2, '0')).join('');
+}
+function seeded(str) { // 같은 부위는 항상 같은 위치에 흠집이 생기도록 하는 결정적 난수 (게임 판정과 무관)
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
+  return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+}
+const flat = a => { const o = []; for (let i = 0; i < a.length; i += 2) o.push(a[i] + ',' + a[i + 1]); return o.join(' '); };
+const poly = (a, attrs) => '<polygon points="' + flat(a) + '" ' + attrs + '/>';
+const pgon = (pts, attrs) => '<polygon points="' + pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ') + '" ' + attrs + '/>';
+const isRight = loc => loc[0] === 'R';
+function sty(fill, stroke, w) { return 'fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + (w || 0.9) + '" stroke-linejoin="round" stroke-opacity=".8"'; }
+const DARK = 'fill="#20282a" stroke="#0b0f10" stroke-width=".6"';
+function jag(x0, y0, x1, y1, dir) { // 부러진 단면(톱니 모양) 폴리곤
+  const w = x1 - x0, off = [0, 3, 0.5, 3.5, 1], d = dir === 'down' ? -1 : 1, e = dir === 'down' ? y1 : y0;
+  const a = dir === 'down' ? [x0, y0, x1, y0] : [x0, y1, x1, y1];
+  for (let i = 0; i <= 4; i++) a.push(+(x1 - w * i / 4).toFixed(1), +(e + d * off[i]).toFixed(1));
+  return a;
+}
+
+function partLook(m, loc, pal) {
+  const s = m.parts[loc];
+  const aLoss = s.armorMax > 0 ? 1 - s.armor / s.armorMax : 0;
+  const stripped = s.armor <= 0;
+  let fill, fill2, stroke;
+  if (s.destroyed) { fill = '#1c1513'; fill2 = '#120e0d'; stroke = '#5a463d'; }
+  else if (stripped) { fill = '#59605f'; fill2 = '#454c4b'; stroke = pal.edge; }
+  else { fill = mixHex(pal.armor, '#2a2d2e', aLoss * 0.6); fill2 = mixHex(pal.armor2, '#1c1f20', aLoss * 0.6); stroke = pal.edge; }
+  return { s, aLoss, stripped, fill, fill2, stroke, dead: s.destroyed };
+}
+
+/* 손상 표시: 장갑 손상(그을림·긁힘), 장갑 소진(노출된 내부 프레임·배선), 구조 손상(균열·불꽃) */
+function damageMarks(loc, L, pal) {
+  if (L.dead) return '';
+  const b = MECH.BOX[loc], r = seeded(loc + pal.armor);
+  const rp = () => [b[0] + (b[2] - b[0]) * r(), b[1] + (b[3] - b[1]) * r()];
+  const s = L.s, sLoss = 1 - s.structure / s.structureMax;
+  let out = '';
+  if (L.aLoss > 0.12 && !L.stripped) {
+    const n = 1 + Math.floor(L.aLoss * 4);
+    for (let i = 0; i < n; i++) {
+      const p = rp(), q = 1.4 + L.aLoss * 2.6;
+      out += pgon([[p[0] - q, p[1] - q * .4], [p[0] - q * .2, p[1] - q], [p[0] + q, p[1] - q * .3], [p[0] + q * .5, p[1] + q * .8], [p[0] - q * .6, p[1] + q * .6]], 'fill="#0d1011" fill-opacity="' + (0.3 + L.aLoss * 0.4).toFixed(2) + '"');
+    }
+  }
+  if (L.stripped) { // 장갑 소진: 노출된 내부 프레임과 배선
+    const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2, w = (b[2] - b[0]) * 0.3, h = (b[3] - b[1]) * 0.3;
+    out += pgon([[cx - w, cy - h], [cx + w, cy - h * .8], [cx + w * .8, cy + h], [cx - w, cy + h * .9]], 'fill="#1b2022" stroke="#ff9a3d" stroke-width=".7" stroke-opacity=".9"');
+    out += '<polyline points="' + (cx - w) + ',' + cy + ' ' + cx + ',' + (cy - h * .5) + ' ' + (cx + w) + ',' + (cy + h * .4) + '" fill="none" stroke="#ff9a3d" stroke-width=".8" stroke-opacity=".9"/>';
+  }
+  if (sLoss > 0) {
+    const n = 1 + Math.floor(sLoss * 4);
+    for (let i = 0; i < n; i++) {
+      const p = rp(), q = rp(), t = rp();
+      out += '<polyline points="' + p.map(v => v.toFixed(1)).join(',') + ' ' + [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2].map(v => v.toFixed(1)).join(',') + ' ' + t.map(v => v.toFixed(1)).join(',') + '" fill="none" stroke="#080a0b" stroke-width="1.1"/>';
+    }
+    if (sLoss >= 0.35) for (let i = 0; i < 2; i++) { const p = rp(); out += '<circle class="spark" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="1.1" style="animation-delay:' + (-i * 0.45) + 's"/>'; }
+  }
+  return out;
+}
+
+/* ---------- 부위 모양 (왼쪽 기준 좌표) ---------- */
+function headShape(L, pal, team, back, turn) {
+  const neck = '<rect x="-3" y="-18.2" width="6" height="3.2" ' + DARK + '/>';
+  if (L.dead) return neck + poly(jag(-4, -22, 4, -17, 'up'), sty('#1c1513', '#5a463d'));
+  const horns = team === 'enemy' ? poly([-7, -23, -10, -30, -5, -26], sty(L.fill2, L.stroke)) + poly([7, -23, 10, -30, 5, -26], sty(L.fill2, L.stroke)) : '';
+  const body = poly(team === 'enemy' ? [-6, -17, -7, -24, -4, -28, 4, -28, 7, -24, 6, -17] : [-5, -17, -6, -23, -3, -27, 3, -27, 6, -23, 5, -17], sty(L.fill, L.stroke));
+  const plate = poly([-3.5, -26.5, 3.5, -26.5, 4.5, -24, -4.5, -24], sty(L.fill2, L.stroke, 0.6));
+  let face;
+  if (back) face = '<path d="M-3,-22 h6 M-3,-20 h6" stroke="#0d1011" stroke-width=".9" fill="none"/>';
+  else if (team === 'enemy') face = poly([-4.6, -23, -1.2, -22.4, -1.2, -20.8, -4.6, -21.6], 'fill="' + pal.glow + '"') + poly([4.6, -23, 1.2, -22.4, 1.2, -20.8, 4.6, -21.6], 'fill="' + pal.glow + '"');
+  else face = '<rect x="-4" y="-23" width="8" height="2.4" fill="' + pal.glow + '"/>';
+  return neck + '<g transform="translate(' + (back ? 0 : turn * 1.6) + ',0)">' + horns + body + plate + face + '</g>' + damageMarks('HD', L, pal);
+}
+function centerShape(L, pal, back) {
+  const hip = poly([-8, 4, 8, 4, 7, 7.5, -7, 7.5], DARK);
+  const base = [-9, -15, 9, -15, 10, -3, 7, 5, -7, 5, -10, -3];
+  if (L.dead) return hip + poly(base, 'fill="#1a1412" stroke="#ff8a2b" stroke-width=".7"') + '<line x1="-6" y1="-8" x2="5" y2="0" stroke="#ff8a2a" stroke-width=".8" stroke-dasharray="1.5 2"/>';
+  const mid = back
+    ? '<path d="M-5,-11 h10 M-5,-8 h10 M-5,-5 h10" stroke="#0d1011" stroke-width=".8" fill="none"/>'
+    : '<circle cx="0" cy="-9" r="3" fill="#0d1011"/><circle cx="0" cy="-9" r="1.9" fill="' + pal.glow + '" fill-opacity=".85"/>';
+  return hip + poly(base, sty(L.fill, L.stroke)) + poly([-5, -12, 5, -12, 6, -4, -6, -4], sty(L.fill2, L.stroke, 0.6)) + poly([-4, 0, 4, 0, 3, 4, -3, 4], sty(L.fill2, L.stroke, 0.6)) + mid + damageMarks('CT', L, pal);
+}
+function sideTorsoShape(L, pal, team) { // 몸통 옆면 + 어깨 장갑
+  const side = [-10, -14, -17, -14, -18, -3, -14, 3, -8, 3, -10, -3];
+  if (L.dead) { // 파괴: 그을린 구멍과 부러진 어깨 장갑 잔해
+    return poly(side, 'fill="#1a1412" stroke="#ff8a2b" stroke-width=".7"') + poly(jag(-21, -20, -11, -13, 'down'), sty('#1c1513', '#5a463d'));
+  }
+  const en = team === 'enemy';
+  const pauld = en ? [-11, -22, -22, -22, -27, -15, -24, -9, -11, -10] : [-11, -21, -21, -20, -25, -14, -23, -9, -11, -10];
+  const ptrim = en ? [-12, -20, -21, -20, -24, -15, -12, -13] : [-12, -19, -20, -18.5, -22.5, -14, -12, -13];
+  return poly(side, sty(L.fill, L.stroke)) + poly([-17, -13, -11, -13, -11, -5, -17, -5], sty(L.fill2, L.stroke, 0.6))
+    + poly(pauld, sty(L.fill, L.stroke)) + poly(ptrim, sty(L.fill2, L.stroke, 0.6))
+    + poly([-21, -16, -13, -17, -13, -15, -21.5, -14.2], 'fill="' + (L.stripped ? '#454c4b' : pal.edge) + '" fill-opacity=".85"')
+    + (en ? poly([-20, -22, -23, -29, -16, -22], sty(L.fill2, L.stroke)) : '')
+    + damageMarks('LT', L, pal);
+}
+function armShape(L, pal) {
+  if (L.dead) { // 파괴: 어깨 관절 잔해와 끊어진 케이블
+    return '<circle cx="-20.5" cy="-1" r="2.6" ' + DARK + '/>' + poly(jag(-24, -9, -17, -2, 'down'), sty('#1c1513', '#5a463d'))
+      + '<polyline points="-21,-2 -19,2 -22,5" fill="none" stroke="#ff8a2a" stroke-width=".8" stroke-dasharray="1.5 2"/>';
+  }
+  return poly([-24, -9, -17, -9, -17, -1, -24, -1], sty(L.fill, L.stroke)) + poly([-25, -1, -16, -1, -17, 11, -24, 11], sty(L.fill2, L.stroke))
+    + poly([-23, 2, -18, 2, -18.5, 8, -23.5, 8], sty(L.fill, L.stroke, 0.6)) + '<circle cx="-20.5" cy="-1" r="2.6" ' + DARK + '/>' + damageMarks('LA', L, pal);
+}
+function legShape(L, pal) {
+  if (L.dead) { // 파괴: 그을린 그루터기와 바닥에 떨어진 파편
+    return poly(jag(-11, 5, -3, 12, 'down'), sty('#1c1513', '#5a463d')) + poly([-15, 27, -6, 26, -5, 29.5, -16, 29.5], sty('#120e0d', '#5a463d'))
+      + '<line x1="-8" y1="12" x2="-8" y2="20" stroke="#ff8a2a" stroke-width=".7" stroke-dasharray="1.5 2"/>';
+  }
+  return poly([-15.5, 26, -3.5, 26, -2.5, 29.5, -16.5, 29.5], DARK)
+    + poly([-11, 5, -3, 5, -4, 15, -11, 15], sty(L.fill, L.stroke)) + poly([-12.5, 16, -4.5, 16, -5.5, 26, -13.5, 26], sty(L.fill2, L.stroke))
+    + poly([-10, 6.5, -4.5, 6.5, -5, 12, -10, 12], sty(L.fill2, L.stroke, 0.6)) + poly([-11, 18, -6, 18, -7, 24, -12, 24], sty(L.fill, L.stroke, 0.6))
+    + '<circle cx="-7.5" cy="15.5" r="3" ' + DARK + '/>' + damageMarks('LL', L, pal);
+}
+
+/* ---------- 무기: 설계 데이터(m.weapons)에 있는 것만 그린다 ---------- */
+// 장착 위치 [x, y, 위쪽 방향 여부, 크기] (왼쪽 기준, 오른쪽은 x 부호 반전). 같은 부위 안에서의 순서(idx)로 정한다.
+const MOUNTS = {
+  A: [[-20.5, 6, 0, 1], [-26.5, 2.5, 0, 0.78]],
+  T: [[-16, -24.5, 1, 1], [-14, -6, 0, 1], [-14.5, 1.5, 0, 1]],
+  CT: [[-4, -1.5, 0, 0.72], [4, -1.5, 0, 0.72]],
+  HD: [[0, -19.5, 0, 0.72]]
+};
+const MUZ = { MG: 10, MSL: 4, BEAM: 0, HAMMER: 9 };
+function mountFor(loc, idx) {
+  const list = loc === 'CT' ? MOUNTS.CT : loc === 'HD' ? MOUNTS.HD : loc[1] === 'A' ? MOUNTS.A : loc[1] === 'T' ? MOUNTS.T : [[0, 0, 0, 0.5]];
+  const mt = list[Math.min(idx, list.length - 1)];
+  return { x: mt[0], y: mt[1], up: mt[2], k: mt[3] };
+}
+function weaponShape(type, pal, lost) {
+  const gun = 'fill="#4b5557" stroke="#0b0f10" stroke-width=".6"';
+  if (lost) return '<polygon points="-3,-1 2,-3.5 4,0 1,3 -3.5,2" fill="#171413" stroke="#5a463d" stroke-width=".6"/><line x1="-2" y1="-1.5" x2="2" y2="2" stroke="#8a6a55" stroke-width=".6"/><line x1="-2" y1="2" x2="2.5" y2="-1.5" stroke="#8a6a55" stroke-width=".6"/><circle class="spark" cx="2.5" cy="-2" r="1"/>';
+  switch (type) {
+    case 'MG': return '<rect x="-2.6" y="-3" width="5.2" height="6" rx=".6" ' + gun + '/><rect x="-2" y="3" width="1.7" height="7" fill="#0d1011"/><rect x=".3" y="3" width="1.7" height="7" fill="#0d1011"/><rect x="-1" y="-1.6" width="2" height="2" fill="' + MECH.HAZARD + '"/>';
+    case 'MSL': return '<rect x="-5" y="-3.6" width="10" height="7.2" rx=".8" ' + gun + '/>' + [-3, 0, 3].map(x => '<circle cx="' + x + '" cy="-1.3" r="1.05" fill="#06080a"/><circle cx="' + x + '" cy="1.5" r="1.05" fill="#06080a"/>').join('') + '<rect x="-5" y="-3.6" width="10" height="1.1" fill="' + MECH.HAZARD + '" fill-opacity=".9"/>';
+    case 'BEAM': return '<rect x="-3.2" y="-3.2" width="6.4" height="6.4" rx="1" ' + gun + '/><circle class="lens" r="2.2" fill="' + pal.glow + '" stroke="#fff" stroke-width=".5" stroke-opacity=".7"/>';
+    case 'HAMMER': return '<rect x="-1.4" y="-6" width="2.8" height="5" fill="#0d1011"/><rect x="-4.8" y="-1.5" width="9.6" height="8" rx="1" fill="' + MECH.HAZARD + '" stroke="#0d1011" stroke-width=".8"/><polygon points="-4,6.5 -2,10.5 0,6.5" fill="#9aa4a6" stroke="#0d1011" stroke-width=".5"/><polygon points="0,6.5 2,10.5 4,6.5" fill="#9aa4a6" stroke="#0d1011" stroke-width=".5"/>';
+  }
+  return '';
+}
+function weaponMount(m, w) {
+  const same = m.weapons.filter(x => x.loc === w.loc);
+  return mountFor(w.loc, same.indexOf(w));
+}
+function weaponsSVG(m, locs, pal) {
+  let out = '';
+  m.weapons.forEach(w => {
+    if (!locs.includes(w.loc)) return;
+    if (m.parts[w.loc].destroyed) return; // 장착 부위가 파괴되면 무기도 부위와 함께 사라진다(데이터상 사용 불가)
+    const mt = weaponMount(m, w), lost = w.destroyed, sx = isRight(w.loc) ? -1 : 1;
+    out += '<g class="wp" data-uid="' + w.uid + '" data-type="' + w.type + '" data-loc="' + w.loc + '" data-lost="' + (lost ? 1 : 0) + '" transform="translate(' + (mt.x * sx) + ',' + mt.y + ') rotate(' + (lost ? -18 * sx : 0) + ') scale(' + mt.k + ',' + (mt.up ? -mt.k : mt.k) + ')">' + weaponShape(w.type, pal, lost) + '</g>';
+  });
+  return out;
+}
+
+/* FX 도우미: 부위/총구 위치 → 토큰 중심 기준 화면 오프셋 (좌우 반전 반영) */
+const flipOf = () => 1; // 좌우 반전 없음(위 설명 참고)
+const turnOf = m => (m.facing === 2 || m.facing === 3 || m.facing === 4) ? -1 : 1; // 머리가 향하는 쪽
+function mechToScreen(m, p) { return { x: p[0] * flipOf(m), y: p[1] + MECH.DY }; }
+function mechPartOffset(m, loc) { return mechToScreen(m, MECH.CEN[loc]); }
+function mechMuzzleOffset(m, w) {
+  const mt = weaponMount(m, w), sx = isRight(w.loc) ? -1 : 1;
+  return mechToScreen(m, [mt.x * sx, mt.y + (mt.up ? -1 : 1) * MUZ[w.type] * mt.k]);
+}
+
+/* ---------- 지속 효과(연기·불꽃·조준선): 반전/회전하지 않는 층에 그려 연기가 항상 위로 오르게 한다 ---------- */
+function overlaySVG(m, o) {
+  let out = '<g class="tokfx">';
+  IV.PARTS.forEach((loc, i) => {
+    const s = m.parts[loc], c = mechPartOffset(m, loc);
+    const x = c.x.toFixed(1), y = c.y.toFixed(1);
+    const ratio = s.structure / s.structureMax;
+    const puff = n => { let h = ''; for (let k = 0; k < n; k++) h += '<circle class="smoke" cx="' + x + '" cy="' + y + '" r="2.8" style="animation-delay:' + (-(i * 0.37 + k * 0.8)).toFixed(2) + 's"/>'; return h; };
+    const flame = '<path class="flame" d="M' + (x - 2.4) + ',' + (+y + 2) + ' Q' + (x - 3.4) + ',' + (y - 3) + ' ' + x + ',' + (y - 8) + ' Q' + (+x + 3.4) + ',' + (y - 3) + ' ' + (+x + 2.4) + ',' + (+y + 2) + ' Z"/>';
+    if (s.destroyed) out += puff(3) + flame;
+    else if (ratio <= 0.3) out += puff(2) + flame;
+    else if (ratio <= 0.55) out += puff(2);
+  });
+  if (!m.alive) { const c = mechPartOffset(m, 'CT'); out += '<path class="flame" d="M' + (c.x - 4) + ',' + (c.y + 4) + ' Q' + (c.x - 6) + ',' + (c.y - 4) + ' ' + c.x + ',' + (c.y - 14) + ' Q' + (c.x + 6) + ',' + (c.y - 4) + ' ' + (c.x + 4) + ',' + (c.y + 4) + ' Z"/>'; }
+  if (o && o.aim && m.parts[o.aim] && !m.parts[o.aim].destroyed) {
+    const c = mechPartOffset(m, o.aim);
+    out += '<g class="reticle" transform="translate(' + c.x.toFixed(1) + ',' + c.y.toFixed(1) + ')"><circle r="8"/><path d="M-13 0H-5M5 0H13M0 -13V-5M0 5V13"/></g>';
+  }
+  return out + '</g>';
+}
+
+/* ---------- 메카 전체 ---------- */
+function mechSVG(m, o) {
+  o = o || {};
+  const pal = MECH.PAL[m.role === 'ally' ? 'ally' : m.id === 'enemy2' ? 'enemy2' : m.team], team = m.team;
+  const back = m.facing === 1 || m.facing === 2; // 북쪽을 보면 뒷모습
+  const grp = (loc, inner) => {
+    const s = m.parts[loc];
+    const aimable = o.aimable && !s.destroyed;
+    return '<g class="mp mp-' + loc + (o.aim === loc ? ' aimed' : '') + (aimable ? ' aimable' : '') + '" data-part="' + loc + '" data-armor="' + s.armor + '" data-structure="' + s.structure + '" data-destroyed="' + (s.destroyed ? 1 : 0) + '"'
+      + (aimable ? ' data-act="aimpart" data-loc="' + loc + '" tabindex="0" role="button" aria-label="' + P[loc].name + ' 정밀 사격 대상으로 지정"' : '') + '>'
+      + (isRight(loc) ? '<g transform="scale(-1,1)">' + inner + '</g>' : inner) + '</g>';
+  };
+  const L = {}; IV.PARTS.forEach(p => { L[p] = partLook(m, p, pal); });
+  let body = '';
+  body += grp('LL', legShape(L.LL, pal)) + grp('RL', legShape(L.RL, pal));
+  body += grp('LA', armShape(L.LA, pal)) + grp('RA', armShape(L.RA, pal)) + weaponsSVG(m, ['LA', 'RA'], pal);
+  body += grp('CT', centerShape(L.CT, pal, back)) + weaponsSVG(m, ['CT'], pal);
+  body += grp('LT', sideTorsoShape(L.LT, pal, team)) + grp('RT', sideTorsoShape(L.RT, pal, team)) + weaponsSVG(m, ['LT', 'RT'], pal);
+  body += grp('HD', headShape(L.HD, pal, team, back, turnOf(m))) + weaponsSVG(m, ['HD'], pal);
+  const arrow = '<g class="mechrot" data-team="' + m.team + '" data-id="' + m.id + '" transform="rotate(' + (-m.facing * 60) + ')"><polygon points="34,0 27,-5.5 27,5.5" fill="' + pal.glow + '" fill-opacity=".9" stroke="#0b0f10" stroke-width=".6"/></g>';
+  return '<g class="shake" data-team="' + m.team + '" data-id="' + m.id + '">' + arrow
+    + '<ellipse cx="0" cy="27" rx="21" ry="4.5" fill="#000" fill-opacity=".4"/>'
+    + '<g class="spr" transform="translate(0,' + MECH.DY + ') scale(' + flipOf(m) + ',1)">' + body + '</g></g>' + overlaySVG(m, o);
+}
+
+/* =====================================================================
+   IRON VECTOR — fx.js : 전투 시각 효과 (SVG + Web Animations)
+   - 판정(rules.js)이 끝난 결과를 "그려 주기만" 한다. 주사위/피해/상태를 바꾸지 않는다.
+   - 효과 전용 난수(Math.random)는 위치/모양에만 쓰이며 게임 판정과 무관하다.
+   - 모든 효과 요소·타이머·애니메이션은 끝나면 정리되고, skip()/clear()로 즉시 정리할 수 있다.
+   ===================================================================== */
+const FX = (function () {
+  const NS = 'http://www.w3.org/2000/svg';
+  let enabled = true, skipping = false, epoch = 0, gen = 0; // epoch: clear() 때마다 증가. 이전 연출 루프는 gen !== epoch 이면 즉시 끝난다
+  const anims = new Set(), timers = new Map(), nodes = new Set();
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const layer = () => document.getElementById('fx');
+  const live = () => enabled && !skipping && gen === epoch && !!layer();
+
+  function mk(name, attrs, parent) {
+    const e = document.createElementNS(NS, name);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    (parent || layer()).appendChild(e);
+    nodes.add(e);
+    return e;
+  }
+  function drop(e) { // 자식 요소(예: 탄환 그룹 안의 선)도 추적 목록에서 함께 제거
+    nodes.delete(e);
+    nodes.forEach(n => { if (n !== e && e.contains(n)) nodes.delete(n); });
+    if (e.parentNode) e.parentNode.removeChild(e);
+  }
+  function wait(ms) {
+    return new Promise(res => {
+      if (!live()) return res();
+      const id = setTimeout(() => { timers.delete(id); res(); }, ms);
+      timers.set(id, res);
+    });
+  }
+  function anim(e, kf, opt) {
+    return new Promise(res => {
+      if (!e.animate) { res(); return; }
+      let a;
+      try { a = e.animate(kf, Object.assign({ fill: 'forwards', easing: 'ease-out' }, opt)); } catch (x) { res(); return; }
+      anims.add(a);
+      const done = () => { anims.delete(a); res(); };
+      a.onfinish = done; a.oncancel = done;
+    });
+  }
+  const burst = (e, kf, opt) => { anim(e, kf, opt).then(() => drop(e)); }; // 기다리지 않는 효과
+  function cancelAll() {
+    epoch++;
+    anims.forEach(a => { try { a.cancel(); } catch (x) { /* 무시 */ } });
+    anims.clear();
+    timers.forEach((res, id) => { clearTimeout(id); res(); });
+    timers.clear();
+    nodes.forEach(n => { if (n.parentNode) n.parentNode.removeChild(n); });
+    nodes.clear();
+  }
+  const CENTER = 'transform-box:fill-box;transform-origin:center';
+
+  /* ----- 기본 효과 조각 ----- */
+  function flashAt(p, r, col, dur) {
+    const c = mk('circle', { cx: p.x, cy: p.y, r, fill: col, opacity: 0, style: CENTER });
+    return anim(c, [{ transform: 'scale(.3)', opacity: .95 }, { transform: 'scale(1.5)', opacity: 0 }], { duration: dur || 260 }).then(() => drop(c));
+  }
+  function sparks(p, n, cols, spread, dur) {
+    for (let i = 0; i < n; i++) {
+      const c = mk('circle', { cx: p.x, cy: p.y, r: rnd(0.8, 1.7).toFixed(2), fill: cols[i % cols.length], opacity: 0 });
+      const a = rnd(0, Math.PI * 2), d = rnd(spread * 0.4, spread);
+      burst(c, [{ transform: 'translate(0px,0px)', opacity: 1 }, { transform: 'translate(' + (Math.cos(a) * d).toFixed(1) + 'px,' + (Math.sin(a) * d + 4).toFixed(1) + 'px)', opacity: 0 }], { duration: dur + rnd(-80, 120) });
+    }
+  }
+  function smoke(p, n, dur, col) {
+    for (let i = 0; i < n; i++) {
+      const c = mk('circle', { cx: p.x + rnd(-4, 4), cy: p.y + rnd(-3, 3), r: rnd(2.2, 3.6).toFixed(1), fill: col || '#8d9391', opacity: 0, style: CENTER });
+      burst(c, [{ transform: 'translate(0px,0px) scale(.5)', opacity: .6 }, { transform: 'translate(' + rnd(-5, 5).toFixed(1) + 'px,' + rnd(-22, -12).toFixed(1) + 'px) scale(2)', opacity: 0 }], { duration: dur + rnd(0, 250), delay: i * 70 });
+    }
+  }
+  function floatText(p, text, col) {
+    const t = mk('text', { x: p.x, y: p.y - 8, fill: col, 'font-size': 9.5, 'font-weight': 700, 'text-anchor': 'middle', opacity: 0, 'paint-order': 'stroke', stroke: '#0b0e0f', 'stroke-width': 2.2, 'font-family': 'Barlow Condensed, Noto Sans KR, sans-serif' });
+    t.textContent = text;
+    burst(t, [{ transform: 'translateY(0px)', opacity: 1 }, { transform: 'translateY(-14px)', opacity: 0 }], { duration: 900, easing: 'ease-out' });
+  }
+
+  /* ----- 무기 발사 ----- */
+  async function fire(type, from, to, team) {
+    const col = team === 'player' ? '#8ff6ff' : '#ffb066';
+    const ang = Math.atan2(to.y - from.y, to.x - from.x) * 180 / Math.PI;
+    if (type === 'BEAM') {
+      const a = { x1: from.x, y1: from.y, x2: to.x, y2: to.y, 'stroke-linecap': 'round', opacity: 0 };
+      const l1 = mk('line', Object.assign({ stroke: col, 'stroke-width': 3.4, filter: 'url(#glow)' }, a));
+      const l2 = mk('line', Object.assign({ stroke: '#ffffff', 'stroke-width': 1.2 }, a));
+      flashAt(from, 6, col, 300);
+      const kf = [{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 0.85, offset: 0.65 }, { opacity: 0 }];
+      await Promise.all([anim(l1, kf, { duration: 440 }), anim(l2, kf, { duration: 440 })]);
+      drop(l1); drop(l2);
+    } else if (type === 'MG') {
+      flashAt(from, 4.5, '#ffe9a0', 200);
+      const dist = Math.hypot(to.x - from.x, to.y - from.y);
+      const ps = [];
+      for (let i = 0; i < 5; i++) {
+        const g = mk('g', { transform: 'translate(' + from.x.toFixed(1) + ',' + from.y.toFixed(1) + ') rotate(' + (ang + rnd(-2.5, 2.5)).toFixed(1) + ')' });
+        const ln = mk('line', { x1: -6, y1: 0, x2: 2, y2: 0, stroke: '#ffe9a0', 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0 }, g);
+        ps.push(anim(ln, [{ transform: 'translateX(0px)', opacity: 0, offset: 0 }, { transform: 'translateX(0px)', opacity: 1, offset: 0.01 }, { transform: 'translateX(' + dist.toFixed(1) + 'px)', opacity: 1 }], { duration: Math.max(140, dist * 1.5), delay: i * 65, easing: 'linear', fill: 'both' }).then(() => drop(g)));
+      }
+      await Promise.all(ps);
+    } else if (type === 'MSL') {
+      flashAt(from, 5, '#ffd9a0', 240);
+      const pts = [];
+      for (let i = 0; i <= 10; i++) { const t = i / 10; pts.push({ x: lerp(from.x, to.x, t), y: lerp(from.y, to.y, t) - Math.sin(Math.PI * t) * 16 }); }
+      const kf = pts.map((p, i) => { const q = pts[Math.min(i + 1, 10)], r = pts[Math.max(i - 1, 0)]; const a = Math.atan2(q.y - r.y, q.x - r.x) * 180 / Math.PI; return { transform: 'translate(' + p.x.toFixed(1) + 'px,' + p.y.toFixed(1) + 'px) rotate(' + a.toFixed(1) + 'deg)', opacity: 1 }; });
+      const m = mk('polygon', { points: '-5,-2 3,-2 6,0 3,2 -5,2', fill: '#e8e2d0', stroke: '#2a2f31', 'stroke-width': 0.6, opacity: 0 });
+      const flight = anim(m, kf, { duration: 560, easing: 'linear' });
+      const trail = (async () => {
+        for (let i = 1; i <= 8; i++) {
+          await wait(62);
+          if (!live()) return;
+          const t = Math.min(1, i * 62 / 560), p = { x: lerp(from.x, to.x, t), y: lerp(from.y, to.y, t) - Math.sin(Math.PI * t) * 16 };
+          const c = mk('circle', { cx: p.x, cy: p.y, r: 2.4, fill: '#b9bcb5', opacity: 0, style: CENTER });
+          burst(c, [{ transform: 'scale(.6)', opacity: .7 }, { transform: 'scale(2.3)', opacity: 0 }], { duration: 650 });
+        }
+      })();
+      await Promise.all([flight, trail]);
+      drop(m);
+    } else { // HAMMER: 근접 타격
+      flashAt(from, 5, '#fff0b0', 200);
+      const mx = (from.x + to.x) / 2 + (to.y - from.y) * 0.35, my = (from.y + to.y) / 2 - (to.x - from.x) * 0.35;
+      const path = mk('path', { d: 'M' + from.x + ',' + from.y + ' Q' + mx.toFixed(1) + ',' + my.toFixed(1) + ' ' + to.x + ',' + to.y, fill: 'none', stroke: '#fff4c8', 'stroke-width': 3.2, 'stroke-linecap': 'round', opacity: 0 });
+      await anim(path, [{ opacity: 0 }, { opacity: 0.95, offset: 0.25 }, { opacity: 0 }], { duration: 260 });
+      drop(path);
+    }
+  }
+
+  /* ----- 피격 ----- */
+  function shake(m) {
+    const g = document.querySelector('#v-battle .shake[data-id="' + m.id + '"]');
+    if (g) anim(g, [{ transform: 'translate(0px,0px)', opacity: 1 }, { transform: 'translate(-2.6px,1px)', opacity: .5 }, { transform: 'translate(2.2px,-1.5px)', opacity: 1 }, { transform: 'translate(-1.6px,1px)', opacity: .6 }, { transform: 'translate(0px,0px)', opacity: 1 }], { duration: 340, fill: 'none' });
+  }
+  function impact(p, shot, melee) {
+    const steps = shot.steps || [];
+    const structure = steps.some(s => s.type === 'structure');
+    const pen = structure && steps.some(s => s.type === 'armor' && s.left === 0);
+    if (melee) { // 충격파
+      const r = mk('circle', { cx: p.x, cy: p.y, r: 6, fill: 'none', stroke: '#fff0b0', 'stroke-width': 2, opacity: 0, style: CENTER });
+      burst(r, [{ transform: 'scale(.4)', opacity: 1 }, { transform: 'scale(3)', opacity: 0 }], { duration: 380 });
+    }
+    if (structure) { // 내부 구조 피해: 더 강한 불꽃과 연기
+      flashAt(p, 9, '#ff8a2a', 300); flashAt(p, 4.5, '#ffffff', 180);
+      sparks(p, 16, ['#ff9a3d', '#ffd27a', '#ff5a2a'], 28, 520);
+      smoke(p, 3, 800);
+      if (pen) floatText(p, '관통!', '#ffcf6b');
+    } else { // 장갑 피해: 금속성 불꽃과 파편
+      flashAt(p, 5.5, '#fff1c0', 220);
+      sparks(p, 10, ['#ffd27a', '#ffffff', '#c9cfd0'], 20, 380);
+      for (let i = 0; i < 3; i++) { // 파편
+        const c = mk('rect', { x: p.x - 1, y: p.y - 1, width: 2.2, height: 1.6, fill: '#6f7a7d', opacity: 0 });
+        const a = rnd(0, Math.PI * 2), d = rnd(10, 22);
+        burst(c, [{ transform: 'translate(0px,0px) rotate(0deg)', opacity: 1 }, { transform: 'translate(' + (Math.cos(a) * d).toFixed(1) + 'px,' + (Math.sin(a) * d + 5).toFixed(1) + 'px) rotate(' + rnd(120, 360).toFixed(0) + 'deg)', opacity: 0 }], { duration: 480 });
+      }
+    }
+  }
+  function missAt(p) { smoke(p, 2, 450, '#9a9a8c'); floatText(p, '빗나감', '#b8c2bb'); }
+  function explode(p, big) {
+    const r = big ? 24 : 13;
+    const outer = mk('circle', { cx: p.x, cy: p.y, r, fill: '#ff7a2a', opacity: 0, style: CENTER });
+    const mid = mk('circle', { cx: p.x, cy: p.y, r: r * 0.7, fill: '#ffd27a', opacity: 0, style: CENTER });
+    const core = mk('circle', { cx: p.x, cy: p.y, r: r * 0.4, fill: '#ffffff', opacity: 0, style: CENTER });
+    const ring = mk('circle', { cx: p.x, cy: p.y, r: r * 0.6, fill: 'none', stroke: '#ffb36b', 'stroke-width': 2, opacity: 0, style: CENTER });
+    sparks(p, big ? 22 : 14, ['#ff9a3d', '#ffd27a', '#ffffff', '#ff5a2a'], big ? 44 : 30, 700);
+    smoke(p, big ? 5 : 3, 900, '#555b5c');
+    burst(mid, [{ transform: 'scale(.2)', opacity: .9 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 480 });
+    burst(core, [{ transform: 'scale(.3)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 260 });
+    burst(ring, [{ transform: 'scale(.4)', opacity: 1 }, { transform: 'scale(2.2)', opacity: 0 }], { duration: 520 });
+    return anim(outer, [{ transform: 'scale(.2)', opacity: .9 }, { transform: 'scale(1.5)', opacity: 0 }], { duration: 560 }).then(() => drop(outer));
+  }
+
+  /* ----- 외부에서 쓰는 진행 함수 ----- */
+  const tokPos = (m, off) => { const c = hexCenter(m.pos.c, m.pos.r); return { x: c.x + off.x, y: c.y + off.y }; };
+  function setFacingDom(m) {
+    const g = document.querySelector('#v-battle .mechrot[data-id="' + m.id + '"]');
+    if (g) g.setAttribute('transform', 'rotate(' + (-m.facing * 60) + ')');
+  }
+  // 판정이 끝난 사격 결과(shots)를 순서대로 보여 준다. (화면 상태는 아직 사격 전 모습)
+  async function volley(attacker, target, shots) {
+    gen = epoch;
+    if (!live()) return;
+    setFacingDom(attacker);
+    for (const s of shots) {
+      if (!live()) return;
+      if (!s.fired) continue;
+      const w = attacker.weapons.find(x => x.uid === s.uid);
+      const from = tokPos(attacker, mechMuzzleOffset(attacker, w));
+      let to;
+      if (s.hit) to = tokPos(target, mechPartOffset(target, s.loc));
+      else { const a = Math.random() * Math.PI * 2, d = rnd(26, 40); const c = hexCenter(target.pos.c, target.pos.r); to = { x: c.x + Math.cos(a) * d, y: c.y + Math.sin(a) * d }; }
+      await fire(w.type, from, to, attacker.team);
+      if (!live()) return;
+      if (s.hit) { impact(to, s, w.type === 'HAMMER'); shake(target); await wait(200); }
+      else { missAt(to); await wait(120); }
+    }
+  }
+  // 상태가 다시 그려진 뒤: 부위 파괴 폭발, 치명타 표시
+  async function aftermath(target, shots) {
+    gen = epoch;
+    if (!live()) return;
+    const jobs = [];
+    let delay = 0;
+    shots.forEach(s => {
+      if (!s.fired || !s.hit) return;
+      (s.steps || []).forEach(st => {
+        if (st.type === 'destroyed') {
+          const p = tokPos(target, mechPartOffset(target, st.loc)), d = delay; delay += 160;
+          jobs.push(wait(d).then(() => live() ? explode(p, false) : null));
+        } else if (st.type === 'crit') {
+          const p = tokPos(target, mechPartOffset(target, st.loc));
+          sparks(p, 8, ['#ffd27a', '#ff9a3d'], 18, 380); floatText(p, '장비 파괴', '#ff8a6b');
+        } else if (st.type === 'mechDestroyed') {
+          const c = hexCenter(target.pos.c, target.pos.r), d = delay + 260; delay += 260;
+          jobs.push(wait(d).then(() => live() ? explode(c, true) : null));
+        }
+      });
+    });
+    await Promise.all(jobs);
+    await wait(80);
+  }
+  return {
+    setEnabled(v) { enabled = !!v; if (!enabled) cancelAll(); },
+    isEnabled() { return enabled; },
+    reset() { skipping = false; },
+    skip() { skipping = true; cancelAll(); },
+    clear() { cancelAll(); skipping = false; },
+    count() { return nodes.size + anims.size + timers.size; },
+    volley, aftermath
+  };
+})();
+
+/* =====================================================================
+   IRON VECTOR — app2.js : 전장 / 결과 화면, 적 턴 진행, 이벤트, 시작
+   ===================================================================== */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const MAP = { R: 34, Wd: Math.sqrt(3) * 34, pad: 8 };
+function hexCenter(c, r) { return { x: MAP.pad + MAP.Wd * (c + 0.5 * (r & 1)) + MAP.Wd / 2, y: MAP.pad + MAP.R + 1.5 * MAP.R * r }; }
+function snapshot(b) { // 사격 직전 모습(연출 재생 동안 화면에 표시) — 모든 기체의 복사본
+  return { mechs: JSON.parse(JSON.stringify(b.mechs)), logLen: b.log.length };
+}
+function viewBattle() {
+  const b = S.battle;
+  if (!b || !S.pre) return b;
+  const ms = S.pre.mechs, by = id => ms.find(m => m.id === id);
+  return Object.assign({}, b, { mechs: ms, player: by('player'), enemy: by('enemy'), ally: by('ally'), enemy2: by('enemy2'), over: false, winner: null, log: b.log.slice(0, S.pre.logLen) });
+}
+/* ----- 2대2 도우미 (1대1에서는 항상 b.enemy / b.player 그대로) ----- */
+function curTarget(b) { // 사격 대상으로 지정한 적 (죽었으면 살아 있는 첫 적)
+  if (b.mode !== '2v2') return b.enemy;
+  const t = b.mechs.find(m => m.id === S.target && m.team === 'enemy' && m.alive);
+  return t || b.mechs.find(m => m.team === 'enemy' && m.alive) || b.enemy;
+}
+function shownMech(b) { // 오른쪽 피해 기록지에 보여 줄 기체
+  if (b.mode !== '2v2') return b.enemy;
+  const m = S.inspect && b.mechs.find(x => x.id === S.inspect && x.id !== 'player');
+  return m || curTarget(b);
+}
+function unitStatus(b, m) { // 행동 상태 표시: [텍스트, css 클래스]
+  if (!m.alive) return ['격파', 'dead'];
+  if (S.actor === m.id) return ['행동 중', 'act'];
+  if (m.team === b.turn) return m.done ? ['행동 완료', 'done'] : m.hasMoved ? ['이동 완료', 'mv'] : ['행동 대기', 'wait'];
+  return b.turn === 'enemy' ? ['행동 완료', 'done'] : ['대기', 'wait']; // 이번 라운드에 이미 행동한 팀 / 아직 차례가 오지 않은 팀
+}
+function setFxBusy(v) { S.fxBusy = v; const b = $('#fxskip'); if (b) b.hidden = !(v && FX.isEnabled()); }
+
+/* ---------- 부위별 피해 기록지 ---------- */
+function dollHTML(m, flash, aimOpt) {
+  const cells = PART_ORDER.map(p => {
+    const s = m.parts[p];
+    const chips = m.weapons.filter(w => w.loc === p).map(w => wTag(w.type, w.destroyed)).join('');
+    const selectable = !!(aimOpt && aimOpt.selectable && !s.destroyed), isSel = !!(aimOpt && aimOpt.sel === p);
+    const tip = P[p].name + (aimOpt && aimOpt.selectable ? (s.destroyed ? ' — 이미 파괴되어 선택할 수 없음' : ' — 클릭하면 정밀 사격 대상으로 지정') : '');
+    return '<div class="dp pos-' + p + (s.destroyed ? ' dead' : '') + (flash && flash[p] ? ' hit' : '') + (selectable ? ' aimable' : '') + (isSel ? ' aim' : '') + '" title="' + tip + '"'
+      + (selectable ? ' data-act="aimpart" data-loc="' + p + '" role="button" tabindex="0" aria-pressed="' + isSel + '"' : '') + '>'
+      + '<div class="cd"><span>' + p + '</span></div>'
+      + '<div class="n">장갑 ' + s.armor + '/' + s.armorMax + '</div><div class="bar ' + barCls(s.armor, s.armorMax) + '"><i style="width:' + pct(s.armor, s.armorMax) + '%"></i></div>'
+      + '<div class="n">구조 ' + s.structure + '/' + s.structureMax + '</div><div class="bar st ' + barCls(s.structure, s.structureMax) + '"><i style="width:' + pct(s.structure, s.structureMax) + '%"></i></div>'
+      + '<div class="chips">' + chips + '</div></div>';
+  }).join('');
+  return '<div class="doll">' + cells + '</div>'
+    + '<div class="dim" style="font-size:11.5px">HD 머리 · CT 중앙 · LT/RT 좌/우 몸통 · LA/RA 좌/우 팔 · LL/RL 좌/우 다리</div>';
+}
+function heatHTML(m) {
+  const max = 20, pen = IV.heatPenalty(m.heat);
+  return '<div class="heat"><div class="hl"><span>열</span><span><b>' + m.heat + '</b> / 한계 ' + C.HEAT_LIMIT + (pen ? ' · 명중 +' + pen : '') + '</span></div>'
+    + '<div class="hb"><i class="' + (pen >= 2 ? 'hot' : pen === 1 ? 'mid' : '') + '" style="width:' + pct(Math.min(m.heat, max), max) + '%"></i><u style="left:' + pct(C.HEAT_LIMIT, max) + '%"></u></div>'
+    + '<div class="hl dim"><span>이동력 ' + IV.movePoints(m) + '</span><span>방열 ' + IV.dissipation(m) + '/라운드</span></div></div>';
+}
+function canPlayerAct(b) { return !!b && !b.over && b.turn === 'player' && !S.busy && b.player.alive && !b.player.done; }
+function weaponRowsHTML(b, m, interactive) {
+  const foe = interactive ? curTarget(b) : IV.foeOf(b, m);
+  const dist = (interactive || b.mode !== '2v2') ? IV.hexDist(m.pos, foe.pos) : undefined; // 2대2에서 상대 기체의 무기 목록은 거리 판정 없이 상태만 보여 줌
+  return '<div class="wlist">' + m.weapons.map(w => {
+    const d = W[w.type], st = IV.weaponStatus(m, w, dist);
+    const live = IV.weaponStatus(m, w).ok;
+    const can = interactive && canPlayerAct(b) && !m.hasAttacked && st.ok;
+    const picked = can && S.picks.has(w.uid);
+    let right = d.ammo === null ? '∞' : '탄 ' + w.ammo + '/' + d.ammo;
+    let sub = w.loc + ' · 피해 ' + d.damage + ' · 열 ' + d.heat + ' · 사거리 ' + d.range;
+    if (!live) sub = (w.lostReason || '파괴됨') + ' · 사용 불가';
+    else if (!st.ok) sub += ' · ' + st.reason;
+    else if (interactive && foe.alive) { const aim = (S.fireMode === 'precise' && S.aimPart) ? S.aimPart : null; const th = IV.computeToHit(b, m, foe, w, { aim }); sub += ' · 목표 ' + th.target + '+ (' + Math.round(th.chance * 100) + '%)'; }
+    return '<div class="wrow' + (can ? ' pickable' : (interactive ? ' dis' : '')) + (picked ? ' picked' : '') + '"' + (can ? ' data-act="pick" data-uid="' + w.uid + '" role="checkbox" aria-checked="' + picked + '" tabindex="0"' : '') + '>'
+      + (interactive ? '<input type="checkbox" tabindex="-1" ' + (picked ? 'checked ' : '') + (can ? '' : 'disabled ') + 'aria-hidden="true">' : '<span></span>')
+      + '<span>' + wTag(w.type, !live) + ' ' + esc(d.short) + '</span><span class="a">' + right + '</span><span class="s2">' + esc(sub) + '</span></div>';
+  }).join('') + '</div>';
+}
+function aimInfoHTML(b) {
+  if (S.fireMode !== 'precise') return '';
+  if (!S.aimPart) return '<div class="aiminfo">정밀 사격: 위 기록지에서 노릴 부위를 클릭하세요.</div>';
+  const loc = S.aimPart, s = curTarget(b).parts[loc];
+  const state = s.destroyed ? '파괴됨' : s.armor <= 0 ? '장갑 소진 · 내부 노출' : s.armor < s.armorMax ? '장갑 손상' : '정상';
+  return '<div class="aiminfo"><b>◎ ' + P[loc].name + '</b><br>장갑 ' + s.armor + '/' + s.armorMax + ' · 구조 ' + s.structure + '/' + s.structureMax + ' · ' + state + '<br>명중 페널티 +' + C.PRECISE_MOD[loc] + '</div>';
+}
+function sheetHTML(b, m, isPlayer, interactive, flash, aimOpt) {
+  const two = b.mode === '2v2', us = unitStatus(b, m);
+  return '<div class="panel sheet"><div class="ph" style="color:' + (isPlayer ? 'var(--ally)' : 'var(--foe)') + '"><span>' + esc(m.tag || (isPlayer ? '아군' : '적')) + ' · ' + esc(m.name) + '</span><span class="ser">' + (two ? esc(us[0]) : (m.alive ? '가동' : '격파')) + '</span></div><div class="pb">'
+    + dollHTML(m, flash, aimOpt) + (aimOpt ? aimInfoHTML(b) : '') + heatHTML(m) + weaponRowsHTML(b, m, interactive) + '</div></div>';
+}
+
+/* ---------- 육각 전장 ---------- */
+function mapHTML(b) {
+  const R = MAP.R, Wd = MAP.Wd, pad = MAP.pad;
+  const width = Wd * 9.5 + pad * 2, height = R * (1.5 * 8 + 2) + pad * 2;
+  const ctr = hexCenter;
+  const hexPts = (cx, cy, rad) => [0, 1, 2, 3, 4, 5].map(k => { const a = (60 * k - 30) * Math.PI / 180; return (cx + rad * Math.cos(a)).toFixed(1) + ',' + (cy + rad * Math.sin(a)).toFixed(1); }).join(' ');
+  const pl = b.player, two = b.mode === '2v2', tgt = curTarget(b);
+  const canMove = canPlayerAct(b) && !pl.hasMoved;
+  const reach = new Map(canMove ? IV.reachableTiles(b, pl).map(t => [t.c + ',' + t.r, t.cost]) : []);
+  const usable = pl.weapons.filter(w => IV.weaponStatus(pl, w).ok);
+  const maxRange = usable.length ? Math.max.apply(null, usable.map(w => W[w.type].range)) : 0;
+  const showRange = pl.alive && !canMove && b.turn === 'player' && !b.over;
+  let out = '<svg class="hex" viewBox="0 0 ' + width.toFixed(0) + ' ' + height.toFixed(0) + '" role="img" aria-label="9×9 육각 전장">'
+    + '<defs><pattern id="rubble" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#2a291e"/><line x1="0" y1="0" x2="0" y2="8" stroke="#6a5b3a" stroke-width="2.4"/></pattern>'
+    + '<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
+  for (let r = 0; r < C.GRID; r++) for (let c = 0; c < C.GRID; c++) {
+    const p = ctr(c, r), k = c + ',' + r, rub = IV.isRubble(b, { c, r }), rc = reach.get(k);
+    const inR = showRange && IV.hexDist(pl.pos, { c, r }) <= maxRange;
+    out += '<polygon class="hx' + (rub ? ' rub' : '') + (inR ? ' rng' : '') + (rc !== undefined ? ' reach' : '') + '" points="' + hexPts(p.x, p.y, R - 1) + '"'
+      + (rc !== undefined ? ' data-act="move" data-c="' + c + '" data-r="' + r + '" tabindex="0" role="button" aria-label="' + k + ' 타일로 이동 (비용 ' + rc + ')"' : '') + '/>'
+      + '<text class="hxt" x="' + p.x.toFixed(1) + '" y="' + (p.y + R * 0.66).toFixed(1) + '" text-anchor="middle">' + k + (rub ? ' 잔해' : '') + '</text>'
+      + (rc !== undefined ? '<text class="hxc" x="' + p.x.toFixed(1) + '" y="' + (p.y + 4).toFixed(1) + '" text-anchor="middle">' + rc + '</text>' : '');
+  }
+  const canAim = canPlayerAct(b) && !pl.hasAttacked && tgt.alive;
+  const inRange = e => canAim && e.alive && usable.some(w => IV.hexDist(pl.pos, e.pos) <= W[w.type].range);
+  const precise = S.fireMode === 'precise';
+  const mark = m => m.id === 'player' ? '나' : m.role === 'ally' ? '아군' : m.id === 'enemy' ? '적1' : '적2';
+  const tok = (m, cls, ring, o) => {
+    const p = ctr(m.pos.c, m.pos.r);
+    let cur = 0, max = 0;
+    IV.PARTS.forEach(q => { cur += m.parts[q].armor + m.parts[q].structure; max += m.parts[q].armorMax + m.parts[q].structureMax; });
+    const code = m.name.split(' ')[0] + (two ? ' · ' + mark(m) : '');
+    const us = unitStatus(b, m);
+    const sel = two && m.team === 'enemy' && m === tgt && m.alive;
+    // 2대2: 기체를 눌러 사격 대상/기록지를 고른다 (기체 위의 투명 원. 부위 정밀 조준용 .mp.aimable 이 더 위에 그려진다)
+    const hit = (two && m.alive) ? '<circle class="selhit" r="' + (R * 0.62) + '" data-act="selectUnit" data-id="' + m.id + '" tabindex="0" role="button" aria-label="' + esc(IV.ident(m)) + ' 선택"/>' : '';
+    return '<g class="tok ' + cls + (m.alive ? '' : ' dead') + (sel ? ' tgt' : '') + (two && m.alive && us[1] === 'done' && !b.over ? ' fin' : '') + (us[1] === 'act' ? ' acting' : '') + (two && m.role === 'ally' ? ' aiunit' : '') + '" data-team="' + m.team + '" data-id="' + m.id + '" transform="translate(' + p.x.toFixed(1) + ',' + p.y.toFixed(1) + ')">'
+      + (ring ? '<circle class="ring" r="' + (R * 0.92) + '"/>' : '')
+      + (sel ? '<circle class="tgtring" r="' + (R * 0.88) + '"/>' : '')
+      + (us[1] === 'act' ? '<circle class="actring" r="' + (R * 0.9) + '"/>' : '')
+      + hit
+      + '<g transform="scale(' + MECH.SCALE + ')">' + mechSVG(m, o) + '</g>'
+      + '<rect class="tok-hp" x="-15" y="' + (R * 0.74 + 3.5) + '" width="30" height="4"/><rect class="tok-hpv" x="-15" y="' + (R * 0.74 + 3.5) + '" width="' + (30 * cur / max).toFixed(1) + '" height="4"/>'
+      + '<text class="tok-text" x="0" y="' + (R * 0.74 + 17) + '">' + esc(code) + (two && m.alive && us[1] === 'done' && !b.over ? ' ✓' : '') + '</text></g>';
+  };
+  if (!two) {
+    out += tok(b.enemy, 'foe', inRange(b.enemy), { aim: precise ? S.aimPart : null, aimable: canAim && precise })
+      + tok(pl, 'ally', false, {});
+  } else { // 격파된 기체를 먼저, 그 위에 살아 있는 기체를 위쪽 줄부터 (아래 줄이 앞에 보이도록)
+    const order = b.mechs.slice().sort((x, y) => (x.alive - y.alive) || (x.pos.r - y.pos.r));
+    order.forEach(m => {
+      out += tok(m, m.team === 'enemy' ? 'foe' : 'ally', m.team === 'enemy' && inRange(m), m === tgt ? { aim: precise ? S.aimPart : null, aimable: canAim && precise } : {});
+    });
+  }
+  out += '<g id="fx" pointer-events="none"></g></svg>';
+  return out;
+}
+
+/* ---------- 판정 표시 ---------- */
+function dieHTML(n, cls) {
+  const pips = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] }[n];
+  let s = '';
+  for (let i = 0; i < 9; i++) s += '<i' + (pips.includes(i) ? ' class="on"' : '') + '></i>';
+  return '<span class="die ' + (cls || '') + '" role="img" aria-label="주사위 ' + n + '">' + s + '</span>';
+}
+function findWeapon(uid) {
+  const b = S.battle; if (!b) return null;
+  const all = [].concat(...b.mechs.map(m => m.weapons));
+  return all.find(w => w.uid === uid) || null;
+}
+function stepText(st) {
+  switch (st.type) {
+    case 'armor': return '장갑 −' + st.amount + ' (' + P[st.loc].name + ' 남은 장갑 ' + st.left + ')';
+    case 'structure': return '내부 구조 −' + st.amount + ' (남은 구조 ' + st.left + ')';
+    case 'transfer': return '피해 ' + st.amount + ' → ' + (st.to ? P[st.to].name + '(으)로 이어짐' : '소멸');
+    case 'crit': { const w = findWeapon(st.weapon); return '치명타 [' + st.dice.join(',') + '] → ' + (w ? W[w.type].short : '장비') + ' 파괴'; }
+    case 'critMiss': return '치명타 판정 [' + st.dice.join(',') + '] → 이상 없음';
+    case 'destroyed': return '★ ' + P[st.loc].name + ' 파괴';
+    case 'weaponLost': { const w = findWeapon(st.weapon); return '★ ' + (w ? W[w.type].short : '무기') + ' 사용 불가'; }
+    case 'mechDestroyed': return '★★ 기체 격파';
+    default: return '';
+  }
+}
+function volleyHTML(v) {
+  if (!v) return '<p class="dim" style="font-size:13px">아직 사격 기록이 없습니다. 무기를 선택하고 사격하면 주사위와 판정이 여기에 표시됩니다.</p>';
+  const head = '<div class="dim" style="font-size:12px;letter-spacing:.1em;font-family:var(--f-label)">' + esc(v.attacker) + (v.targetLabel ? ' → ' + esc(v.targetLabel) : '') + (v.precise ? ' 정밀 사격 → ' + P[v.part].name : ' 일반 사격') + '</div>';
+  return head + v.shots.map(s => {
+    if (!s.fired) return '<div class="shot"><div class="who">' + esc(s.name) + '<small>발사 불가: ' + esc(s.reason) + '</small></div></div>';
+    let h = '<div class="shot"><div class="who">' + esc(s.name) + '<small>' + esc(s.toHit.text) + '</small></div>'
+      + '<div class="dg">' + dieHTML(s.attackRoll.dice[0]) + dieHTML(s.attackRoll.dice[1]) + '<span>= <b>' + s.attackRoll.sum + '</b> ≥ ' + s.toHit.target + '?</span></div>'
+      + '<span class="res ' + (s.hit ? 'hit' : 'miss') + '">' + (s.hit ? '명중' : '빗나감') + '</span>';
+    if (s.hit) {
+      h += (s.locRoll
+        ? '<div class="dg">' + dieHTML(s.locRoll.dice[0], 'loc') + dieHTML(s.locRoll.dice[1], 'loc') + '<span>= <b>' + s.locRoll.sum + '</b> → <b>' + P[s.loc].name + '</b> · 피해 ' + s.damage + '</span></div>'
+        : '<div class="dg"><span class="tag">정밀</span><span>지정 부위 → <b>' + P[s.loc].name + '</b> · 피해 ' + s.damage + ' (부위 주사위 없음)</span></div>')
+        + '<div class="steps2">' + s.steps.map(x => '<span class="' + (/destroyed|weaponLost|mechDestroyed|crit$/.test(x.type) ? 'k' : '') + '">' + esc(stepText(x)) + '</span>').join('') + '</div>';
+    }
+    return h + '</div>';
+  }).join('');
+}
+
+/* ---------- 사격 계획: 발사 전에 목표치·보정·사거리·탄약·열을 확인 ---------- */
+function planHTML(b) {
+  const pl = b.player, en = curTarget(b), dist = IV.hexDist(pl.pos, en.pos);
+  const act = canPlayerAct(b) && !pl.hasAttacked && en.alive;
+  const precise = S.fireMode === 'precise';
+  const mb = (mode, label) => '<button class="btn sm' + (S.fireMode === mode ? ' on' : '') + '" data-act="fireMode" data-mode="' + mode + '" aria-pressed="' + (S.fireMode === mode) + '"' + (act ? '' : ' disabled') + '>' + label + '</button>';
+  const rows = pl.weapons.map(w => {
+    const d = W[w.type], st = IV.weaponStatus(pl, w, dist);
+    const th = (st.ok && en.alive) ? IV.computeToHit(b, pl, en, w, { aim: precise ? S.aimPart : null }) : null;
+    return '<tr class="' + (S.picks.has(w.uid) ? 'sel' : '') + (st.ok ? '' : ' off') + '"><td>' + wTag(w.type, !st.ok) + ' ' + esc(d.short) + '</td><td class="n">' + dist + '/' + d.range + '</td><td class="n">' + (d.ammo === null ? '∞' : w.ammo + '/' + d.ammo) + '</td><td class="n">+' + d.heat + '</td><td class="n">' + (th ? th.target + '+ · ' + Math.round(th.chance * 100) + '%' : '-') + '</td><td class="m">' + esc(th ? th.text : st.reason) + '</td></tr>';
+  }).join('');
+  const add = pl.weapons.filter(w => S.picks.has(w.uid)).reduce((n, w) => n + W[w.type].heat, 0);
+  const after = pl.heat + add;
+  const rule = precise
+    ? '정밀 사격: 지정 부위에만 피해(피격 부위 주사위 없음). 부위별 명중 페널티 ' + IV.PARTS.map(p => p + ' +' + C.PRECISE_MOD[p]).join(' · ') + '. 이 일제 사격 도중 지정 부위가 파괴되면 남은 무기는 발사하지 않습니다.'
+    : '일반 사격: 명중하면 2D6으로 피격 부위를 무작위로 정합니다. 기록지나 적 기체의 부위를 클릭하면 정밀 사격으로 전환됩니다.';
+  return '<div class="panel"><div class="ph"><span>사격 계획' + (b.mode === '2v2' ? ' → ' + esc(IV.ident(en)) : '') + '</span><span class="ser">PL-07</span></div><div class="pb stack">'
+    + '<div class="row" role="group" aria-label="사격 방식">' + mb('normal', '일반 사격') + mb('precise', '정밀 사격') + '</div>'
+    + '<div class="dim" style="font-size:12.5px">' + rule + '</div>'
+    + '<div class="scroll-x"><table class="t plan"><thead><tr><th>무기</th><th>거리/사거리</th><th>탄약</th><th>열</th><th>목표치 · 확률</th><th>보정치</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+    + '<div class="dim" style="font-size:12.5px">선택한 무기 ' + S.picks.size + '정 · 발사 후 열 <b class="mono">' + after + '</b> / 한계 ' + C.HEAT_LIMIT + (IV.heatPenalty(after) ? ' (다음 판정부터 명중 +' + IV.heatPenalty(after) + ')' : '') + ' · 이번 일제 사격의 목표치는 사격 시작 시점의 열 ' + pl.heat + ' 기준</div>'
+    + '</div></div>';
+}
+
+/* ---------- 2대2: 기체 명단 (상태·열·탄약·행동 여부를 한눈에, 눌러서 선택) ---------- */
+function rosterHTML(b) {
+  return '<div class="roster" role="group" aria-label="전투 기체 명단">' + b.mechs.map(m => {
+    const us = unitStatus(b, m), hp = Math.round(IV.healthFrac(m) * 100);
+    const live = m.weapons.filter(w => !w.destroyed && !m.parts[w.loc].destroyed).length;
+    const ammo = m.weapons.filter(w => W[w.type].ammo !== null).map(w => wTag(w.type, w.destroyed || m.parts[w.loc].destroyed) + w.ammo).join(' ');
+    const isTgt = m.team === 'enemy' && m === curTarget(b), isSel = (S.inspect ? S.inspect === m.id : m.id === 'player' || isTgt);
+    const pen = IV.heatPenalty(m.heat);
+    return '<div class="ru ' + (m.team === 'enemy' ? 'foe' : 'ally') + ' st-' + us[1] + (isSel ? ' sel' : '') + (isTgt ? ' tgt' : '') + '" data-act="selectUnit" data-id="' + m.id + '" role="button" tabindex="0" aria-pressed="' + isSel + '">'
+      + '<div class="rn"><b>' + esc(m.tag) + '</b> ' + esc(m.name.split(' ')[0]) + '<span class="rs">' + esc(us[0]) + '</span></div>'
+      + '<div class="bar ' + barCls(hp, 100) + '"><i style="width:' + hp + '%"></i></div>'
+      + '<div class="rm">장갑·구조 ' + hp + '% · 열 <b>' + m.heat + '</b>' + (pen ? '<em>(+' + pen + ')</em>' : '') + ' · 무기 ' + live + '/' + m.weapons.length + '</div>'
+      + '<div class="rm">' + (ammo || '탄약 무기 없음') + '</div></div>';
+  }).join('') + '</div>';
+}
+
+/* ---------- 전장 화면 ---------- */
+function renderBattle() {
+  const b = viewBattle();
+  if (!b) { $('#v-battle').innerHTML = '<div class="panel"><div class="pb">진행 중인 전투가 없습니다. 출격 준비에서 전투를 시작하세요.</div></div>'; return; }
+  const pl = b.player, two = b.mode === '2v2', en = curTarget(b), shown = shownMech(b), dist = IV.hexDist(pl.pos, en.pos);
+  S.picks.forEach(uid => { const w = pl.weapons.find(x => x.uid === uid); if (!w || !IV.weaponStatus(pl, w, dist).ok) S.picks.delete(uid); });
+  if (!S.pre && S.aimPart && en.parts[S.aimPart].destroyed) S.aimPart = null; // 파괴된 부위는 선택 해제
+  const act = canPlayerAct(b);
+  const aimOpt = { selectable: act && !pl.hasAttacked && en.alive && shown === en, sel: S.fireMode === 'precise' ? S.aimPart : null };
+  const actorM = S.actor && b.mechs.find(m => m.id === S.actor);
+  const phase = b.over ? '종료' : (two && actorM) ? esc(IV.ident(actorM)) + ' 행동 중' : b.turn === 'enemy' ? '적 행동' : !pl.alive ? 'AI 진행' : !pl.hasMoved ? '이동 / 사격' : !pl.hasAttacked ? '사격' : '턴 종료 대기';
+  const status = '<div class="panel"><div class="status"><span class="big">ROUND ' + b.round + '</span><span class="row"><span class="chip ' + (b.turn === 'player' ? 'ally' : 'foe') + ' on">' + (b.over ? '전투 종료' : b.turn === 'player' ? '아군 턴' : '적 턴') + '</span><span class="chip">' + phase + '</span><span class="chip">' + (two ? '대상 거리 ' : '거리 ') + dist + '</span></span></div></div>';
+  let hint, btns = '';
+  if (b.over) {
+    hint = b.winner === 'player' ? (two ? '적 팀을 전멸시켰습니다.' : '적 기체를 격파했습니다.') : b.winner === 'enemy' ? (two ? '아군 팀이 전멸했습니다.' : '아군 기체가 격파되었습니다.') : '라운드 제한에 도달했습니다.';
+    btns = '<button class="btn primary" data-act="nav" data-view="result">결과 보기 →</button>';
+  } else if (!act) {
+    hint = two ? (actorM ? esc(IV.ident(actorM)) + ' 행동 중입니다…' : !pl.alive ? '조종 기체가 격파되었습니다. 남은 AI가 전투를 진행합니다…' : '진행 중입니다…') : '적이 행동 중입니다…';
+  } else {
+    hint = (two && !pl.hasMoved ? '대상: ' + esc(IV.ident(en)) + ' (전장의 적 기체나 상단 명단을 눌러 바꿉니다). ' : '') + (!pl.hasMoved ? '금색 타일을 눌러 이동하세요 (숫자는 이동 비용). 이동하지 않고 사격하면 조준 보너스 ' + C.AIM_MOD + ', 이동하면 ' + (C.MOVED_MOD > 0 ? '+' : '') + C.MOVED_MOD + '입니다.'
+      : !pl.hasAttacked ? (S.fireMode === 'precise' ? (S.aimPart ? '정밀 사격: ' + P[S.aimPart].name + ' 지정. 왼쪽 무기 목록에서 발사할 무기를 선택하세요.' : '정밀 사격: 오른쪽 적 기록지나 전장의 적 기체에서 노릴 부위를 클릭하세요.') : '왼쪽 무기 목록에서 발사할 무기를 선택하고 사격하세요. 적 부위를 클릭하면 정밀 사격입니다.') : '이번 턴 공격을 마쳤습니다. 턴을 종료하세요.');
+    if (!pl.hasMoved) btns += '<button class="btn" data-act="skipMove">제자리 유지</button>';
+    if (!pl.hasAttacked) {
+      const pr = S.fireMode === 'precise';
+      btns += '<button class="btn primary" data-act="fire"' + ((S.picks.size && (!pr || S.aimPart)) ? '' : ' disabled') + '>' + (pr ? '정밀 사격' + (S.aimPart ? ' · ' + P[S.aimPart].name : '') : '일반 사격') + ' (' + S.picks.size + '정)</button>';
+    }
+    btns += '<button class="btn' + (pl.hasAttacked ? ' primary' : '') + '" data-act="endTurn">턴 종료 ▶</button>';
+  }
+  const abort = '<button class="btn sm warn" data-act="abort">' + (S.confirmAbort ? '정말 중단? 다시 클릭' : '전투 중단') + '</button>';
+  const mid = '<div class="stack a-mid">' + status + (two ? rosterHTML(b) : '')
+    + '<div class="panel"><div class="mapwrap">' + mapHTML(b) + '</div><div class="legendmap"><span>■ 금색 = 이동 가능</span><span>▨ 빗금 = 잔해(엄폐, 비용 ' + C.RUBBLE_COST + ')</span><span>▷ 화살표 = 기체 방향</span><span style="color:var(--foe)">⬡ 점선 고리 = 사격 가능한 적</span>' + (two ? '<span>◎ 실선 고리 = 사격 대상 · ✓ = 행동 완료</span>' : '') + '</div></div>'
+    + '<div class="panel"><div class="actbar"><div class="hint">' + hint + '</div><div class="row">' + btns + '<button class="btn sm" id="fxskip" data-act="fxskip"' + (S.fxBusy && FX.isEnabled() ? '' : ' hidden') + '>연출 건너뛰기</button>' + abort + '</div></div></div>'
+    + planHTML(b)
+    + '<div class="panel"><div class="ph"><span>판정 결과</span><span class="ser">2D6 · 표시값 = 계산값</span></div><div class="dice">' + volleyHTML(S.volley) + '</div></div></div>';
+  const logHtml = b.log.slice(-300).map(l => '<p class="' + l.cls + ' team-' + l.team + '">' + esc(l.text) + '</p>').join('');
+  $('#v-battle').innerHTML = '<div class="battle">'
+    + '<div class="a-pl">' + sheetHTML(b, pl, true, true, S.hitFlash[pl.id]) + '</div>' + mid
+    + '<div class="a-en">' + sheetHTML(b, shown, shown.team === 'player', false, S.hitFlash[shown.id], shown === en ? aimOpt : undefined) + '</div>'
+    + '<div class="a-log panel"><div class="ph"><span>전투 로그</span><span class="ser">LOG</span></div><div class="log" id="logbox">' + logHtml + '</div></div></div>';
+  const lg = $('#logbox'); if (lg) lg.scrollTop = lg.scrollHeight;
+}
+
+/* 사격 한 번(일제 사격)의 연출: 판정은 이미 끝났고, 여기서는 화면만 사격 전 → 연출 → 결과 순서로 보여 준다 */
+async function playVolley(b, atk, tgt, shots, pre, extra) {
+  const animate = FX.isEnabled() && shots.some(s => s.fired);
+  const wasBusy = S.busy;
+  if (animate) {
+    const pa = pre.mechs.find(x => x.id === atk.id); if (pa) pa.facing = atk.facing; // 공격 방향은 사격 시작과 함께 정해진다
+    S.pre = pre; S.busy = true; setFxBusy(true); FX.reset(); render();
+    await new Promise(r => setTimeout(r, 30)); // 호출한 쪽(디스패처)이 곧바로 다시 그리는 것을 기다린 뒤 효과 시작 (안 그러면 첫 효과가 사라진 화면에 그려짐)
+    if (S.battle !== b) return;
+    await FX.volley(atk, tgt, shots);
+  }
+  if (S.battle !== b) return;
+  S.pre = null;
+  S.volley = Object.assign({ team: atk.team, attacker: IV.ident(atk), targetLabel: b.mode === '2v2' ? IV.ident(tgt) : null, shots }, extra || {});
+  flashFrom(shots, tgt);
+  if (animate) { render(); await FX.aftermath(tgt, shots); }
+  FX.reset(); setFxBusy(false);
+  if (S.battle !== b) return;
+  S.busy = wasBusy; render();
+}
+
+/* ---------- 결과 화면 ---------- */
+function renderResult() {
+  const b = S.battle;
+  if (!b || !b.over) { $('#v-result').innerHTML = '<div class="panel"><div class="pb">아직 끝난 전투가 없습니다.</div></div>'; return; }
+  const win = b.winner === 'player', draw = b.winner === 'draw';
+  const two = b.mode === '2v2';
+  const loser = win ? b.enemy : b.player;
+  const cause = draw ? '라운드 제한(' + C.MAX_ROUNDS + ')에 도달' : two ? (win ? '적 팀 전멸' : '아군 팀 전멸') : loser.parts.HD.destroyed ? '머리 파괴' : '중앙 몸통 파괴';
+  const sp = b.stats.player, se = b.stats.enemy;
+  const rate = s => s.shots ? Math.round(s.hits / s.shots * 100) + '%' : '-';
+  const row = (k, a, e) => '<tr><td>' + k + '</td><td class="n">' + a + '</td><td class="n">' + e + '</td></tr>';
+  const lost = arr => arr.length ? esc(arr.join(', ')) : '없음';
+  $('#v-result').innerHTML = '<div class="result">'
+    + '<div class="verdict ' + (draw ? 'draw' : win ? 'win' : 'lose') + '"><h2>' + (draw ? '무승부' : win ? '승리' : '패배') + '</h2><p>' + b.round + '라운드 · ' + esc(cause) + '</p></div>'
+    + '<div class="panel"><div class="ph"><span>전투 통계</span><span class="ser">RESULT</span></div><div class="pb scroll-x"><table class="t"><thead><tr><th></th><th>' + (two ? '아군 팀' : '아군 ' + esc(b.player.name)) + '</th><th>' + (two ? '적 팀' : '적 ' + esc(b.enemy.name)) + '</th></tr></thead><tbody>'
+    + row('발사 횟수', sp.shots, se.shots) + row('명중', sp.hits + ' (' + rate(sp) + ')', se.hits + ' (' + rate(se) + ')') + row('가한 피해', sp.damage, se.damage)
+    + row('파괴한 부위', lost(sp.partsLost), lost(se.partsLost)) + row('남은 열', two ? b.mechs.filter(m => m.team === 'player').map(m => esc(m.tag) + ' ' + m.heat).join(' · ') : b.player.heat, two ? b.mechs.filter(m => m.team === 'enemy').map(m => esc(m.tag) + ' ' + m.heat).join(' · ') : b.enemy.heat)
+    + (two ? row('생존 기체', b.mechs.filter(m => m.team === 'player').map(m => esc(m.tag) + (m.alive ? ' 가동' : ' 격파')).join(' · '), b.mechs.filter(m => m.team === 'enemy').map(m => esc(m.tag) + (m.alive ? ' 가동' : ' 격파')).join(' · ')) : '') + '</tbody></table></div></div>'
+    + '<div class="two">' + (two ? b.mechs.map(m => sheetHTML(b, m, m.team === 'player', false)).join('') : sheetHTML(b, b.player, true, false) + sheetHTML(b, b.enemy, false, false)) + '</div>'
+    + '<div class="gobar"><button class="btn" data-act="goHangar">설계 수정</button><span class="row"><button class="btn" data-act="toBrief">' + (two ? '편성 바꾸기' : '적 기체 바꾸기') + '</button><button class="btn primary" data-act="start">같은 설정으로 재전투 ▶</button></span></div></div>';
+}
+
+/* ---------- 전투 진행 ---------- */
+function flashFrom(shots, tgt) {
+  const f = {};
+  shots.forEach(s => { if (s.fired && s.hit) f[s.loc] = true; });
+  S.hitFlash = {};
+  S.hitFlash[tgt.id] = f; // 기체별로 따로 표시
+}
+function scheduleResult(b) {
+  setTimeout(() => { if (S.battle === b && S.view === 'battle' && b.over) { S.view = 'result'; render(); } }, 3200);
+}
+function startBattle() {
+  const v = IV.validateDesign(S.design);
+  if (!v.ok) return toast('유효하지 않은 설계입니다: ' + v.errors[0]);
+  const two = S.mode === '2v2';
+  S.battle = IV.createBattle(S.design, IV.PRESETS[S.enemyKey], two ? { mode: '2v2', allyDesign: IV.PRESETS[S.allyKey], enemy2Design: IV.PRESETS[S.enemy2Key] } : undefined);
+  S.target = null; S.inspect = null; S.actor = null;
+  FX.clear(); S.pre = null; S.fireMode = 'normal'; S.aimPart = null; S.fxBusy = false;
+  S.picks = new Set(); S.volley = null; S.busy = false; S.confirmAbort = false; S.hitFlash = {};
+  S.view = 'battle';
+  const tt = $('#toast'); if (tt) tt.hidden = true;
+  render();
+}
+// AI 기체 한 대의 한 턴을 화면에 보여 주며 진행한다 (판정은 rules.js 가 하고, 여기서는 순서와 연출만 맡는다)
+async function runAIUnit(b, m) {
+  const two = b.mode === '2v2';
+  S.actor = m.id; S.busy = true; render();
+  await sleep(two ? 500 : 750); if (S.battle !== b) return false;
+  const mv = IV.aiChooseMove(b, m);
+  if (mv && !mv.stay) IV.moveMech(b, m, mv); else IV.skipMove(b, m);
+  render();
+  await sleep(two ? 550 : 850); if (S.battle !== b) return false;
+  const pick = IV.aiPickAttack(b, m);
+  if (pick) {
+    if (two && pick.foe.id !== 'player') S.inspect = pick.foe.id; // 맞는 기체의 기록지를 보여 준다
+    const pre = snapshot(b);
+    const r = IV.attack(b, m, pick.uids, { target: pick.foe }); // AI도 같은 규칙, 기본은 일반 사격(무작위 피격 부위)
+    await playVolley(b, m, pick.foe, r.shots, pre);
+  } else {
+    m.hasAttacked = true;
+    IV.log(b, m.team, 'sys', IV.ident(m) + ': 사격 가능한 무기가 없거나 사거리 밖');
+    render();
+  }
+  if (S.battle !== b) return false;
+  IV.endUnit(b, m);
+  await sleep(FX.isEnabled() ? (two ? 300 : 450) : (two ? 500 : 1000)); if (S.battle !== b) return false;
+  return true;
+}
+// 지금 턴인 팀의 AI 기체들을 차례로 움직이고, 팀이 모두 끝나면 다음 팀으로 넘어간다. 사람이 조종할 차례가 오면 멈춘다.
+async function runAiPhases(b) {
+  S.busy = true; render();
+  let guard = 0;
+  while (!b.over && guard++ < 200) {
+    const turnAtStart = b.turn;
+    for (const m of IV.teamUnits(b, b.turn)) {
+      if (b.over) break;
+      if (m.control === 'ai' && m.alive && !m.done) { if (!(await runAIUnit(b, m))) return; }
+    }
+    if (S.battle !== b) return;
+    if (b.over) break;
+    IV.endTurn(b);
+    if (b.turn === turnAtStart) break; // 사람이 아직 행동 중이면 넘어가지 않는다
+    if (b.turn === 'player' && b.player.alive) break;
+    render();
+  }
+  if (S.battle !== b) return;
+  S.actor = null; S.inspect = null; S.busy = false; render();
+  if (b.over) scheduleResult(b);
+}
+const ACTS = {
+  nav(el) { S.view = el.dataset.view; },
+  goBrief() { S.view = 'brief'; },
+  goHangar() { S.view = 'hangar'; },
+  toBrief() { S.view = 'brief'; },
+  enemy(el) { S.enemyKey = el.dataset.key; },
+  ally(el) { S.allyKey = el.dataset.key; },
+  enemy2(el) { S.enemy2Key = el.dataset.key; },
+  mode(el) { S.mode = el.dataset.mode === '2v2' ? '2v2' : '1v1'; },
+  selectUnit(el) { // 2대2: 적을 누르면 사격 대상, 아군 AI를 누르면 그 기체의 기록지를 본다
+    const b = S.battle; if (!b || b.mode !== '2v2') return;
+    const m = b.mechs.find(x => x.id === el.dataset.id); if (!m) return;
+    if (m.team === 'enemy') { S.target = m.id; S.inspect = null; } else S.inspect = m.id === 'player' ? null : m.id;
+  },
+  start() { startBattle(); },
+  move(el) {
+    const b = S.battle;
+    if (!canPlayerAct(b)) return;
+    const r = IV.moveMech(b, b.player, { c: Number(el.dataset.c), r: Number(el.dataset.r) });
+    if (!r.ok) toast(r.reason);
+  },
+  pick(el) {
+    const b = S.battle; if (!canPlayerAct(b)) return;
+    const uid = el.dataset.uid;
+    if (S.picks.has(uid)) S.picks.delete(uid); else S.picks.add(uid);
+  },
+  skipMove() { const b = S.battle; if (canPlayerAct(b)) IV.skipMove(b, b.player); },
+  fire() {
+    const b = S.battle; if (!canPlayerAct(b) || b.player.hasAttacked) return;
+    const uids = Array.from(S.picks);
+    if (!uids.length) return toast('발사할 무기를 선택하세요.');
+    const precise = S.fireMode === 'precise';
+    if (precise && !S.aimPart) return toast('정밀 사격할 부위를 먼저 지정하세요.');
+    if (precise && curTarget(b).parts[S.aimPart].destroyed) { S.aimPart = null; return toast('이미 파괴된 부위는 공격할 수 없습니다.'); }
+    if (!b.player.hasMoved) IV.skipMove(b, b.player);
+    const pre = snapshot(b);
+    const part = precise ? S.aimPart : null, tgt = curTarget(b);
+    let opts = precise ? { mode: 'precise', part } : undefined;
+    if (b.mode === '2v2') opts = Object.assign({}, opts || {}, { target: tgt });
+    const r = IV.attack(b, b.player, uids, opts);
+    if (!r.ok) return toast(r.reason);
+    S.picks.clear();
+    playVolley(b, b.player, tgt, r.shots, pre, { precise, part })
+      .then(() => { if (S.battle === b && b.over) scheduleResult(b); });
+  },
+  aimpart(el) {
+    const b = S.battle; if (!canPlayerAct(b) || b.player.hasAttacked) return;
+    const loc = el.dataset.loc;
+    if (curTarget(b).parts[loc].destroyed) return toast(P[loc].name + '은(는) 이미 파괴되어 선택할 수 없습니다.');
+    if (S.fireMode === 'precise' && S.aimPart === loc) { S.fireMode = 'normal'; S.aimPart = null; return; } // 같은 부위를 다시 누르면 해제
+    S.fireMode = 'precise'; S.aimPart = loc;
+  },
+  fireMode(el) {
+    const b = S.battle; if (!canPlayerAct(b) || b.player.hasAttacked) return;
+    S.fireMode = el.dataset.mode === 'precise' ? 'precise' : 'normal';
+    if (S.fireMode === 'normal') S.aimPart = null;
+  },
+  animToggle() { S.anim = !S.anim; saveAnim(S.anim); FX.setEnabled(S.anim); toast('전투 연출 ' + (S.anim ? '켜짐' : '꺼짐')); },
+  fxskip() { FX.skip(); },
+  endTurn() {
+    const b = S.battle; if (!canPlayerAct(b)) return;
+    S.picks.clear();
+    if (b.mode === '2v2') IV.endUnit(b, b.player); // 내 기체의 행동을 마치면 아군 AI → 적1 → 적2 순서로 진행
+    else { if (!b.player.hasMoved) IV.skipMove(b, b.player); b.player.hasAttacked = true; IV.endTurn(b); }
+    if (!b.over) runAiPhases(b);
+  },
+  abort() {
+    if (!S.confirmAbort) { S.confirmAbort = true; setTimeout(() => { S.confirmAbort = false; if (S.view === 'battle') render(); }, 3000); return; }
+    FX.clear(); S.pre = null; S.fxBusy = false; S.fireMode = 'normal'; S.aimPart = null; S.actor = null; S.inspect = null; S.target = null;
+    S.confirmAbort = false; S.battle = null; S.busy = false; S.view = 'brief';
+  }
+};
+
+/* ---------- 화면 전환 / 이벤트 ---------- */
+function renderNav() {
+  const b = S.battle;
+  const items = [['hangar', '1', '격납고', true], ['brief', '2', '출격 준비', true], ['battle', '3', '전장', !!b], ['result', '4', '결과', !!(b && b.over)]];
+  $('#steps').innerHTML = items.map(i => '<button class="step' + (S.view === i[0] ? ' on' : '') + '" data-act="nav" data-view="' + i[0] + '"' + (i[3] ? '' : ' disabled') + '><b>' + i[1] + '</b>' + i[2] + '</button>').join('')
+    + '<button class="step fxt' + (S.anim ? ' on' : '') + '" data-act="animToggle" aria-pressed="' + S.anim + '" title="발사·피격 연출을 켜거나 끕니다"><b>' + (S.anim ? '●' : '○') + '</b>연출 ' + (S.anim ? 'ON' : 'OFF') + '</button>';
+}
+function focusSelector(el) {
+  if (!el || !el.dataset || !el.dataset.act) return null;
+  return '[' + Object.keys(el.dataset).map(k => 'data-' + k.replace(/[A-Z]/g, m => '-' + m.toLowerCase()) + '="' + String(el.dataset[k]).replace(/"/g, '\\"') + '"]').join('[');
+}
+function render() {
+  const sel = focusSelector(document.activeElement);
+  ['hangar', 'brief', 'battle', 'result'].forEach(v => { $('#v-' + v).hidden = S.view !== v; });
+  document.body.classList.toggle('noanim', !S.anim);
+  if (S.view !== 'battle') FX.clear();
+  renderNav();
+  if (S.view === 'hangar') renderHangar();
+  else if (S.view === 'brief') renderBrief();
+  else if (S.view === 'battle') renderBattle();
+  else renderResult();
+  S.hitFlash = {};
+  if (sel) { try { const n = document.querySelector(sel.replace(/^\[/, '[')); if (n && !n.disabled) n.focus({ preventScroll: true }); } catch (e) { /* 무시 */ } }
+}
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el || el.disabled) return;
+  const a = el.dataset.act;
+  if (HANGAR_ACTS[a]) { HANGAR_ACTS[a](el); saveDesign(); render(); return; }
+  if (ACTS[a]) { ACTS[a](el); render(); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target;
+  if (el && el.matches && el.matches('polygon[data-act], .wrow[data-act], .dp[data-act], .mp[data-act], .selhit[data-act], .ru[data-act]')) { e.preventDefault(); el.dispatchEvent(new MouseEvent('click', { bubbles: true })); }
+});
+document.addEventListener('input', e => {
+  if (e.target && e.target.id === 'mechName') { S.design.name = e.target.value.slice(0, 24) || '무명 기체'; saveDesign(); }
+});
+FX.setEnabled(S.anim);
+render();
+
+</script>
+
+</body></html>
