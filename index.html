@@ -72,8 +72,19 @@
     .gicon:hover { background: #dfe8fb; outline: 1px solid #9db4e6; }
     .path { font-size: 12px; color: #555; border: 1px solid #a5a28f; background: #fff; padding: 2px 6px; margin: 4px 4px 0; }
 
+    /* ---------- 게임 실행 창 ---------- */
+    .gamewin { padding-bottom: 4px; }
+    .bar, .grip { touch-action: none; }
+    .gamewin iframe { display: block; width: 100%; height: calc(100% - 30px); border: none; background: #000; }
+    .gamewin.max { top: 0 !important; left: 0 !important; width: 100% !important; height: calc(100% - 36px) !important; max-width: none; border-radius: 0; border-width: 0; padding-bottom: 0; }
+    .gamewin.max .bar { border-radius: 0; }
+    .gamewin.max .grip { display: none; }
+    .grip { position: absolute; right: -3px; bottom: -3px; width: 18px; height: 18px; cursor: nwse-resize;
+      background: linear-gradient(135deg, transparent 50%, #1f4fbf 50%); }
+    body.dragging iframe { pointer-events: none; }  /* 창 끌 때 게임 화면이 마우스를 뺏지 않게 */
+
     /* ---------- 작업표시줄 ---------- */
-    #taskbar {
+    #taskbar { z-index: 100000;
       position: absolute; bottom: 0; left: 0; right: 0; height: 36px;
       background: linear-gradient(#3b76e6 0%, #245edb 10%, #1d50c4 90%, #163f9e 100%);
       display: flex; align-items: center; gap: 6px; padding-right: 8px;
@@ -100,7 +111,7 @@
     }
 
     /* ---------- 시작 메뉴 ---------- */
-    #menu {
+    #menu { z-index: 100001;
       position: absolute; bottom: 36px; left: 0; width: 240px;
       background: #fff; border: 2px solid #1f4fbf; border-radius: 8px 8px 0 0;
       display: none; overflow: hidden; box-shadow: 3px -2px 12px rgba(0,0,0,0.4);
@@ -161,17 +172,17 @@
 
   <div class="win" id="games" data-title="게임" style="top:60px; left:130px;">
     <div class="bar"><span>📁 게임</span><div class="btns"><span class="min">_</span><span class="x">✕</span></div></div>
-    <div class="path">주소: C:\방현기\게임 — 아이콘을 누르면 새 탭에서 실행돼요</div>
+    <div class="path">주소: C:\방현기\게임 — 아이콘을 누르면 창으로 실행돼요</div>
     <div class="body">
       <div class="ggrid">
-        <a class="gicon" href="games/doodle-boat/" target="_blank"><div class="img">🚤</div><div>낙서 보트</div></a>
-        <a class="gicon" href="games/doodle-racer/" target="_blank"><div class="img">🏎️</div><div>낙서 레이서</div></a>
-        <a class="gicon" href="games/combo-highway/" target="_blank"><div class="img">🛣️</div><div>콤보 하이웨이</div></a>
-        <a class="gicon" href="games/crimson-court/" target="_blank"><div class="img">👑</div><div>진홍의 궁정</div></a>
-        <a class="gicon" href="games/iron-breakwater/" target="_blank"><div class="img">🌊</div><div>강철 방파제</div></a>
-        <a class="gicon" href="games/rust-ring/" target="_blank"><div class="img">🥊</div><div>RUST RING</div></a>
-        <a class="gicon" href="games/iron-vector/" target="_blank"><div class="img">🛡️</div><div>IRON VECTOR</div></a>
-        <a class="gicon" href="games/iron-vector-3d/" target="_blank"><div class="img">🦾</div><div>IRON VECTOR 3D</div></a>
+        <a class="gicon" href="games/doodle-boat/"><div class="img">🚤</div><div>낙서 보트</div></a>
+        <a class="gicon" href="games/doodle-racer/"><div class="img">🏎️</div><div>낙서 레이서</div></a>
+        <a class="gicon" href="games/combo-highway/"><div class="img">🛣️</div><div>콤보 하이웨이</div></a>
+        <a class="gicon" href="games/crimson-court/"><div class="img">👑</div><div>진홍의 궁정</div></a>
+        <a class="gicon" href="games/iron-breakwater/"><div class="img">🌊</div><div>강철 방파제</div></a>
+        <a class="gicon" href="games/rust-ring/"><div class="img">🥊</div><div>RUST RING</div></a>
+        <a class="gicon" href="games/iron-vector/"><div class="img">🛡️</div><div>IRON VECTOR</div></a>
+        <a class="gicon" href="games/iron-vector-3d/"><div class="img">🦾</div><div>IRON VECTOR 3D</div></a>
       </div>
     </div>
   </div>
@@ -238,32 +249,100 @@
       w.classList.remove("open");
       const t = document.getElementById("task-" + w.id);
       if (t) t.remove();
+      if (w.classList.contains("gamewin")) w.remove();  // 게임 창은 닫으면 게임도 종료
     }
+
+    // 마우스/손가락 끌기 공통 함수
+    function dragWith(e, onMove) {
+      e.preventDefault();
+      document.body.classList.add("dragging");
+      const move = ev => onMove(ev);
+      const up = () => {
+        document.body.classList.remove("dragging");
+        removeEventListener("pointermove", move); removeEventListener("pointerup", up);
+      };
+      addEventListener("pointermove", move);
+      addEventListener("pointerup", up);
+    }
+
+    // 창 버튼, 드래그 연결
+    function bindWin(w) {
+      w.querySelector(".x").onclick = e => { e.stopPropagation(); closeWin(w); };
+      w.querySelector(".min").onclick = e => { e.stopPropagation(); w.classList.remove("open"); };
+      w.addEventListener("pointerdown", () => focusWin(w));
+      const maxBtn = w.querySelector(".maxb");
+      if (maxBtn) maxBtn.onclick = e => { e.stopPropagation(); w.classList.toggle("max"); };
+
+      const bar = w.querySelector(".bar");
+      bar.addEventListener("dblclick", () => { if (maxBtn) w.classList.toggle("max"); });
+      bar.addEventListener("pointerdown", e => {
+        if (e.target.closest(".btns") || w.classList.contains("max")) return;
+        const sx = e.clientX - w.offsetLeft, sy = e.clientY - w.offsetTop;
+        dragWith(e, ev => {
+          w.style.left = Math.max(0, ev.clientX - sx) + "px";
+          w.style.top = Math.max(0, ev.clientY - sy) + "px";
+        });
+      });
+
+      const grip = w.querySelector(".grip");
+      if (grip) grip.addEventListener("pointerdown", e => {
+        e.stopPropagation(); focusWin(w);
+        const sx = e.clientX, sy = e.clientY, sw = w.offsetWidth, sh = w.offsetHeight;
+        dragWith(e, ev => {
+          w.style.width = Math.max(320, sw + ev.clientX - sx) + "px";
+          w.style.height = Math.max(240, sh + ev.clientY - sy) + "px";
+        });
+      });
+    }
+
+    // 게임을 창 안에서 실행
+    let gameCount = 0;
+    function openGame(icon) {
+      const src = icon.getAttribute("href");
+      const id = "game-" + src.replace(/[^a-z0-9]/gi, "");
+      const old = document.getElementById(id);
+      if (old) { old.classList.add("open"); focusWin(old); menu.classList.remove("open"); return; }
+
+      const emoji = icon.querySelector(".img").textContent;
+      const title = icon.querySelector("div:last-child").textContent;
+      const W = innerWidth, H = innerHeight - 36;
+      const w = document.createElement("div");
+      w.className = "win gamewin open";
+      w.id = id;
+      w.dataset.title = title;
+      const ww = Math.min(960, W - 20), wh = Math.min(640, H - 20);
+      const off = (gameCount++ % 5) * 26;
+      w.style.width = ww + "px"; w.style.height = wh + "px";
+      w.style.left = Math.max(0, (W - ww) / 2 - 60 + off) + "px";
+      w.style.top = Math.max(0, (H - wh) / 2 - 40 + off) + "px";
+      if (W < 700) w.classList.add("max");  // 폰에서는 처음부터 전체 화면
+      w.innerHTML =
+        '<div class="bar"><span>' + emoji + ' ' + title + '</span>' +
+        '<div class="btns"><span class="min">_</span><span class="maxb">□</span><span class="x">✕</span></div></div>' +
+        '<iframe src="' + src + '" allow="fullscreen; autoplay; gamepad" allowfullscreen></iframe>' +
+        '<div class="grip"></div>';
+      document.body.insertBefore(w, document.getElementById("menu"));
+      bindWin(w);
+      openWin(id);
+      w.querySelector("iframe").focus();
+    }
+    document.querySelectorAll(".gicon").forEach(a => {
+      a.onclick = e => { e.preventDefault(); openGame(a); };
+    });
+
+    // 게임 화면을 클릭하면 그 창이 맨 앞으로 오게
+    addEventListener("blur", () => setTimeout(() => {
+      const a = document.activeElement;
+      if (a && a.tagName === "IFRAME") focusWin(a.closest(".win"));
+    }));
 
     // 아이콘·메뉴 클릭으로 창 열기 (폰에서도 한 번 탭으로 열림)
     document.querySelectorAll("[data-open]").forEach(el => {
       el.onclick = () => openWin(el.dataset.open);
     });
 
-    // 창 버튼, 드래그
-    document.querySelectorAll(".win").forEach(w => {
-      w.querySelector(".x").onclick = e => { e.stopPropagation(); closeWin(w); };
-      w.querySelector(".min").onclick = e => { e.stopPropagation(); w.classList.remove("open"); };
-      w.addEventListener("pointerdown", () => focusWin(w));
-
-      const bar = w.querySelector(".bar");
-      bar.addEventListener("pointerdown", e => {
-        if (e.target.closest(".btns")) return;
-        const sx = e.clientX - w.offsetLeft, sy = e.clientY - w.offsetTop;
-        const move = ev => {
-          w.style.left = Math.max(0, ev.clientX - sx) + "px";
-          w.style.top = Math.max(0, ev.clientY - sy) + "px";
-        };
-        const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); };
-        addEventListener("pointermove", move);
-        addEventListener("pointerup", up);
-      });
-    });
+    // 처음부터 있는 창들 연결
+    document.querySelectorAll(".win").forEach(bindWin);
 
     // 시작 메뉴
     document.getElementById("start").onclick = e => { e.stopPropagation(); menu.classList.toggle("open"); };
