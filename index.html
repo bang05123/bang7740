@@ -83,6 +83,57 @@
       background: linear-gradient(135deg, transparent 50%, #1f4fbf 50%); }
     body.dragging iframe { pointer-events: none; }  /* 창 끌 때 게임 화면이 마우스를 뺏지 않게 */
 
+    /* ---------- 부팅 화면 ---------- */
+    #boot, #welcome {
+      position: fixed; inset: 0; z-index: 200000;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    #boot { background: #000; color: #fff; transition: opacity .4s; }
+    .logo { display: flex; align-items: center; gap: 14px; }
+    .logo .mark {
+      width: 64px; height: 64px; border-radius: 14px;
+      background: linear-gradient(135deg, #f2a64b, #e05a16);
+      display: flex; align-items: center; justify-content: center;
+      font: bold italic 34px Tahoma, sans-serif; color: #fff;
+      box-shadow: 0 0 24px rgba(242,166,75,.5);
+    }
+    .logo .name { font: bold 40px "Franklin Gothic Medium", Tahoma, sans-serif; letter-spacing: 1px; }
+    .logo .name small { font-size: 20px; color: #f2a64b; vertical-align: super; margin-left: 4px; }
+    .loader {
+      margin-top: 60px; width: 160px; height: 18px; padding: 2px;
+      border: 2px solid #b2b2b2; border-radius: 4px; overflow: hidden; position: relative;
+    }
+    .loader i {
+      position: absolute; top: 2px; width: 10px; height: 10px; border-radius: 1px;
+      background: linear-gradient(#a8c8ff, #2f6fe0 60%, #1d4fbf);
+      animation: slide 1.6s linear infinite;
+    }
+    .loader i:nth-child(2) { animation-delay: .1s; }
+    .loader i:nth-child(3) { animation-delay: .2s; }
+    @keyframes slide { from { left: -40px; } to { left: 170px; } }
+    .boot-foot { position: absolute; bottom: 30px; color: #777; font-size: 12px; }
+
+    #welcome {
+      display: none; color: #fff;
+      background: linear-gradient(#00309c 0, #00309c 70px, #5a7edc 72px, #5a7edc 74px, #3a6ad6 76px, #6f97e8 50%, #3a6ad6 calc(100% - 76px), #f39a3a calc(100% - 74px), #00309c calc(100% - 72px));
+    }
+    #welcome .hello { font: italic bold 64px Tahoma, sans-serif; text-shadow: 3px 3px 6px rgba(0,0,0,.35); }
+    #welcome .who { margin-top: 12px; font-size: 18px; opacity: .9; }
+
+    /* ---------- 업데이트 내역 ---------- */
+    #updates { width: 420px; }
+    .upd { padding: 8px 0; border-bottom: 1px dashed #c9c6b5; }
+    .upd .when { color: #888; font-size: 11px; }
+    .upd b a { color: #000; text-decoration: none; }
+    .upd b a:hover { color: #1f4fbf; text-decoration: underline; }
+    .upd ul { margin-top: 4px; color: #333; }
+
+    /* ---------- 방명록 ---------- */
+    #guestbook { width: 520px; }
+    #guestbook .body { max-height: 65vh; }
+    .gb-tip { font-size: 12px; color: #555; background: #ffffe1; border: 1px solid #c9c38f; padding: 6px 8px; margin-bottom: 8px; }
+
     /* ---------- 작업표시줄 ---------- */
     #taskbar { z-index: 100000;
       position: absolute; bottom: 0; left: 0; right: 0; height: 36px;
@@ -128,12 +179,25 @@
 </head>
 <body>
 
+  <!-- 부팅 화면 (클릭하면 건너뛰기) -->
+  <div id="boot">
+    <div class="logo"><div class="mark">H</div><div class="name">BANG OS<small>HK</small></div></div>
+    <div class="loader"><i></i><i></i><i></i></div>
+    <div class="boot-foot">Copyright © 방현기 · 화면을 누르면 건너뛰기</div>
+  </div>
+  <div id="welcome">
+    <div class="hello">환영합니다</div>
+    <div class="who">방현기의 컴퓨터를 시작하는 중...</div>
+  </div>
+
   <!-- 바탕화면 아이콘 -->
   <div id="icons">
     <div class="icon" data-open="about"><div class="img">🧑‍💻</div><div class="label">내 소개</div></div>
     <div class="icon" data-open="skills"><div class="img">🛠️</div><div class="label">할 줄 아는 것</div></div>
     <div class="icon" data-open="games"><div class="img">📁</div><div class="label">게임</div></div>
     <div class="icon" data-open="projects"><div class="img">🎮</div><div class="label">프로젝트</div></div>
+    <div class="icon" data-open="guestbook"><div class="img">📝</div><div class="label">방명록</div></div>
+    <div class="icon" data-open="updates"><div class="img">📋</div><div class="label">업데이트 내역</div></div>
     <div class="icon" data-open="contact"><div class="img">✉️</div><div class="label">연락처</div></div>
   </div>
 
@@ -187,6 +251,19 @@
     </div>
   </div>
 
+  <div class="win" id="guestbook" data-title="방명록" style="top:50px; left:200px;">
+    <div class="bar"><span>📝 방명록 - 메모장</span><div class="btns"><span class="min">_</span><span class="x">✕</span></div></div>
+    <div class="body">
+      <div class="gb-tip">한마디 남겨주세요! 글을 쓰려면 GitHub 로그인이 필요해요. (읽기는 누구나 가능)</div>
+      <div id="gb"></div>
+    </div>
+  </div>
+
+  <div class="win" id="updates" data-title="업데이트 내역" style="top:70px; left:260px;">
+    <div class="bar"><span>📋 업데이트 내역</span><div class="btns"><span class="min">_</span><span class="x">✕</span></div></div>
+    <div class="body"><div id="updList">불러오는 중...</div></div>
+  </div>
+
   <div class="win" id="contact" data-title="연락처" style="top:190px; left:230px;">
     <div class="bar"><span>✉️ 연락처</span><div class="btns"><span class="min">_</span><span class="x">✕</span></div></div>
     <div class="body">
@@ -202,6 +279,8 @@
     <div class="item" data-open="skills">🛠️ 할 줄 아는 것</div>
     <div class="item" data-open="games">📁 게임</div>
     <div class="item" data-open="projects">🎮 프로젝트</div>
+    <div class="item" data-open="guestbook">📝 방명록</div>
+    <div class="item" data-open="updates">📋 업데이트 내역</div>
     <div class="item" data-open="contact">✉️ 연락처</div>
     <div class="item off" id="closeAll">⏻ 모든 창 닫기</div>
   </div>
@@ -360,8 +439,76 @@
     }
     tick(); setInterval(tick, 10000);
 
-    // 처음 열면 소개 창 띄우기
-    openWin("about");
+    // ===== 업데이트 내역: 깃허브 이슈 중 '업데이트' 라벨 붙은 것 =====
+    const REPO = "bang05123/bang7740";
+    let updLoaded = false;
+    function esc(t) { return t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+    function loadUpdates() {
+      if (updLoaded) return; updLoaded = true;
+      const box = document.getElementById("updList");
+      fetch("https://api.github.com/repos/" + REPO + "/issues?state=closed&per_page=50")
+        .then(r => r.json())
+        .then(list => {
+          const ups = list.filter(i => !i.pull_request && i.labels.some(l => l.name === "업데이트"));
+          if (!ups.length) { box.textContent = "아직 업데이트 기록이 없어요."; return; }
+          box.innerHTML = ups.map(i => {
+            const d = new Date(i.closed_at || i.created_at).toLocaleDateString("ko-KR");
+            // 본문의 '바꾼 것' 아래 첫 단계 항목만 보여주기
+            const sec = (i.body || "").split("## 바꾼 것")[1] || "";
+            const lines = sec.split("##")[0].split("\n").filter(l => /^- /.test(l))
+              .map(l => "<li>" + esc(l.slice(2).replace(/\*\*|`/g, "")) + "</li>").join("");
+            return '<div class="upd"><div class="when">#' + i.number + " · " + d + "</div>" +
+              '<b><a href="' + i.html_url + '" target="_blank">' + esc(i.title) + "</a></b>" +
+              (lines ? "<ul>" + lines + "</ul>" : "") + "</div>";
+          }).join("");
+        })
+        .catch(() => { box.textContent = "불러오지 못했어요. 잠시 후 다시 열어주세요."; updLoaded = false; });
+    }
+
+    // ===== 방명록: utterances (깃허브 이슈 댓글) =====
+    let gbLoaded = false;
+    function loadGuestbook() {
+      if (gbLoaded) return; gbLoaded = true;
+      const sc = document.createElement("script");
+      sc.src = "https://utteranc.es/client.js";
+      sc.setAttribute("repo", REPO);
+      sc.setAttribute("issue-term", "방명록");
+      sc.setAttribute("label", "방명록");
+      sc.setAttribute("theme", "github-light");
+      sc.crossOrigin = "anonymous"; sc.async = true;
+      document.getElementById("gb").appendChild(sc);
+    }
+
+    // 창이 처음 열릴 때 내용 불러오기
+    const _openWin = openWin;
+    openWin = function (id) {
+      if (id === "updates") loadUpdates();
+      if (id === "guestbook") loadGuestbook();
+      _openWin(id);
+    };
+    document.querySelectorAll("[data-open]").forEach(el => {
+      el.onclick = () => openWin(el.dataset.open);
+    });
+
+    // ===== 부팅 화면 → 환영합니다 → 바탕화면 =====
+    const boot = document.getElementById("boot"), welcome = document.getElementById("welcome");
+    let booted = false;
+    function finishBoot() {
+      if (booted) return; booted = true;
+      boot.remove(); welcome.remove();
+      openWin("about");
+    }
+    function showWelcome() {
+      if (booted) return;
+      boot.style.opacity = 0;
+      setTimeout(() => { if (booted) return; boot.style.display = "none"; welcome.style.display = "flex"; }, 400);
+      setTimeout(finishBoot, 2200);
+    }
+    boot.onclick = finishBoot; welcome.onclick = finishBoot;
+    let seen = false;
+    try { seen = sessionStorage.getItem("booted") === "1"; sessionStorage.setItem("booted", "1"); } catch (e) {}
+    if (seen) finishBoot();       // 같은 탭에서 새로고침하면 바로 바탕화면
+    else setTimeout(showWelcome, 3000);
   </script>
 </body>
 </html>
