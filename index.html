@@ -79,6 +79,7 @@
     .gamewin.max { top: 0 !important; left: 0 !important; width: 100% !important; height: calc(100% - 36px) !important; max-width: none; border-radius: 0; border-width: 0; padding-bottom: 0; }
     .gamewin.max .bar { border-radius: 0; }
     .gamewin.max .grip { display: none; }
+    body.touchdev .gamewin.max { height: 100% !important; z-index: 100002 !important; }  /* 폰: 작업표시줄까지 덮기 */
     .grip { position: absolute; right: -3px; bottom: -3px; width: 18px; height: 18px; cursor: nwse-resize;
       background: linear-gradient(135deg, transparent 50%, #1f4fbf 50%); }
     body.dragging iframe { pointer-events: none; }  /* 창 끌 때 게임 화면이 마우스를 뺏지 않게 */
@@ -281,6 +282,7 @@
 
   <script>
     let z = 10;
+    if (matchMedia("(pointer: coarse)").matches) document.body.classList.add("touchdev");
     const tasks = document.getElementById("tasks");
     const menu = document.getElementById("menu");
 
@@ -381,7 +383,7 @@
       w.style.width = ww + "px"; w.style.height = wh + "px";
       w.style.left = Math.max(0, (W - ww) / 2 - 60 + off) + "px";
       w.style.top = Math.max(0, (H - wh) / 2 - 40 + off) + "px";
-      if (W < 700) w.classList.add("max");  // 폰에서는 처음부터 전체 화면
+      if (W < 700 || H < 560 || matchMedia("(pointer: coarse)").matches) w.classList.add("max");  // 폰·작은 화면에서는 처음부터 전체 화면
       w.innerHTML =
         '<div class="bar"><span>' + emoji + ' ' + title + '</span>' +
         '<div class="btns"><span class="min">_</span><span class="maxb">□</span><span class="x">✕</span></div></div>' +
