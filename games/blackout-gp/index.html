@@ -38,6 +38,15 @@
   @media (max-height: 500px) { #titleScreen .sub { margin: 4px 0 10px; } #titleScreen .menu button { font-size: 17px; padding: 5px 18px; margin: 6px 0; } }
   .setrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0; font-size: 15px; }
   .setrow input[type=range] { width: 50%; }
+  body.spec .hud, body.spec #radar, body.spec #mirror, body.spec #touch, body.spec #fx, body.spec #msg, body.spec #center { display: none !important; }
+  #specBar { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: none; align-items: center; gap: 6px; z-index: 22; background: rgba(0,0,0,.6); border: 2px solid #fff; padding: 6px 8px; font-weight: 800; color: #fff; white-space: nowrap; }
+  body.spec #specBar { display: flex; }
+  #specBar button { font: inherit; font-size: 15px; font-weight: 800; padding: 7px 12px; background: rgba(255,255,255,.08); color: #fff; border: 2px solid #fff; cursor: pointer; }
+  #specBar button.on { background: #d85a30; }
+  #specName { min-width: 150px; text-align: center; font-size: 15px; } #specName small { display: block; font-size: 11px; color: #bbb; font-weight: 600; }
+  #specTag { position: fixed; left: 16px; top: calc(14px + env(safe-area-inset-top)); z-index: 22; display: none; color: #fff; font: 900 italic 15px sans-serif; background: #d85a30; padding: 4px 10px; letter-spacing: 1px; }
+  body.spec #specTag { display: block; }
+  @media (max-width: 700px) { #specBar { gap: 4px; padding: 4px 5px; } #specBar button { font-size: 13px; padding: 6px 8px; } #specName { min-width: 104px; font-size: 12px; } #specName small { font-size: 10px; } }
   body.inmenu .hud, body.inmenu #radar, body.inmenu #mirror, body.inmenu #touch, body.inmenu #fx { display: none !important; }
   #bigMsg { position: fixed; left: 0; right: 0; top: 30%; text-align: center; font-size: min(12vw, 96px); font-weight: 900; font-style: italic; color: #fff; text-shadow: 6px 6px 0 #d85a30; pointer-events: none; z-index: 12; opacity: 0; }
   table.res td.ko { color: #ff8a5a; text-align: center; }
@@ -252,9 +261,12 @@
     <h1 id="endTitle">FINISH</h1>
     <table class="res" id="resTable"></table>
     <p id="endInfo"></p>
-    <button id="bAgain">다시 달리기</button><button class="ghost" id="bMenu">코스 선택</button><button class="ghost" id="bTitle">타이틀</button>
+    <button id="bSpec">📺 관전</button><button id="bAgain">다시 달리기</button><button class="ghost" id="bMenu">코스 선택</button><button class="ghost" id="bTitle">타이틀</button>
   </div>
 </div>
+
+<div id="specTag">● LIVE</div>
+<div id="specBar"><button id="spPrev">◀</button><div id="specName">-</div><button id="spNext">▶</button><button id="spChase" class="on">체이스</button><button id="spTv">TV</button><button id="spBack">결과</button></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script>
@@ -1370,6 +1382,7 @@ const keys = {};
 const input = { steer: 0, gas: 0, brake: 0, nitro: false, boostPress: false, drift: false, analog: false, gun: false, sp: false, spPress: false };
 addEventListener("keydown", e => {
   if (!keys[e.code]) {
+    if (SPEC.on) { if (e.code === "ArrowLeft" || e.code === "KeyA") specStep(-1); if (e.code === "ArrowRight" || e.code === "KeyD") specStep(1); if (e.code === "KeyC" || e.code === "KeyV") specMode(SPEC.mode === "chase" ? "tv" : "chase"); if (e.code === "Escape" || e.code === "Enter") specOff(true); keys[e.code] = true; return; }
     if (e.code === "KeyC") toggleCam();
     if (e.code === "KeyR") resetToTrack();
     if (e.code === "KeyM") setSound(!SND.on);
@@ -1469,14 +1482,59 @@ function placeGrid(shuffle = true) {
   suspReset(player, p.y);
 }
 function startRace() {
-  audioInit(); clearTimeout(endTimer); setMsg("", 0.01); flashT = 0; slowT = 0;
+  specOff(); audioInit(); clearTimeout(endTimer); setMsg("", 0.01); flashT = 0; slowT = 0;
   placeGrid(!gridFresh); gridFresh = false; raceT = 0; countdown = 3.2; state = "count"; // 메뉴에서 보던 자리 그대로 출발
   showScreen(null); hideBig(); kos.clear();
 }
 const SCREENS = ["titleScreen", "helpScreen", "setScreen", "startScreen", "endScreen", "pauseScreen"];
 function showScreen(id) { for (const k of SCREENS) document.getElementById(k).style.display = k === id ? "flex" : "none"; document.body.classList.toggle("inmenu", ["titleScreen", "helpScreen", "setScreen", "startScreen"].includes(id)); }
-function toMenu() { clearTimeout(endTimer); state = "menu"; placeGrid(); gridFresh = true; showScreen("startScreen"); }
-function toTitle() { clearTimeout(endTimer); state = "menu"; placeGrid(); gridFresh = true; showScreen("titleScreen"); }
+// ---- 관전: 결승 뒤 다른 차를 체이스 캠 / TV 캠으로 보기
+const SPEC = { on: false, car: null, mode: "chase", tv: null, h: 0, pos: new THREE.Vector3(), look: new THREE.Vector3(), fresh: true, side: 1 };
+function specCars() { return [player, ...ais].filter(c => !c.dead); }
+function specOn() {
+  const st = standings(), list = specCars(); // 처음엔 아직 달리는 차 중 가장 앞 차, 없으면 1위
+  const pick = st.find(r => !r.done && !r.ret) || st.find(r => !r.ret); SPEC.car = (pick && (pick.me ? player : ais.find(a => a.name === pick.name))) || list[0] || player;
+  SPEC.on = true; SPEC.fresh = true; SPEC.tv = null; player.mesh.visible = true;
+  document.getElementById("endScreen").style.display = "none"; document.body.classList.add("spec"); specLabel();
+}
+function specOff(showRes) {
+  if (!SPEC.on) return; SPEC.on = false; document.body.classList.remove("spec"); player.mesh.visible = camMode !== "cockpit"; firstFrame = true;
+  if (showRes && state === "end") document.getElementById("endScreen").style.display = "flex";
+}
+function specStep(d) { const list = specCars(); if (!list.length) return; let i = list.indexOf(SPEC.car); i = (i + d + list.length) % list.length; SPEC.car = list[i]; SPEC.fresh = true; SPEC.tv = null; specLabel(); }
+function specMode(m) { SPEC.mode = m; SPEC.fresh = true; SPEC.tv = null; document.getElementById("spChase").classList.toggle("on", m === "chase"); document.getElementById("spTv").classList.toggle("on", m === "tv"); }
+function specLabel() {
+  const c = SPEC.car; if (!c) return; const st = standings(), pos = st.findIndex(r => r.me ? c === player : r.name === c.name) + 1;
+  const lap = Math.min(lapsTotal, Math.floor(Math.max(0, c.prog) / L) + 1);
+  document.getElementById("specName").innerHTML = `${pos}위 · ${c.name}<small>${c.done ? "완주" : `랩 ${lap}/${lapsTotal} · ${Math.round(Math.abs(c.vf || 0) * 3.6)} km/h`}</small>`;
+}
+function specCam(dt) {
+  let c = SPEC.car; if (!c || (c.dead && specCars().length)) { specStep(1); c = SPEC.car; } if (!c) return;
+  const m = c.mesh.position, k = SPEC.fresh ? 1 : 0;
+  if (SPEC.mode === "chase") {
+    let dh = c.h - SPEC.h; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI; SPEC.h += dh * (k || Math.min(1, (c.tumble ? 1.5 : 6) * dt));
+    const big = (c.mesh.userData.topH || 3.5) / 3.5, back = 12.5 * big + 1.5, up = 4 * big, fx_ = Math.sin(SPEC.h), fz_ = Math.cos(SPEC.h);
+    const want = _sv.set(m.x - fx_ * back, m.y + up, m.z - fz_ * back), look = _sv2.set(m.x + fx_ * 10, m.y + 1.3, m.z + fz_ * 10);
+    SPEC.pos.lerp(want, k || 1 - Math.exp(-6 * dt)); SPEC.look.lerp(look, k || 1 - Math.exp(-10 * dt));
+    camera.position.copy(SPEC.pos); camera.lookAt(SPEC.look); camera.fov = 64;
+  } else { // TV 캠: 길가에 세운 카메라가 다가오는 차를 줌으로 따라감. 지나가면 다음 카메라로
+    const ahead = c.prog - (SPEC.tv ? SPEC.tv.prog : -1e9);
+    if (!SPEC.tv || ahead > 40 || ahead < -420) {
+      SPEC.side = -SPEC.side; const sp = c.prog + 150 + Math.random() * 80, lat = SPEC.side * (HALF + 5 + Math.random() * 9), q = posAt(sp, lat);
+      SPEC.tv = { prog: sp, x: q.x, y: q.y + 9 + Math.random() * 8, z: q.z }; // 길가 높은 곳 (벽·관중석에 덜 가리게) SPEC.look.set(m.x, m.y + 1, m.z);
+    }
+    const T = SPEC.tv; camera.position.set(T.x, T.y, T.z); SPEC.look.lerp(_sv.set(m.x, m.y + 1, m.z), k || 1 - Math.exp(-9 * dt)); camera.lookAt(SPEC.look);
+    const d = Math.max(1, camera.position.distanceTo(SPEC.look)); camera.fov = clamp(2 * Math.atan(9 / d) * 180 / Math.PI, 7, 60); // 멀면 당겨 찍고 가까우면 넓게
+  }
+  SPEC.fresh = false; camera.updateProjectionMatrix(); fov = camera.fov;
+  if ((SPEC.lt = (SPEC.lt || 0) + dt) > 0.25) { SPEC.lt = 0; specLabel(); }
+}
+const _sv = new THREE.Vector3(), _sv2 = new THREE.Vector3();
+document.getElementById("bSpec").onclick = specOn; document.getElementById("spBack").onclick = () => specOff(true);
+document.getElementById("spPrev").onclick = () => specStep(-1); document.getElementById("spNext").onclick = () => specStep(1);
+document.getElementById("spChase").onclick = () => specMode("chase"); document.getElementById("spTv").onclick = () => specMode("tv");
+function toMenu() { specOff(); clearTimeout(endTimer); state = "menu"; placeGrid(); gridFresh = true; showScreen("startScreen"); }
+function toTitle() { specOff(); clearTimeout(endTimer); state = "menu"; placeGrid(); gridFresh = true; showScreen("titleScreen"); }
 function isTouchDev() { return matchMedia("(pointer: coarse)").matches || "ontouchstart" in window; }
 const SET = { vol: 60, shake: 1, gfx: isTouchDev() ? "low" : "high" }; try { Object.assign(SET, JSON.parse(localStorage.getItem("bgp_set") || "{}")); } catch (e) {}
 function applySet() {
@@ -2530,6 +2588,7 @@ function updateCamera(dt) {
     camera.position.set(p.x + Math.sin(a) * R - Math.sin(p.h) * 12, p.y + 4.5 + Math.sin(t * 0.15) * 1.5, p.z + Math.cos(a) * R - Math.cos(p.h) * 12); camera.lookAt(p.x - Math.sin(p.h) * 14, p.y + 1, p.z - Math.cos(p.h) * 14);
     if (camera.fov !== 55) { camera.fov = 55; camera.updateProjectionMatrix(); } fov = 55; firstFrame = true; return;
   }
+  if (SPEC.on && state === "end") { specCam(dt); return; }
   if (player.dead && camMode === "chase") { // 리타이어: 잔해 주위를 천천히 돌며 멀어짐
     const p = player, t = p.camRetT = (p.camRetT || 0) + dt, a = camH + 0.6 + t * 0.22, dist = 11 + Math.min(14, t * 2.2), up = 3.5 + Math.min(6, t * 0.9);
     camPos.lerp(new THREE.Vector3(p.x - Math.sin(a) * dist, p.y + up, p.z - Math.cos(a) * dist), 1 - Math.exp(-3 * dt)); camera.position.copy(camPos);
@@ -2752,7 +2811,7 @@ function drawRadar() {
 }
 
 function renderMirror() {
-  const show = state === "race" || state === "count" || state === "end";
+  const show = (state === "race" || state === "count" || state === "end") && !SPEC.on;
   mirrorEl.style.display = show ? "block" : "none"; if (!show) return;
   const r = mirrorEl.getBoundingClientRect(), W = document.documentElement.clientWidth || innerWidth, H = document.documentElement.clientHeight || innerHeight;
   if (r.width < 10) return;
