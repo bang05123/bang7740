@@ -2196,7 +2196,6 @@ function detachPart(c, pt, zone, power) {
   const bs = new THREE.Box3().setFromObject(pt), r = Math.max(0.35, bs.getSize(new THREE.Vector3()).length() * 0.35);
   const pg_ = pivotize(pt);
   WRECK.push({ obj: pg_, x: pg_.position.x, y: pg_.position.y, z: pg_.position.z, vx: c.vx * 0.8 + ox / ol * kick, vy: 3 + Math.random() * 5 * power, vz: c.vz * 0.8 + oz / ol * kick, wx: (Math.random() - 0.5) * 12, wy: (Math.random() - 0.5) * 12, wz: (Math.random() - 0.5) * 12, r, idx: c.idx, rest: false, hitT: 0.6, wheel: !!pt.userData.isWheel });
-  { const w = WRECK[WRECK.length - 1], hv = Math.hypot(w.vx, w.vz); if (hv > 45) { w.vx *= 45 / hv; w.vz *= 45 / hv; } }
   sndClank(1, P_.x, P_.z);
   if (Math.hypot(c.x - player.x, c.z - player.z) < 300) for (let k = 0; k < 8; k++) emit(sparks, P_.x, P_.y, P_.z, (Math.random() - 0.5) * 10 + c.vx * 0.5, Math.random() * 6, (Math.random() - 0.5) * 10 + c.vz * 0.5, 0.4);
 }
@@ -2232,13 +2231,12 @@ function stepWreck(dt) {
   for (const w of WRECK) {
     w.hitT = Math.max(0, w.hitT - dt);
     if (w.hitT <= 0) for (const c of cars) { // 차가 밟거나 치면 튕겨나가고, 차도 출렁
-      if (c.dead || Math.abs(c.y - w.y) > 2.5 || (w.gy !== undefined && w.y > w.gy + 1.2)) continue; // 공중에 뜬 파편은 다시 안 침 (차 앞에서 계속 저글링되던 문제)
+      if (c.dead || Math.abs(c.y - w.y) > 2.5) continue;
       const dx = w.x - c.x, dz = w.z - c.z; if (dx * dx + dz * dz > (c.mesh.userData.hl + w.r + 2) ** 2) continue;
       const fx = Math.sin(c.h), fz = Math.cos(c.h), lz = dx * fx + dz * fz, lx = dx * Math.cos(c.h) - dz * Math.sin(c.h);
       if (Math.abs(lz) > c.mesh.userData.hl + w.r || Math.abs(lx) > c.mesh.userData.hwd + w.r) continue;
       const sp = Math.hypot(c.vx, c.vz); if (sp < 4) continue;
-      const fwd = Math.min(sp * (0.45 + Math.random() * 0.2), 38), side = (lx >= 0 ? 1 : -1) * (4 + Math.random() * 7), rx = Math.cos(c.h), rz = -Math.sin(c.h); // 차 속도의 절반쯤 앞으로 + 옆으로 튕김
-      w.vx = fx * fwd + rx * side; w.vz = fz * fwd + rz * side; w.vy = 2.5 + Math.random() * 3 + Math.min(4, sp * 0.03); w.wx = (Math.random() - 0.5) * 16; w.wy = (Math.random() - 0.5) * 16; w.wz = (Math.random() - 0.5) * 16; w.rest = false; w.hitT = 0.8;
+      const k = 0.9 + Math.random() * 0.5; w.vx = c.vx * k + (Math.random() - 0.5) * 8; w.vz = c.vz * k + (Math.random() - 0.5) * 8; w.vy = 4 + Math.random() * 6 + Math.min(8, sp * 0.05); w.wx = (Math.random() - 0.5) * 25; w.wy = (Math.random() - 0.5) * 25; w.wz = (Math.random() - 0.5) * 25; w.rest = false; w.hitT = 0.5;
       const big = Math.min(1.6, w.r), spf = Math.min(1, sp / 60); c.kickT = 1.2;
       c.vy = (c.vy || 0) + big * 3.5 * spf; c.ry += (Math.random() - 0.5) * big * 0.9 * spf;
       if (!c.tumble && big > 1.1 && sp > 60 && Math.random() < 0.12) (window.__tlog && window.__tlog.push("debris")), enterTumble(c, (Math.random() - 0.5) * big * 3, (Math.random() - 0.5) * big * 3, big * 4); c.vf *= 1 - Math.min(0.06, big * 0.03); toWorld(c);
@@ -2247,7 +2245,6 @@ function stepWreck(dt) {
       for (let j = 0; j < 6; j++) emit(sparks, w.x, w.y + 0.3, w.z, (Math.random() - 0.5) * 8, Math.random() * 5, (Math.random() - 0.5) * 8, 0.3);
     }
     if (w.rest) continue;
-    const ad = Math.exp(-0.35 * dt); w.vx *= ad; w.vz *= ad; const sd = Math.exp(-0.9 * dt); w.wx *= sd; w.wy *= sd; w.wz *= sd; // 공기 저항: 끝없이 날아가거나 돌지 않게
     w.vy -= 26 * dt; w.x += w.vx * dt; w.y += w.vy * dt; w.z += w.vz * dt;
     w.idx = nearest(w.x, w.z, w.idx); const t = TRK[w.idx], lat = (w.x - t.x) * nx(t) + (w.z - t.z) * nz(t), g0 = surfH(t.s, lat);
     const o = w.obj; o.position.set(w.x, w.y, w.z); const wl = Math.hypot(w.wx, w.wy, w.wz); if (wl > 0.01) { ax.set(w.wx / wl, w.wy / wl, w.wz / wl); q.setFromAxisAngle(ax, wl * dt); o.quaternion.premultiply(q); }
@@ -2291,7 +2288,6 @@ function propsNear(x, z, rad) { const out = [], n = Math.ceil(rad / PCELL); cons
   for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) { const a = PGRID.get((cx + i + 5000) * 100000 + (cz + j + 5000)); if (a) for (const pr of a) if (!pr.broken) out.push(pr); } return out; }
 function breakProp(pr, vx, vy, vz, quiet) {
   if (pr.broken) return; pr.broken = true; let mesh;
-  { const hv = Math.hypot(vx, vz), cap = 40; if (hv > cap) { vx *= cap / hv; vz *= cap / hv; } vy = Math.min(vy, 13); } // 너무 빠르게 날아가지 않게
   if (pr.inst) { const { im, om, i, m } = pr.inst; let mat = im.material; if (im.instanceColor) { mat = im.material.clone(); const c = new THREE.Color(); im.getColorAt(i, c); mat.color.copy(c); }
     mesh = new THREE.Mesh(im.geometry, mat); m.decompose(mesh.position, mesh.quaternion, mesh.scale); im.setMatrixAt(i, ZERO_M); im.instanceMatrix.needsUpdate = true; if (om) { om.setMatrixAt(i, ZERO_M); om.instanceMatrix.needsUpdate = true; } }
   else { const o = pr.obj; o.updateMatrixWorld(true); if (!o.userData.propOrig) o.userData.propOrig = { parent: o.parent, p: o.position.clone(), q: o.quaternion.clone(), s: o.scale.clone() }; const P_ = new THREE.Vector3(), Q = new THREE.Quaternion(), Sc = new THREE.Vector3(); o.matrixWorld.decompose(P_, Q, Sc); o.parent.remove(o); o.position.copy(P_); o.quaternion.copy(Q); o.scale.copy(Sc); mesh = o; }
@@ -2314,7 +2310,7 @@ function stepProps() { // 차가 들이받으면 부숴짐
     for (const pr of propsNear(c.x, c.z, hl + 8)) {
       const dx = pr.x - c.x, dz = pr.z - c.z, fx = Math.sin(c.h), fz = Math.cos(c.h), lz = dx * fx + dz * fz, lx = dx * Math.cos(c.h) - dz * Math.sin(c.h);
       if (Math.abs(lz) > hl + pr.r * 0.6 || Math.abs(lx) > hw + pr.r * 0.6) continue; if (c.y > pr.y + pr.h + 0.5 || c.y < pr.y - 3) continue;
-      const K = PROP_KIND[pr.kind]; breakProp(pr, c.vx * (0.5 + Math.random() * 0.2) + (Math.random() - 0.5) * 8, 2.5 + Math.random() * 3.5 + sp * 0.025, c.vz * (0.5 + Math.random() * 0.2) + (Math.random() - 0.5) * 8);
+      const K = PROP_KIND[pr.kind]; breakProp(pr, c.vx * (1.05 + Math.random() * 0.3) + (Math.random() - 0.5) * 6, 3 + Math.random() * 5 + sp * 0.04, c.vz * (1.05 + Math.random() * 0.3) + (Math.random() - 0.5) * 6);
       if (c.tumble) { c.tv.multiplyScalar(K.slow); continue; }
       c.vf *= K.slow; c.vl *= K.slow; toWorld(c); if (K.dmg) { applyDamage(c, K.dmg * Math.min(1, sp / 50), hitLocal(c, fx, fz), null, "prop"); c.ry += (Math.random() - 0.5) * 0.4 * (1 - K.slow) * 10; c.kickT = 1; }
       if (c === player) shake = Math.max(shake, (1 - K.slow) * 4 + 0.08);
