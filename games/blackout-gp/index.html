@@ -2182,6 +2182,11 @@ function applyDamage(c, amt, loc, by, src) {
   if (c === player && amt > 6) setMsg(c.hp < 15 ? "위험! 차가 버티지 못함" : c.hp < 40 ? "심한 파손!" : "파손!", 0.9);
   if (c.hp <= 0) explode(c);
 }
+const _wbb = new THREE.Box3(), _wv = new THREE.Vector3();
+function pivotize(obj) { // 부품 모양의 한가운데를 회전 중심으로 (원점이 차 중심에 있어서 엉뚱한 점을 축으로 돌고 공중에 떠 보이던 문제)
+  obj.updateMatrixWorld(true); _wbb.setFromObject(obj); const cen = _wbb.getCenter(new THREE.Vector3());
+  const g = new THREE.Group(); g.userData.pivot = true; g.position.copy(cen); wreckG.add(g); obj.position.sub(cen); g.add(obj); return g;
+}
 function detachPart(c, pt, zone, power) {
   const d = ensureDmg(c), u = c.mesh.userData; c.mesh.updateMatrixWorld(true); pt.updateMatrixWorld(true);
   const P_ = new THREE.Vector3(), Q = new THREE.Quaternion(), Sc = new THREE.Vector3(); pt.matrixWorld.decompose(P_, Q, Sc);
@@ -2189,7 +2194,8 @@ function detachPart(c, pt, zone, power) {
   if (zone && d.fr[zone]) d.fr[zone].visible = true;
   const ox = P_.x - c.x, oz = P_.z - c.z, ol = Math.hypot(ox, oz) || 1, kick = (3 + Math.random() * 6) * power;
   const bs = new THREE.Box3().setFromObject(pt), r = Math.max(0.35, bs.getSize(new THREE.Vector3()).length() * 0.35);
-  WRECK.push({ obj: pt, x: P_.x, y: P_.y, z: P_.z, vx: c.vx * 0.8 + ox / ol * kick, vy: 3 + Math.random() * 5 * power, vz: c.vz * 0.8 + oz / ol * kick, wx: (Math.random() - 0.5) * 12, wy: (Math.random() - 0.5) * 12, wz: (Math.random() - 0.5) * 12, r, idx: c.idx, rest: false, hitT: 0.6, wheel: !!pt.userData.isWheel });
+  const pg_ = pivotize(pt);
+  WRECK.push({ obj: pg_, x: pg_.position.x, y: pg_.position.y, z: pg_.position.z, vx: c.vx * 0.8 + ox / ol * kick, vy: 3 + Math.random() * 5 * power, vz: c.vz * 0.8 + oz / ol * kick, wx: (Math.random() - 0.5) * 12, wy: (Math.random() - 0.5) * 12, wz: (Math.random() - 0.5) * 12, r, idx: c.idx, rest: false, hitT: 0.6, wheel: !!pt.userData.isWheel });
   { const w = WRECK[WRECK.length - 1], hv = Math.hypot(w.vx, w.vz); if (hv > 45) { w.vx *= 45 / hv; w.vz *= 45 / hv; } }
   sndClank(1, P_.x, P_.z);
   if (Math.hypot(c.x - player.x, c.z - player.z) < 300) for (let k = 0; k < 8; k++) emit(sparks, P_.x, P_.y, P_.z, (Math.random() - 0.5) * 10 + c.vx * 0.5, Math.random() * 6, (Math.random() - 0.5) * 10 + c.vz * 0.5, 0.4);
@@ -2243,10 +2249,11 @@ function stepWreck(dt) {
     if (w.rest) continue;
     const ad = Math.exp(-0.35 * dt); w.vx *= ad; w.vz *= ad; const sd = Math.exp(-0.9 * dt); w.wx *= sd; w.wy *= sd; w.wz *= sd; // 공기 저항: 끝없이 날아가거나 돌지 않게
     w.vy -= 26 * dt; w.x += w.vx * dt; w.y += w.vy * dt; w.z += w.vz * dt;
-    w.idx = nearest(w.x, w.z, w.idx); const t = TRK[w.idx], lat = (w.x - t.x) * nx(t) + (w.z - t.z) * nz(t), gy = surfH(t.s, lat) + w.r * 0.45; w.gy = gy;
-    if (w.y < gy) { w.y = gy; if (w.vy < -3) sndClank(Math.min(1, -w.vy / 10), w.x, w.z); if (w.vy < 0) w.vy = -w.vy * (w.wheel ? 0.45 : 0.28); const fr = Math.exp(-(w.wheel ? 0.8 : 3.2) * dt); w.vx *= fr; w.vz *= fr; w.wx *= Math.exp(-4 * dt); w.wy *= Math.exp(-4 * dt); w.wz *= Math.exp(-4 * dt);
-      if (Math.hypot(w.vx, w.vz) < 0.6 && Math.abs(w.vy) < 1.2) w.rest = true; }
+    w.idx = nearest(w.x, w.z, w.idx); const t = TRK[w.idx], lat = (w.x - t.x) * nx(t) + (w.z - t.z) * nz(t), g0 = surfH(t.s, lat);
     const o = w.obj; o.position.set(w.x, w.y, w.z); const wl = Math.hypot(w.wx, w.wy, w.wz); if (wl > 0.01) { ax.set(w.wx / wl, w.wy / wl, w.wz / wl); q.setFromAxisAngle(ax, wl * dt); o.quaternion.premultiply(q); }
+    o.updateMatrixWorld(true); _wbb.setFromObject(o); const low = _wbb.min.y; w.gy = w.y - low + g0; // 모양의 가장 낮은 점이 땅에 닿게
+    if (low < g0) { w.y += g0 - low; o.position.y = w.y; if (w.vy < -3) sndClank(Math.min(1, -w.vy / 10), w.x, w.z); if (w.vy < 0) w.vy = -w.vy * (w.wheel ? 0.45 : 0.28); const fr = Math.exp(-(w.wheel ? 0.8 : 3.2) * dt); w.vx *= fr; w.vz *= fr; w.wx *= Math.exp(-4 * dt); w.wy *= Math.exp(-4 * dt); w.wz *= Math.exp(-4 * dt);
+      if (Math.hypot(w.vx, w.vz) < 0.6 && Math.abs(w.vy) < 1.2) w.rest = true; }
   }
 }
 function stepDamageFx(dt) { // 연기·불꽃 (가까운 차만)
@@ -2290,7 +2297,8 @@ function breakProp(pr, vx, vy, vz, quiet) {
   else { const o = pr.obj; o.updateMatrixWorld(true); if (!o.userData.propOrig) o.userData.propOrig = { parent: o.parent, p: o.position.clone(), q: o.quaternion.clone(), s: o.scale.clone() }; const P_ = new THREE.Vector3(), Q = new THREE.Quaternion(), Sc = new THREE.Vector3(); o.matrixWorld.decompose(P_, Q, Sc); o.parent.remove(o); o.position.copy(P_); o.quaternion.copy(Q); o.scale.copy(Sc); mesh = o; }
   wreckG.add(mesh);
   const big = pr.kind === "board" || pr.kind === "lamp" || pr.kind === "pole";
-  WRECK.push({ obj: mesh, x: mesh.position.x, y: mesh.position.y, z: mesh.position.z, vx, vy, vz, wx: (Math.random() - 0.5) * (big ? 4 : 14), wy: (Math.random() - 0.5) * 8, wz: (Math.random() - 0.5) * (big ? 4 : 14), r: Math.min(1.6, Math.max(0.35, pr.r * 0.5)), idx: nearest(mesh.position.x, mesh.position.z, 0), rest: false, hitT: 0.5, prop: true });
+  const pm_ = pivotize(mesh);
+  WRECK.push({ obj: pm_, x: pm_.position.x, y: pm_.position.y, z: pm_.position.z, vx, vy, vz, wx: (Math.random() - 0.5) * (big ? 4 : 14), wy: (Math.random() - 0.5) * 8, wz: (Math.random() - 0.5) * (big ? 4 : 14), r: Math.min(1.6, Math.max(0.35, pr.r * 0.5)), idx: fullNearest(pm_.position.x, pm_.position.z), rest: false, hitT: 0.5, prop: true });
   if (!quiet && Math.hypot(pr.x - player.x, pr.z - player.z) < 260) { for (let k = 0; k < 8; k++) emit(pr.kind === "bush" || pr.kind === "cactus" ? dust : sparks, pr.x, pr.y + 1, pr.z, (Math.random() - 0.5) * 8 + vx * 0.3, Math.random() * 5, (Math.random() - 0.5) * 8 + vz * 0.3, 0.5); sndClank(big ? 1 : 0.6, pr.x, pr.z); if (big) sndImpact(14, pr.x, pr.z); }
   if (pr.link) for (const q of pr.link) breakProp(q, vx * 0.8, vy + 2, vz * 0.8, true);
 }
