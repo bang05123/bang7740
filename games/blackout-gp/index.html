@@ -2485,6 +2485,15 @@ function drawReticle() { // 조준 표시와 미사일 경고
     for (let i = HITFX.hurt.length - 1; i >= 0; i--) { const H = HITFX.hurt[i]; H.t -= dtf; if (H.t <= 0) { HITFX.hurt.splice(i, 1); continue; }
       let rel = H.ang - camAng; while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI; const a = -Math.PI / 2 - rel; // 화면 위 = 정면
       fctx.strokeStyle = `rgba(255,40,30,${Math.min(1, H.t * 2) * 0.85 * H.k})`; fctx.lineWidth = 10 + H.k * 10; fctx.beginPath(); fctx.arc(w / 2, h / 2, R, a - 0.35, a + 0.35); fctx.stroke(); } }
+  for (const o of ais) { // 라이벌 머리 위 내구도 막대
+    if (o.dead || o.hp === undefined) continue; const d = Math.hypot(o.x - camera.position.x, o.z - camera.position.z); if (d > 220) continue;
+    const v = new THREE.Vector3(o.x, o.y + 3.4, o.z).project(camera); if (v.z >= 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) continue;
+    const x = (v.x + 1) / 2 * w, y = (1 - v.y) / 2 * h, bw = clamp(900 / d, 26, 64), bh = Math.max(4, bw / 9), hp = Math.max(0, o.hp) / 100, a_ = d > 160 ? (220 - d) / 60 : 1;
+    fctx.globalAlpha = a_; fctx.fillStyle = "rgba(0,0,0,.6)"; fctx.fillRect(x - bw / 2 - 1, y - 1, bw + 2, bh + 2);
+    fctx.fillStyle = hp > 0.7 ? "#7cff8a" : hp > 0.4 ? "#ffd23a" : hp > 0.15 ? "#ff8a2a" : (performance.now() % 400 < 200 ? "#ff2a2a" : "#7a1010"); fctx.fillRect(x - bw / 2, y, bw * hp, bh);
+    if (d < 90) { fctx.fillStyle = "#fff"; fctx.font = "bold 11px sans-serif"; fctx.textAlign = "center"; fctx.fillText(o.name.split(" ")[0], x, y - 3); fctx.textAlign = "left"; }
+    fctx.globalAlpha = 1;
+  }
   { const m = muzzle(player), fx_ = Math.sin(player.h), fz_ = Math.cos(player.h), v = new THREE.Vector3(m[0] + fx_ * 70, m[1], m[2] + fz_ * 70).project(camera); if (v.z < 1) { const x = (v.x + 1) / 2 * w, y = (1 - v.y) / 2 * h;
     if (HITFX.mark > 0 || HITFX.big > 0) { const big = HITFX.big > 0, r1 = big ? 9 : 7, r2 = big ? 24 : 16; fctx.strokeStyle = big ? "#ff4a3a" : "#ffffff"; fctx.lineWidth = big ? 4 : 3; fctx.beginPath(); for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { fctx.moveTo(x + sx * r1, y + sy * r1); fctx.lineTo(x + sx * r2, y + sy * r2); } fctx.stroke(); } // 맞힌 표시 (X)
     fctx.strokeStyle = "rgba(255,255,255,0.75)"; fctx.lineWidth = 2; fctx.beginPath(); fctx.moveTo(x - 12, y); fctx.lineTo(x - 4, y); fctx.moveTo(x + 4, y); fctx.lineTo(x + 12, y); fctx.moveTo(x, y - 12); fctx.lineTo(x, y - 4); fctx.moveTo(x, y + 4); fctx.lineTo(x, y + 12); fctx.stroke(); } } // 정면 조준선
