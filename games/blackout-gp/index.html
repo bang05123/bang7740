@@ -212,7 +212,7 @@
     <h1>조작법</h1>
     <p><b>키보드</b> · 가속 ↑/W · 브레이크 ↓/S · 조향 ←→/AD · 필살 부스트 Space · 드리프트 Shift<br>기관포 Z (누르고 있기) · 특수무기 X · 시점 C · 복귀 R · 소리 M · 일시정지 Esc</p>
     <p><b>게임패드</b> · 조향 왼쪽 스틱 · 가속 RT · 브레이크 LT · 부스트 A · 드리프트 B · 기관포 RB · 특수무기 X · 시점 Y</p>
-    <p><b>폰</b> · 왼쪽 핸들을 엄지로 돌려 조향 · 오른쪽 브레이크·부스트·특수 버튼 (자동 가속·자동 기관포는 준비 화면에서 켜고 끔)</p>
+    <p><b>폰</b> · 왼쪽 핸들을 엄지로 돌려 조향 · 오른쪽 브레이크·부스트·특수 버튼 (자동 가속은 준비 화면에서 켜고 끔)</p>
     <p><b>특수무기</b> · 미사일: 앞차를 쫓아감 · 작살: 꽂히면 좌우로 휘두르고 다시 눌러 당김 · 레일건: 누르고 모았다 떼기 · 충격파: 앞을 통째로 날림</p>
     <p><b>규칙</b> · 부스트는 3번뿐. 차가 부서지면 수리 없이 끝까지 간다. 내구도가 0이 되면 폭발·리타이어</p>
     <button class="ghost" id="bHelpBack">뒤로</button>
@@ -235,7 +235,7 @@
     <div class="courses"><button class="csel" data-c="desert">더스트 하이웨이<small>아무도 안 쓰는 황야 고속도로</small></button><button class="csel" data-c="circuit">메가 서킷<small>거대 구조물 사이 야간 서킷</small></button><button class="csel" data-c="dam">레드워터 댐<small>미래 마을을 통째로 막고 달리는 축제</small></button></div>
     <div class="laps">특수무기 <button class="wsel lsel" data-w="missile">미사일</button><button class="wsel lsel" data-w="harpoon">작살</button><button class="wsel lsel" data-w="rail">레일건</button><button class="wsel lsel" data-w="shock">충격파</button></div>
     <div class="laps">바퀴 수 <button class="lsel" data-l="1">1</button><button class="lsel" data-l="2">2</button><button class="lsel" data-l="3">3</button><button class="lsel" data-l="5">5</button><button class="lsel" data-l="7">7</button><button class="lsel" data-l="10">10</button></div>
-    <div class="laps tonly-flex">모바일 <button class="lsel" id="oGas">자동 가속</button><button class="lsel" id="oGun">자동 기관포</button></div>
+    <div class="laps tonly-flex">모바일 <button class="lsel" id="oGas">자동 가속</button></div>
     <button id="bStart">출발</button><button class="ghost" id="bSetupBack">뒤로</button>
   </div>
 </div>
@@ -1389,10 +1389,10 @@ for (const [id, k] of [["tLeft", "left"], ["tRight", "right"], ["tGas", "gas"], 
   el.addEventListener("pointerdown", on); el.addEventListener("pointerup", off); el.addEventListener("pointercancel", off); el.addEventListener("pointerleave", off);
 }
 let padInfo = "게임패드: 연결 안 됨", yHeld = false, steerTarget = 0;
-// ---- 모바일 옵션: 자동 가속·자동 기관포
-const MOB = { gas: true, gun: true, steer: "wheel" }; try { const o = JSON.parse(localStorage.getItem("bgp_mob") || "{}"); Object.assign(MOB, o); } catch (e) {} MOB.steer = "wheel"; // 조향은 핸들만
-function syncMob() { try { localStorage.setItem("bgp_mob", JSON.stringify(MOB)); } catch (e) {} document.getElementById("oGas").classList.toggle("on", MOB.gas); document.getElementById("oGun").classList.toggle("on", MOB.gun); document.body.classList.toggle("manualgas", !MOB.gas); }
-document.getElementById("oGas").onclick = () => { MOB.gas = !MOB.gas; syncMob(); }; document.getElementById("oGun").onclick = () => { MOB.gun = !MOB.gun; syncMob(); }; syncMob();
+// ---- 모바일 옵션: 자동 가속
+const MOB = { gas: true, steer: "wheel" }; try { const o = JSON.parse(localStorage.getItem("bgp_mob") || "{}"); Object.assign(MOB, o); } catch (e) {} MOB.steer = "wheel"; delete MOB.gun; // 조향은 핸들만, 자동 사격은 없앰
+function syncMob() { try { localStorage.setItem("bgp_mob", JSON.stringify(MOB)); } catch (e) {} document.getElementById("oGas").classList.toggle("on", MOB.gas); document.body.classList.toggle("manualgas", !MOB.gas); }
+document.getElementById("oGas").onclick = () => { MOB.gas = !MOB.gas; syncMob(); }; syncMob();
 // ---- 핸들: 엄지로 잡고 돌림 (잡은 각도 기준으로 따라 돎, 놓으면 가운데로)
 const WHEEL = { on: false, id: null, ang: 0, grab: 0, max: 0.92 }; // 53도만 돌려도 끝까지 꺾임
 { const zone = document.getElementById("wheelZone"), el = document.getElementById("swheel");
@@ -1426,7 +1426,6 @@ function readInput(dt) {
     const x = WHEEL.ang / WHEEL.max; if (Math.abs(WHEEL.ang) > 0.01 || WHEEL.on) { steer = Math.sign(x) * Math.pow(Math.abs(x), 0.85); analog = true; } // 가운데부터 바로 반응
     const g_ = document.getElementById("swheelG"); if (g_) g_.setAttribute("transform", `rotate(${WHEEL.ang * 180 / Math.PI})`);
     if (MOB.gas && !touch.brake) gas = 1;
-    if (MOB.gun && player.wpn && !player.wpn.over && player.wpn.heat < 0.85 && state === "race") { const m = muzzle(player); if (rayHit(player, m[0], m[2], Math.sin(player.h), Math.cos(player.h), 150, 0.6)) gun = true; }
   }
   const pads = navigator.getGamepads ? navigator.getGamepads() : [];
   for (const gp of pads) {
@@ -2051,7 +2050,7 @@ function repairCar(c) {
   for (const [mesh, mat] of d.chars) mesh.material = mat; d.chars = [];
   for (const k in d.fr) d.fr[k].visible = false; u.body.position.y = 0;
   d.det = { F: [], B: [], P: [], N: [] }; for (const it of d.info) if (it.out !== undefined) d.det[d.zoneOf(it.c.x, it.c.z)].push(it.pt); for (const k in d.det) d.det[k].sort((a, b) => b.userData.out - a.userData.out);
-  Object.assign(c, { barT: 0, tumble: false, rolls: 0, hp: 100, hpMul: 1, zoneD: { F: 0, B: 0, P: 0, N: 0 }, dead: false, deadT: 0, camRetT: 0, lastHit: null, dmgFxT: 0 });
+  Object.assign(c, { tumble: false, rolls: 0, hp: 100, hpMul: 1, zoneD: { F: 0, B: 0, P: 0, N: 0 }, dead: false, deadT: 0, camRetT: 0, lastHit: null, dmgFxT: 0 });
 }
 function repairAll() { for (const w of WRECK) if (!w.obj.userData.orig) wreckG.remove(w.obj); WRECK.length = 0; resetProps(); for (const c of [player, ...ais]) repairCar(c); }
 function hitLocal(c, dx, dz) { // 월드 방향(차 중심→맞은 곳)을 차체 좌표의 맞은 지점으로
@@ -2063,7 +2062,6 @@ function applyDamage(c, amt, loc, by, src) {
   if (!(amt > 0.15) || c.dead || state !== "race" || c.done) return;
   if (c !== player && by !== player) amt *= 0.6; // 라이벌끼리·혼자 입는 피해는 줄여서 판이 너무 일찍 비지 않게 (나와 엮인 피해는 그대로)
   if (window.__dlog) window.__dlog.push([c.name.split(' ')[0], Math.round(amt), src, Math.round(c.prog)]);
-  c.barT = performance.now(); // 맞은 순간부터 잠깐 내구도 막대 표시
   if (by === player && c !== player) { const big = src !== "gun"; HITFX.mark = 0.18; if (big) HITFX.big = 0.4; if (HITFX.tickCd <= 0 || big) { sndTick(big); HITFX.tickCd = 0.06; } }
   if (c === player && amt >= 0.2) { const src2 = by && by !== player ? by : null, ang = src2 ? Math.atan2(src2.x - player.x, src2.z - player.z) : (loc ? Math.atan2(loc.x - (ensureDmg(c).C0.x), loc.z - ensureDmg(c).C0.z) + player.h : null);
     if (ang !== null) { HITFX.hurt.push({ ang, t: 0.6, k: Math.min(1, 0.25 + amt / 15) }); if (HITFX.hurt.length > 8) HITFX.hurt.shift(); } if (amt >= 1.5 || src === "gun") sndHurt(Math.min(1, 0.3 + amt / 20)); }
@@ -2478,7 +2476,6 @@ function showEnd() {
 // ================= 화면 효과 =================
 const fx = document.getElementById("fx"), fctx = fx.getContext("2d");
 const lines = Array.from({ length: 90 }, () => ({ a: Math.random() * Math.PI * 2, r: Math.random(), sp: 0.6 + Math.random() }));
-const _hpV = new THREE.Vector3();
 function drawReticle() { // 조준 표시와 미사일 경고
   if (!player.wpn || player.dead || state !== "race") return; const w = fx.width, h = fx.height; camera.updateMatrixWorld(); // 백미러 렌더 후 남은 행렬 대신 현재 시점으로 투영
   { const dtf = 1 / 60; HITFX.mark = Math.max(0, HITFX.mark - dtf); HITFX.big = Math.max(0, HITFX.big - dtf); HITFX.tickCd -= dtf;
@@ -2487,16 +2484,6 @@ function drawReticle() { // 조준 표시와 미사일 경고
     for (let i = HITFX.hurt.length - 1; i >= 0; i--) { const H = HITFX.hurt[i]; H.t -= dtf; if (H.t <= 0) { HITFX.hurt.splice(i, 1); continue; }
       let rel = H.ang - camAng; while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI; const a = -Math.PI / 2 - rel; // 화면 위 = 정면
       fctx.strokeStyle = `rgba(255,40,30,${Math.min(1, H.t * 2) * 0.85 * H.k})`; fctx.lineWidth = 10 + H.k * 10; fctx.beginPath(); fctx.arc(w / 2, h / 2, R, a - 0.35, a + 0.35); fctx.stroke(); } }
-  for (const o of ais) { // 라이벌 머리 위 내구도 막대
-    if (o.dead || o.hp === undefined || !o.barT) continue; const age = (performance.now() - o.barT) / 1000; if (age > 2.5) continue; const d = Math.hypot(o.x - camera.position.x, o.z - camera.position.z); if (d > 220) continue;
-    const u = o.mesh.userData, wp = o.mesh.getWorldPosition(_hpV); if (u.topH === undefined && !o.tumble) { const bb = new THREE.Box3().setFromObject(o.mesh); u.topH = bb.max.y - wp.y; } // 차 지붕(가장 높은 곳) 높이 (월드 기준)
-    const v = _hpV.set(wp.x, wp.y + (u.topH || 3) + 1.0, wp.z).project(camera); if (v.z >= 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) continue;
-    const x = (v.x + 1) / 2 * w, y = (1 - v.y) / 2 * h, bw = clamp(900 / d, 26, 64), bh = Math.max(4, bw / 9), hp = Math.max(0, o.hp) / 100, a_ = (d > 160 ? (220 - d) / 60 : 1) * Math.min(1, (2.5 - age) / 0.5);
-    fctx.globalAlpha = a_; fctx.fillStyle = "rgba(0,0,0,.6)"; fctx.fillRect(x - bw / 2 - 1, y - 1, bw + 2, bh + 2);
-    fctx.fillStyle = hp > 0.7 ? "#7cff8a" : hp > 0.4 ? "#ffd23a" : hp > 0.15 ? "#ff8a2a" : (performance.now() % 400 < 200 ? "#ff2a2a" : "#7a1010"); fctx.fillRect(x - bw / 2, y, bw * hp, bh);
-    if (d < 90) { fctx.fillStyle = "#fff"; fctx.font = "bold 11px sans-serif"; fctx.textAlign = "center"; fctx.fillText(o.name.split(" ")[0], x, y - 3); fctx.textAlign = "left"; }
-    fctx.globalAlpha = 1;
-  }
   { const m = muzzle(player), fx_ = Math.sin(player.h), fz_ = Math.cos(player.h), v = new THREE.Vector3(m[0] + fx_ * 70, m[1], m[2] + fz_ * 70).project(camera); if (v.z < 1) { const x = (v.x + 1) / 2 * w, y = (1 - v.y) / 2 * h;
     if (HITFX.mark > 0 || HITFX.big > 0) { const big = HITFX.big > 0, r1 = big ? 9 : 7, r2 = big ? 24 : 16; fctx.strokeStyle = big ? "#ff4a3a" : "#ffffff"; fctx.lineWidth = big ? 4 : 3; fctx.beginPath(); for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { fctx.moveTo(x + sx * r1, y + sy * r1); fctx.lineTo(x + sx * r2, y + sy * r2); } fctx.stroke(); } // 맞힌 표시 (X)
     fctx.strokeStyle = "rgba(255,255,255,0.75)"; fctx.lineWidth = 2; fctx.beginPath(); fctx.moveTo(x - 12, y); fctx.lineTo(x - 4, y); fctx.moveTo(x + 4, y); fctx.lineTo(x + 12, y); fctx.moveTo(x, y - 12); fctx.lineTo(x, y - 4); fctx.moveTo(x, y + 4); fctx.lineTo(x, y + 12); fctx.stroke(); } } // 정면 조준선
