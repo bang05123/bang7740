@@ -1512,9 +1512,10 @@ function demoTick(dt) {
   const alive = [player, ...ais].filter(c => !c.dead);
   if (raceT > 80 || alive.length < 3 || [player, ...ais].some(c => c.done) || player.prog > L * (lapsTotal - 0.3)) { demoStart(); return; } // 판 다시
   DEMO.camT -= dt;
-  if (DEMO.camT <= 0 || !SPEC.car || SPEC.car.dead) { // 볼거리 있는 차 고르기: 가까이 붙어 싸우는 차 우선
+  const shotOver = SPEC.mode === "tv" ? (SPEC.tvDone || DEMO.camT < -14) : DEMO.camT <= 0;
+  if (shotOver || !SPEC.car || SPEC.car.dead) { // 볼거리 있는 차 고르기: 가까이 붙어 싸우는 차 우선
     let best = null, bs = -1e9; for (const c of alive) { let near = 1e9; for (const o of alive) if (o !== c) near = Math.min(near, Math.abs(o.prog - c.prog) + Math.abs(o.lat - c.lat)); const sc = -near + Math.random() * 25 + (c === SPEC.car ? -30 : 0); if (sc > bs) { bs = sc; best = c; } }
-    SPEC.car = best || alive[0]; DEMO.n++; SPEC.mode = DEMO.n % 3 === 0 ? "chase" : "tv"; SPEC.tv = null; SPEC.fresh = true; DEMO.camT = 6 + Math.random() * 3;
+    SPEC.car = best || alive[0]; DEMO.n++; SPEC.mode = DEMO.n % 3 === 0 ? "chase" : "tv"; SPEC.tv = null; SPEC.tvDone = false; SPEC.fresh = true; DEMO.camT = 7 + Math.random() * 3;
   }
 }
 // ---- 관전: 결승 뒤 다른 차를 체이스 캠 / TV 캠으로 보기
@@ -1547,10 +1548,11 @@ function specCam(dt) {
     SPEC.pos.lerp(want, k || 1 - Math.exp(-6 * dt)); SPEC.look.lerp(look, k || 1 - Math.exp(-10 * dt));
     camera.position.copy(SPEC.pos); camera.lookAt(SPEC.look); camera.fov = 64;
   } else { // TV 캠: 길가에 세운 카메라가 다가오는 차를 줌으로 따라감. 지나가면 다음 카메라로
-    const ahead = c.prog - (SPEC.tv ? SPEC.tv.prog : -1e9);
-    if (!SPEC.tv || ahead > 40 || ahead < -260) {
-      SPEC.side = -SPEC.side; const sp = c.prog + 95 + Math.random() * 55, lat = SPEC.side * (HALF + 4 + Math.random() * 8), q = posAt(wrapS(sp), lat);
-      SPEC.tv = { prog: sp, x: q.x, y: q.y + 6 + Math.random() * 6, z: q.z }; // 길가 높은 곳 (벽·관중석에 덜 가리게) SPEC.look.set(m.x, m.y + 1, m.z);
+    const ahead = c.prog - (SPEC.tv ? SPEC.tv.prog : -1e9), v = Math.max(30, Math.abs(c.vf || 0));
+    // 차가 카메라 앞을 지나 뒷모습이 멀어질 때까지 붙잡고 있다가 다음 카메라로
+    if (SPEC.tv && ahead > SPEC.tv.past) SPEC.tvDone = true;
+    if (!SPEC.tv || ahead > SPEC.tv.past + (DEMO.on ? 1e9 : 0) || ahead < -SPEC.tv.lead - 150) {
+      SPEC.tv = tvPick(c, v); SPEC.look.set(m.x, m.y + 1, m.z); SPEC.tvDone = false;
     }
     const T = SPEC.tv; camera.position.set(T.x, T.y, T.z); SPEC.look.lerp(_sv.set(m.x, m.y + 1, m.z), k || 1 - Math.exp(-9 * dt)); camera.lookAt(SPEC.look);
     const d = Math.max(1, camera.position.distanceTo(SPEC.look)); camera.fov = clamp(2 * Math.atan(11 / d) * 180 / Math.PI, 12, 60); // 멀면 당겨 찍고 가까우면 넓게
@@ -1559,6 +1561,21 @@ function specCam(dt) {
   if (SPEC.on && (SPEC.lt = (SPEC.lt || 0) + dt) > 0.25) { SPEC.lt = 0; specLabel(); }
 }
 const _sv = new THREE.Vector3(), _sv2 = new THREE.Vector3();
+function tvPick(c, v) { // 길가 카메라 자리 고르기: 차가 다가오고 지나가는 길이 간판·선인장·벽에 안 가리는 곳
+  const past = v * 1.6 + 50; let best = null, bb = 1e9;
+  for (let tr = 0; tr < 10 && bb > 0; tr++) {
+    SPEC.side = -SPEC.side; const lead = v * 2.4 + 70 + Math.random() * 40, sp = c.prog + lead, lat = SPEC.side * (HALF + 8 + Math.random() * 10), q = posAt(wrapS(sp), lat);
+    const cam = { prog: sp, lead, past, x: q.x, y: q.y + 6 + Math.random() * 6, z: q.z };
+    let blocked = 0;
+    for (const f of [-0.85, -0.6, -0.35, -0.12, 0.35, 0.75]) { // 다가오는 구간·지나간 뒤 구간을 몇 군데 찍어서 시야 확인
+      const pt = posAt(wrapS(sp + (f < 0 ? f * lead : f * past)), 0), dx = pt.x - cam.x, dz = pt.z - cam.z, dl = Math.hypot(dx, dz); if (dl < 1) continue;
+      const ux = dx / dl, uz = dz / dl, yh = pt.y + 1.5;
+      if (raySolid(cam.x, cam.z, ux, uz, dl - 4, yh) !== null || rayProp(cam.x, cam.z, ux, uz, dl - 4, yh)) blocked += f > -0.2 && f < 0.5 ? 2 : 1; // 카메라 바로 앞을 지나는 순간이 가리면 더 나쁨
+    }
+    if (blocked < bb) { bb = blocked; best = cam; }
+  }
+  return best;
+}
 document.getElementById("bSpec").onclick = specOn; document.getElementById("spBack").onclick = () => specOff(true);
 document.getElementById("spPrev").onclick = () => specStep(-1); document.getElementById("spNext").onclick = () => specStep(1);
 document.getElementById("spChase").onclick = () => specMode("chase"); document.getElementById("spTv").onclick = () => specMode("tv");
@@ -2869,7 +2886,7 @@ document.querySelectorAll(".csel").forEach(b => b.addEventListener("click", load
 let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
-  const realDt = Math.max(0, Math.min(1 / 30, (now - last) / 1000)); last = now; /* 첫 프레임 시각이 last보다 앞설 수 있어서 음수 dt 방지 (켜자마자 차가 뒤집히던 원인) */
+  const realDt = Math.min(1 / 30, (now - last) / 1000); if (!(realDt > 0.0005)) return; last = now; /* 첫 프레임 시각이 last보다 앞설 수 있어서 음수 dt 방지 (켜자마자 차가 뒤집히던 원인) */
   let dt = realDt;
   if (slowT > 0) { slowT -= realDt; dt *= 0.3; }
   try {
