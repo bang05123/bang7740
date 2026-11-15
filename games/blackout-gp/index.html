@@ -1454,11 +1454,12 @@ try { lapsTotal = parseInt(localStorage.getItem("bgp_laps")) || 5; } catch (e) {
 const AI_BOOST_MAX = 3; // 라이벌 한 대가 한 레이스에 쓸 수 있는 부스트 총 횟수
 function setLaps(n) { lapsTotal = n; try { localStorage.setItem("bgp_laps", String(n)); } catch (e) {} document.querySelectorAll(".lsel[data-l]").forEach(b => b.classList.toggle("on", +b.dataset.l === n)); }
 function setMsg(t, dur = 1.4) { document.getElementById("msg").textContent = t; msgT = dur; }
-function placeGrid() {
+let gridOrder = null, gridFresh = false; // 출발 순서: 메뉴로 올 때 한 번만 섞고, 코스 바꾸거나 출발 누를 땐 그대로 (차가 순간이동하지 않게)
+function placeGrid(shuffle = true) {
   if (player.mesh) repairAll();
   armAll();
   const slot = i => [-14 - i * 28, i % 2 ? 9 : -9]; // 앞뒤 28m·좌우 18m 간격으로 넉넉하게
-  const order = [...Array(ais.length + 1).keys()]; for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; } // 출발 순서는 매번 랜덤
+  if (shuffle || !gridOrder) { gridOrder = [...Array(ais.length + 1).keys()]; for (let i = gridOrder.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [gridOrder[i], gridOrder[j]] = [gridOrder[j], gridOrder[i]]; } } const order = gridOrder; // 출발 순서는 판마다 랜덤
   ais.forEach((a, i) => { const [pr, ln] = slot(order[i]); const p = posAt(L + pr, ln);
     Object.assign(a, { prog: pr, laneT: ln, lane: ln, lv: 0, latV: 0, wander: ln, v: 0, done: false, finishT: 0, boostT: 0, left: AI_BOOST_MAX, used: 0, nextOK: 0, x: p.x, z: p.z, h: p.h, y: p.y, vf: 0, vl: 0, ry: 0, vx: 0, vz: 0, lat: ln, ax: 0, ay: 0, stuckT: 0, charges: 0 });
     a.idx = fullNearest(p.x, p.z); a.s = TRK[a.idx].s; suspReset(a, p.y); });
@@ -1469,13 +1470,13 @@ function placeGrid() {
 }
 function startRace() {
   audioInit(); clearTimeout(endTimer); setMsg("", 0.01); flashT = 0; slowT = 0;
-  placeGrid(); raceT = 0; countdown = 3.2; state = "count";
+  placeGrid(!gridFresh); gridFresh = false; raceT = 0; countdown = 3.2; state = "count"; // 메뉴에서 보던 자리 그대로 출발
   showScreen(null); hideBig(); kos.clear();
 }
 const SCREENS = ["titleScreen", "helpScreen", "setScreen", "startScreen", "endScreen", "pauseScreen"];
 function showScreen(id) { for (const k of SCREENS) document.getElementById(k).style.display = k === id ? "flex" : "none"; document.body.classList.toggle("inmenu", ["titleScreen", "helpScreen", "setScreen", "startScreen"].includes(id)); }
-function toMenu() { clearTimeout(endTimer); state = "menu"; placeGrid(); showScreen("startScreen"); }
-function toTitle() { clearTimeout(endTimer); state = "menu"; placeGrid(); showScreen("titleScreen"); }
+function toMenu() { clearTimeout(endTimer); state = "menu"; placeGrid(); gridFresh = true; showScreen("startScreen"); }
+function toTitle() { clearTimeout(endTimer); state = "menu"; placeGrid(); gridFresh = true; showScreen("titleScreen"); }
 function isTouchDev() { return matchMedia("(pointer: coarse)").matches || "ontouchstart" in window; }
 const SET = { vol: 60, shake: 1, gfx: isTouchDev() ? "low" : "high" }; try { Object.assign(SET, JSON.parse(localStorage.getItem("bgp_set") || "{}")); } catch (e) {}
 function applySet() {
@@ -1531,7 +1532,7 @@ document.getElementById("bPortrait").onclick = () => document.body.classList.add
 document.querySelectorAll(".lsel[data-l]").forEach(b => b.onclick = () => setLaps(+b.dataset.l)); setLaps(lapsTotal);
 function setSpecial(w) { mySpecial = w; try { localStorage.setItem("bgp_special", w); } catch (e) {} document.querySelectorAll(".wsel").forEach(b => b.classList.toggle("on", b.dataset.w === w)); if (player.wpn && state !== "race") armAll(); }
 document.querySelectorAll(".wsel").forEach(b => b.onclick = () => setSpecial(b.dataset.w)); setSpecial(mySpecial);
-document.querySelectorAll(".csel").forEach(b => b.onclick = () => { if (b.dataset.c !== courseId) { buildCourse(b.dataset.c); placeGrid(); } });
+document.querySelectorAll(".csel").forEach(b => b.onclick = () => { if (b.dataset.c !== courseId) { buildCourse(b.dataset.c); placeGrid(false); gridFresh = true; } });
 
 // ================= 높이 (점프·착지) =================
 function stepVertical(o, groundY, dt, isPlayer) {
@@ -1655,7 +1656,7 @@ function tireStep(dt, env) {
 }
 function stepPlayer(dt) { stepCar(player, player.dead ? DEAD_INP : input, dt); }
 function stepCar(p, inp, dt) {
-  CUR = p; INP = inp; const isP = p === player, canGo = state === "race" && !p.done && !p.dead;
+  CUR = p; INP = inp; const isP = p === player, canGo = (state === "race" || (state === "end" && !isP)) && !p.done && !p.dead; // 내가 들어온 뒤에도 라이벌은 끝까지 달림
   let slip = false;
   for (const a of [player, ...ais]) { if (a === p) continue; const d = a.prog - p.prog; if (d > 3 && d < 32 && p.vf > 15 && Math.abs(a.lat - p.lat) < 3.6) slip = true; }
   p.slip = slip;
@@ -1838,7 +1839,7 @@ const DEAD_INP = { steer: 0, gas: 0, brake: 0, drift: false, boostPress: false }
 function stepAI(dt) {
   for (const a of ais) {
     if (a.dead) { stepCar(a, DEAD_INP, dt); a.v = a.vf; a.lane = a.lat; continue; }
-    const canGo = state === "race" && !a.done, gap = a.prog - player.prog;
+    const canGo = (state === "race" || state === "end") && !a.done, gap = a.prog - player.prog;
     a.v = a.vf; a.lane = a.lat;
     // 실력: 엔진·최고속·그립 배율 (뒤처지면 조금씩 따라붙음)
     const catchUp = gap < -120 ? 1 + Math.min(0.13, (-gap - 120) / 2500) : gap > 80 ? 1 - Math.min(0.04, (gap - 80) / 2000) : 1;
@@ -2461,16 +2462,25 @@ function standings() {
   const all = [{ name: player.name, prog: player.prog, done: player.done, t: player.finishT, me: true, ret: player.dead }, ...ais.map(a => ({ name: a.name, prog: a.prog, done: a.done, t: a.finishT, ret: a.dead }))];
   return all.sort((a, b) => (a.ret - b.ret) || ((a.done && b.done) ? a.t - b.t : (b.done - a.done) || (b.prog - a.prog)));
 }
+let endRefresh = 0;
 function showEnd() {
   if (!player.done && !player.dead) return; state = "end";
+  renderEnd(); clearInterval(endRefresh); endRefresh = setInterval(() => { if (state !== "end") { clearInterval(endRefresh); return; } renderEnd(); }, 500);
+  document.getElementById("endScreen").style.display = "flex";
+}
+function estT(r) { // 아직 달리는 차: 지금까지 평균 속도로 남은 거리를 달린다고 치고 예상 기록
+  const pace = Math.max(15, r.prog / Math.max(1, raceT)); return raceT + Math.max(0, lapsTotal * L - r.prog) / pace;
+}
+function renderEnd() {
   const st = standings(), pos = st.findIndex(r => r.me) + 1;
   document.getElementById("endTitle").textContent = player.dead ? "RETIRED" : pos === 1 ? "1위! FINISH" : `${pos}위 FINISH`;
-  const lead = st.find(r => r.done && !r.ret), carOf = r => r.me ? player : ais.find(a => a.name === r.name);
+  for (const r of st) if (!r.done && !r.ret) r.est = estT(r);
+  st.sort((a, b) => (a.ret - b.ret) || ((a.done ? a.t : a.est) - (b.done ? b.t : b.est)));
+  const lead = st.find(r => r.done && !r.ret) || st.find(r => !r.ret), lt = lead ? (lead.done ? lead.t : lead.est) : 0, carOf = r => r.me ? player : ais.find(a => a.name === r.name);
   document.getElementById("resTable").innerHTML = `<tr style="color:#888;font-size:12px"><td></td><td></td><td style="text-align:right">기록</td><td class="ko">격파</td></tr>` + st.map((r, i) => { const c = carOf(r), ko = kos.get(c) || 0;
-    return `<tr class="${r.me ? "me" : ""}"><td>${r.ret ? "-" : i + 1}</td><td>${r.name}</td><td style="text-align:right">${r.ret ? "리타이어" : r.done ? (r === lead ? fmt(r.t) : "+" + (r.t - lead.t).toFixed(2)) : "주행 중"}</td><td class="ko">${ko ? "💥" + ko : ""}</td></tr>`; }).join("");
+    return `<tr class="${r.me ? "me" : ""}"><td>${r.ret ? "-" : i + 1}</td><td>${r.name}</td><td style="text-align:right">${r.ret ? "리타이어" : r.done ? (r === lead ? fmt(r.t) : "+" + (r.t - lt).toFixed(2)) : `<span style="color:#8b93a0" title="아직 달리는 중 · 예상 기록">~${r === lead ? fmt(r.est) : "+" + (r.est - lt).toFixed(1)} 🏁</span>`}</td><td class="ko">${ko ? "💥" + ko : ""}</td></tr>`; }).join("");
   const myBest = player.laps.length ? Math.min(...player.laps) : null;
   document.getElementById("endInfo").innerHTML = `${C.name} · 이번 최고 랩 ${myBest ? fmt(myBest) : "-"} · 코스 기록 ${best ? fmt(best) : "-"}<br>격파 ${kos.get(player) || 0} · 남은 내구도 ${Math.max(0, Math.round(player.hp ?? 0))} · 부스트 ${3 - player.charges}/3 사용`;
-  document.getElementById("endScreen").style.display = "flex";
 }
 
 // ================= 화면 효과 =================
@@ -2581,7 +2591,7 @@ function updateHud() {
   const st = standings(), pos = st.findIndex(r => r.me) + 1, lap = Math.min(lapsTotal, Math.max(1, player.laps.length + 1));
   const hp = Math.max(0, player.hp ?? 100), hc = hp > 70 ? "#7cff8a" : hp > 40 ? "#ffd23a" : hp > 15 ? "#ff8a2a" : (performance.now() % 400 < 200 ? "#ff2a2a" : "#5a1010");
   document.getElementById("hudTL").innerHTML = `<b>${pos}</b> / ${TOTAL} 위<br>랩 ${lap} / ${lapsTotal}<br><span style="display:inline-block;width:96px;height:9px;background:rgba(0,0,0,.5);border:1px solid #fff4;vertical-align:middle"><i style="display:block;width:${hp}%;height:100%;background:${hc}"></i></span> <small>내구도</small><br>${player.slip ? '<span style="color:#39d4ff">슬립스트림</span>' : ""}`;
-  document.getElementById("hudTR").innerHTML = `시간 ${fmt(raceT)}<br>이번 랩 ${fmt(Math.max(0, raceT - player.lapStart))}<br>최고 랩 ${best ? fmt(best) : "-"}`;
+  document.getElementById("hudTR").innerHTML = `시간 ${fmt(player.done ? player.finishT : raceT)}<br>이번 랩 ${player.done ? "-" : fmt(Math.max(0, raceT - player.lapStart))}<br>최고 랩 ${best ? fmt(best) : "-"}`;
   const kmh = Math.round(Math.abs(player.vf) * 3.6);
   document.getElementById("speed").innerHTML = `${kmh}<small> km/h</small>`;
   const maxC = Math.round(P.charges); let ch = ""; for (let i = 0; i < 3; i++) ch += `<i class="${i >= maxC ? "lock" : (i < player.charges ? "full" : "used")}"></i>`;
@@ -2764,7 +2774,7 @@ function renderMirror() {
 }
 
 // ================= 루프 =================
-buildCourse(courseId); loadBest(); placeGrid();
+buildCourse(courseId); loadBest(); placeGrid(); gridFresh = true;
 document.querySelectorAll(".csel").forEach(b => b.addEventListener("click", loadBest));
 let last = performance.now();
 function frame(now) {
@@ -2779,7 +2789,7 @@ function frame(now) {
       document.getElementById("center").textContent = countdown > 0.2 ? (n > 0 ? n : "") : "GO!";
       if (countdown <= 0) { state = "race"; raceT = 0; player.lapStart = 0; sndBeep(true); setTimeout(() => { if (state === "race") document.getElementById("center").textContent = ""; }, 700); }
     }
-    if (state === "race" || state === "end") { raceT += state === "race" ? dt : 0; stepPlayer(dt); stepAI(dt); stepWeapons(dt); lapLogic(); }
+    if (state === "race" || state === "end") { raceT += dt; /* 결승 뒤에도 시계는 계속 (라이벌 기록 재려고) */ stepPlayer(dt); stepAI(dt); stepWeapons(dt); lapLogic(); }
     else if (state === "count" || state === "menu") { stepPlayer(dt); stepAI(dt); }
     stepParticles(smoke, dt, -1.5, 1.2); stepParticles(sparks, dt, 18, 0.5); stepParticles(dust, dt, -0.6, 0.8); stepParticles(debris, dt, 22, 0.3); stepParticles(boostCore, dt, 0, 3); stepParticles(boostFire, dt, -2, 2.2); stepParticles(smokeD, dt, -1.2, 1.1); stepParticles(fireP, dt, -6, 3); if (state === "race" || state === "end") stepProps(); stepWreck(dt); stepDamageFx(dt); stepBoostFx(dt); stepParticles(streaks, dt, 0, 0);
     if (msgT > 0) { msgT -= realDt; if (msgT <= 0) document.getElementById("msg").textContent = ""; }
@@ -2799,7 +2809,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 function simulate(secs, driver) {
   const dt = 1 / 60;
-  for (let t = 0; t < secs; t += dt) { if (state !== "race") break; const d = driver(player); Object.assign(input, d); raceT += dt; stepPlayer(dt); stepAI(dt); stepWeapons(dt); stepProps(); stepWreck(dt); lapLogic(); }
+  for (let t = 0; t < secs; t += dt) { if (state !== "race" && state !== "end") break; const d = driver(player); Object.assign(input, d); raceT += dt; stepPlayer(dt); stepAI(dt); stepWeapons(dt); stepProps(); stepWreck(dt); lapLogic(); }
 }
 window.__cam = () => { updateCamera(1 / 30); return camera.position.distanceTo(new THREE.Vector3(player.x, player.y, player.z)); };
 window.__SND = SND; window.__upd = updateSound; window.__inp = input; window.__bgp = { get camera() { return camera; }, raySolid, get SOLIDS() { return SOLIDS; }, useSpecial, fireGun, PROJ, TETHERS, setSpecial, enterTumble, applyDamage, explode, hitLocal, WRECK, get GAP() { return GAP; }, player, ais, get state() { return state; }, get L() { return L; }, get HALF() { return HALF; }, P, startRace, simulate, get TRK() { return TRK; }, idxAtS, posAt, surfH, setCourse(id) { buildCourse(id); loadBest(); placeGrid(); }, skipCount() { countdown = 0.01; } };
