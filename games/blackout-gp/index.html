@@ -2051,7 +2051,7 @@ function repairCar(c) {
   for (const [mesh, mat] of d.chars) mesh.material = mat; d.chars = [];
   for (const k in d.fr) d.fr[k].visible = false; u.body.position.y = 0;
   d.det = { F: [], B: [], P: [], N: [] }; for (const it of d.info) if (it.out !== undefined) d.det[d.zoneOf(it.c.x, it.c.z)].push(it.pt); for (const k in d.det) d.det[k].sort((a, b) => b.userData.out - a.userData.out);
-  Object.assign(c, { tumble: false, rolls: 0, hp: 100, hpMul: 1, zoneD: { F: 0, B: 0, P: 0, N: 0 }, dead: false, deadT: 0, camRetT: 0, lastHit: null, dmgFxT: 0 });
+  Object.assign(c, { barT: 0, tumble: false, rolls: 0, hp: 100, hpMul: 1, zoneD: { F: 0, B: 0, P: 0, N: 0 }, dead: false, deadT: 0, camRetT: 0, lastHit: null, dmgFxT: 0 });
 }
 function repairAll() { for (const w of WRECK) if (!w.obj.userData.orig) wreckG.remove(w.obj); WRECK.length = 0; resetProps(); for (const c of [player, ...ais]) repairCar(c); }
 function hitLocal(c, dx, dz) { // 월드 방향(차 중심→맞은 곳)을 차체 좌표의 맞은 지점으로
@@ -2063,6 +2063,7 @@ function applyDamage(c, amt, loc, by, src) {
   if (!(amt > 0.15) || c.dead || state !== "race" || c.done) return;
   if (c !== player && by !== player) amt *= 0.6; // 라이벌끼리·혼자 입는 피해는 줄여서 판이 너무 일찍 비지 않게 (나와 엮인 피해는 그대로)
   if (window.__dlog) window.__dlog.push([c.name.split(' ')[0], Math.round(amt), src, Math.round(c.prog)]);
+  c.barT = performance.now(); // 맞은 순간부터 잠깐 내구도 막대 표시
   if (by === player && c !== player) { const big = src !== "gun"; HITFX.mark = 0.18; if (big) HITFX.big = 0.4; if (HITFX.tickCd <= 0 || big) { sndTick(big); HITFX.tickCd = 0.06; } }
   if (c === player && amt >= 0.2) { const src2 = by && by !== player ? by : null, ang = src2 ? Math.atan2(src2.x - player.x, src2.z - player.z) : (loc ? Math.atan2(loc.x - (ensureDmg(c).C0.x), loc.z - ensureDmg(c).C0.z) + player.h : null);
     if (ang !== null) { HITFX.hurt.push({ ang, t: 0.6, k: Math.min(1, 0.25 + amt / 15) }); if (HITFX.hurt.length > 8) HITFX.hurt.shift(); } if (amt >= 1.5 || src === "gun") sndHurt(Math.min(1, 0.3 + amt / 20)); }
@@ -2486,9 +2487,9 @@ function drawReticle() { // 조준 표시와 미사일 경고
       let rel = H.ang - camAng; while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI; const a = -Math.PI / 2 - rel; // 화면 위 = 정면
       fctx.strokeStyle = `rgba(255,40,30,${Math.min(1, H.t * 2) * 0.85 * H.k})`; fctx.lineWidth = 10 + H.k * 10; fctx.beginPath(); fctx.arc(w / 2, h / 2, R, a - 0.35, a + 0.35); fctx.stroke(); } }
   for (const o of ais) { // 라이벌 머리 위 내구도 막대
-    if (o.dead || o.hp === undefined) continue; const d = Math.hypot(o.x - camera.position.x, o.z - camera.position.z); if (d > 220) continue;
+    if (o.dead || o.hp === undefined || !o.barT) continue; const age = (performance.now() - o.barT) / 1000; if (age > 2.5) continue; const d = Math.hypot(o.x - camera.position.x, o.z - camera.position.z); if (d > 220) continue;
     const v = new THREE.Vector3(o.x, o.y + 3.4, o.z).project(camera); if (v.z >= 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) continue;
-    const x = (v.x + 1) / 2 * w, y = (1 - v.y) / 2 * h, bw = clamp(900 / d, 26, 64), bh = Math.max(4, bw / 9), hp = Math.max(0, o.hp) / 100, a_ = d > 160 ? (220 - d) / 60 : 1;
+    const x = (v.x + 1) / 2 * w, y = (1 - v.y) / 2 * h, bw = clamp(900 / d, 26, 64), bh = Math.max(4, bw / 9), hp = Math.max(0, o.hp) / 100, a_ = (d > 160 ? (220 - d) / 60 : 1) * Math.min(1, (2.5 - age) / 0.5);
     fctx.globalAlpha = a_; fctx.fillStyle = "rgba(0,0,0,.6)"; fctx.fillRect(x - bw / 2 - 1, y - 1, bw + 2, bh + 2);
     fctx.fillStyle = hp > 0.7 ? "#7cff8a" : hp > 0.4 ? "#ffd23a" : hp > 0.15 ? "#ff8a2a" : (performance.now() % 400 < 200 ? "#ff2a2a" : "#7a1010"); fctx.fillRect(x - bw / 2, y, bw * hp, bh);
     if (d < 90) { fctx.fillStyle = "#fff"; fctx.font = "bold 11px sans-serif"; fctx.textAlign = "center"; fctx.fillText(o.name.split(" ")[0], x, y - 3); fctx.textAlign = "left"; }
