@@ -2779,7 +2779,7 @@ document.querySelectorAll(".csel").forEach(b => b.addEventListener("click", load
 let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
-  const realDt = Math.min(1 / 30, (now - last) / 1000); last = now;
+  const realDt = Math.max(0, Math.min(1 / 30, (now - last) / 1000)); last = now; /* 첫 프레임 시각이 last보다 앞설 수 있어서 음수 dt 방지 (켜자마자 차가 뒤집히던 원인) */
   let dt = realDt;
   if (slowT > 0) { slowT -= realDt; dt *= 0.3; }
   try {
