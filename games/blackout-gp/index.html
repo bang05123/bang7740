@@ -3021,7 +3021,7 @@ function updateCamera(dt) {
   const baseV = 62 + spdR * 12 + (boost ? 22 : 0);
   const asp = camera.aspect, H = 2 * Math.atan(Math.tan(baseV * Math.PI / 360) * (16 / 9));
   const targetFov = asp >= 16 / 9 ? baseV : Math.min(asp < 1 ? 88 : 100, 2 * Math.atan(Math.tan(H / 2) / asp) * 180 / Math.PI);
-  fov += (targetFov - fov) * (1 - Math.exp(-(boost ? 7 : 3) * dt)); camera.fov = fov; camera.updateProjectionMatrix();
+  fov += (targetFov - fov) * (1 - Math.exp(-(boost ? 7 : 3) * dt)); camera.fov = Math.min(124, fov + STRETCH.x * 20 * STRETCH.sc); camera.updateProjectionMatrix(); // 부스트 순간 시야가 쭈욱 넓어졌다 튕기며 돌아옴
 }
 function syncMeshes(dt) {
   const p = player, pm = p.mesh;
@@ -3234,6 +3234,13 @@ POST.fxScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), POST.fxaa)); POST
 function postResize() { const v = new THREE.Vector2(); renderer.getDrawingBufferSize(v); POST.rt.setSize(Math.max(4, v.x), Math.max(4, v.y)); POST.rt2.setSize(Math.max(4, v.x), Math.max(4, v.y)); aoResize(v.x, v.y); POST.fxaa.uniforms.px.value.set(1 / Math.max(1, v.x), 1 / Math.max(1, v.y)); bloomResize(v.x, v.y); POST.mat.uniforms.aspect.value = v.x / Math.max(1, v.y); POST.mat.uniforms.px.value.set(1 / Math.max(1, v.x), 1 / Math.max(1, v.y)); }
 postResize(); addEventListener("resize", postResize); try { new ResizeObserver(postResize).observe(document.documentElement); } catch (e) {}
 const _shR = new THREE.Vector3(), _shU = new THREE.Vector3(), _shP = new THREE.Vector3();
+// 부스트 화면 늘림: 고무줄 같은 스프링 (켜는 순간 확 늘어났다 살짝 튕기며 자리 잡고, 끌 때는 툭 줄어듦)
+const STRETCH = { x: 0, v: 0, was: false, sc: 1 };
+function stretchTick(dt) {
+  const on = state === "race" && player.boostT > 0 && !player.dead && !SPEC.on && !REPLAY.on; STRETCH.sc = Math.max(0.3, SET.shake);
+  if (on && !STRETCH.was) STRETCH.v += 9; if (!on && STRETCH.was) STRETCH.v -= 4.5; STRETCH.was = on;
+  const target = on ? 0.15 : 0, h = Math.min(dt, 1 / 30); STRETCH.v += ((target - STRETCH.x) * 70 - STRETCH.v * 9) * h; STRETCH.x += STRETCH.v * h; STRETCH.x = clamp(STRETCH.x, -0.45, 1.3);
+}
 const DYN = { t: 0, n: 0, sum: 0, pr: 0 };
 function dynRes(realDt) {
   if (!isTouch || state !== "race") return; DYN.sum += realDt; DYN.n++; DYN.t += realDt; if (DYN.t < 2) return;
@@ -3252,7 +3259,8 @@ function renderMain(dt) {
   const tWarp = active ? Math.max(0, sr - 0.3) * 0.13 + boost * 0.13 : 0;
   const tCa = active ? Math.max(0, sr - 0.6) * 0.4 + boost * 0.6 + Math.min(1, shake) * 0.3 : 0;
   const k = 1 - Math.exp(-5 * dt); POST.blur += (tBlur - POST.blur) * k; POST.warp += (tWarp - POST.warp) * k; POST.ca += (tCa - POST.ca) * k;
-  const u = POST.mat.uniforms; u.blur.value = POST.blur; u.warp.value = POST.warp; u.ca.value = POST.ca;
+  stretchTick(dt); const stx = STRETCH.x * STRETCH.sc;
+  const u = POST.mat.uniforms; u.blur.value = POST.blur + Math.max(0, stx) * 0.06; u.warp.value = POST.warp + stx * 0.42; u.ca.value = POST.ca + Math.abs(stx) * 0.5; // 가장자리만 늘어나고 가운데는 선명 (줄어들 땐 반대로 오므라듦)
   const bloomOn = SET.gfx !== "low"; u.lite.value = SET.gfx === "low" ? 1 : 0; u.aoK.value = SET.gfx === "low" ? 0 : 0.8; u.bloom.value = bloomOn ? (courseId === "circuit" ? 1.3 : 0.7) + boost * 0.3 : 0; // 밤 서킷은 더 세게, 폰(그래픽 낮음)은 끔
   POST.vig = (POST.vig || 0) + ((active ? boost * 0.45 + Math.max(0, sr - 0.7) * 0.25 : 0) - (POST.vig || 0)) * k; u.vig.value = POST.vig;
   { const f = SUN_DIR, r = _shR.set(0, 1, 0).cross(f); if (r.lengthSq() < 1e-6) r.set(1, 0, 0); r.normalize(); const up = _shU.copy(f).cross(r), tex = 90 / sun.shadow.mapSize.x, P0 = _shP.set(player.x, player.y, player.z); // 그림자 픽셀 격자에 맞춰 스냅
