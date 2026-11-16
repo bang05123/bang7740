@@ -110,9 +110,9 @@
   #touch #tDrift { right: calc(22px + min(25vh, 114px) + min(21vh, 96px)) !important; bottom: 30px !important; left: auto !important; width: min(15vh, 68px); height: min(15vh, 68px); font-size: 12px; }
   #touch .tb .bi { display: flex; gap: 3px; justify-content: center; margin-top: 4px; pointer-events: none; }
   #touch .tb { flex-direction: column; }
-  #touch .tb .bi i { width: 9px; height: 9px; transform: rotate(45deg); border: 1.5px solid #fff; display: block; }
-  #touch .tb .bi i.full { background: #ff5a1f; box-shadow: 0 0 6px #ff5a1f; } #touch .tb .bi i.lock { border-color: #555; }
-  #touch .tb .hb { width: 70%; height: 5px; margin-top: 4px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.4); pointer-events: none; } #touch .tb .hb i { display: block; height: 100%; }
+  #touch .tb .bi > i { width: 9px; height: 9px; transform: rotate(45deg); border: 1.5px solid #fff; display: block; }
+  #touch .tb .bi > i.full { background: #ff5a1f; box-shadow: 0 0 6px #ff5a1f; } #touch .tb .bi > i.lock { border-color: #555; }
+  #touch .tb .hb { display: block; width: 40px; height: 6px; margin-top: 2px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.5); border-radius: 3px; overflow: hidden; pointer-events: none; } #touch .tb .hb i { display: block; height: 100%; transform: none; border: 0; }
   #touch .tb .am { font-size: 10px; margin-top: 2px; letter-spacing: 1px; pointer-events: none; }
   body.touch #hudBR .barlabel, body.touch #hudBR #charges, body.touch #hudBR #wpnHud { display: none !important; } /* 폰: 부스트·무기 표시는 버튼 안으로 */
   body.touch #hudBR { bottom: calc(4px + env(safe-area-inset-bottom)) !important; }
@@ -3288,7 +3288,7 @@ function updateHud() {
   const maxC = Math.round(P.charges); let ch = ""; for (let i = 0; i < 3; i++) ch += `<i class="${i >= maxC ? "lock" : (i < player.charges ? "full" : "used")}"></i>`;
   const ce = document.getElementById("charges"); if (ce.innerHTML !== ch) ce.innerHTML = ch;
   if (isTouch) { setHTML("tNitroI", ch); /* 폰: 버튼 안에 남은 부스트 */
-    if (player.wpn) { const w = player.wpn; setHTML("tGunI", `<span class="hb" style="display:block;width:${Math.round(40)}px"><i style="width:${Math.round(w.heat * 100)}%;background:${w.over ? "#ff3b3b" : "#ffd23a"}"></i></span>`);
+    if (player.wpn) { const w = player.wpn; setHTML("tGunI", `<span class="hb"><i style="width:${Math.round(w.heat * 100)}%;background:${w.over ? "#ff3b3b" : "#ffd23a"}"></i></span>`);
       setHTML("tSpI", `<span class="am">${"●".repeat(w.ammo)}${"○".repeat(Math.max(0, WEAPONS[w.sp].ammo - w.ammo))}${w.sp === "rail" && w.charge > 0 ? ` <b style="color:#8ff4ff">${w.charge >= 1 ? "!" : Math.round(w.charge * 100) + "%"}</b>` : ""}</span>`); } }
   if (player.wpn) { const w = player.wpn, hc2 = w.over ? "#ff3b3b" : "#ffd23a"; const wh = `기관포 <span style="display:inline-block;width:60px;height:7px;background:rgba(0,0,0,.5);vertical-align:middle"><i style="display:block;height:100%;width:${Math.round(w.heat * 100)}%;background:${hc2}"></i></span><br>${WEAPONS[w.sp].name} ${"●".repeat(w.ammo)}${"○".repeat(Math.max(0, WEAPONS[w.sp].ammo - w.ammo))}${w.sp === "rail" && w.charge > 0 ? ` <b style="color:#8ff4ff">${w.charge >= 1 ? "발사!" : Math.round(w.charge * 100) + "%"}</b>` : ""}`; const we = document.getElementById("wpnHud"); if (we.innerHTML !== wh) we.innerHTML = wh; }
   flashT = Math.max(0, flashT - 0.05); const fe = document.getElementById("flash"); fe.style.opacity = flashT * 0.85; fe.style.background = flashT > 0.5 ? "#fff" : "#ff9a3a";
