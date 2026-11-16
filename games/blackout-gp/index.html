@@ -2754,7 +2754,7 @@ function dentAt(c, loc, depth) { // 맞은 자리 근처 꼭짓점을 안쪽으�
     inv.copy(pt.matrix).invert(); pL.copy(loc).applyMatrix4(inv); dL.copy(dir).transformDirection(inv);
     const v = new THREE.Vector3();
     for (const m of [mesh, ...extra]) { const pos = m.geometry.attributes.position; let moved = false;
-      for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i); const dd = v.distanceTo(pL); if (dd < R) { const f = (1 - dd / R) ** 2 * depth * (0.7 + 0.6 * Math.sin(Math.round(v.x * 8) * 1.7 + Math.round(v.z * 8) * 2.3 + Math.round(v.y * 8) * 0.9) ** 2); v.addScaledVector(dL, f); v.y -= f * 0.25; pos.setXYZ(i, v.x, v.y, v.z); moved = true; } } /* 같은 자리 꼭짓점은 똑같이 움직여서 틈이 안 벌어짐 */
+      for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i); const dd = v.distanceTo(pL); if (dd < R) { const f = (1 - dd / R) ** 2 * depth * (0.7 + 0.6 * Math.sin(Math.round(v.x * 8) * 1.7 + Math.round(v.z * 8) * 2.3 + Math.round(v.y * 8) * 0.9) ** 2); v.addScaledVector(dL, f); pos.setXYZ(i, v.x, v.y, v.z); moved = true; /* 아래로 꺼지는 건 뺌 (옆 부품이 떠 보였음) */ } } /* 같은 자리 꼭짓점은 똑같이 움직여서 틈이 안 벌어짐 */
       if (moved) { pos.needsUpdate = true; m.geometry.computeVertexNormals(); } }
   }
 }
