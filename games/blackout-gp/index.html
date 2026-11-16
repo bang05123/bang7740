@@ -152,6 +152,9 @@
   body.touch #topBtns { bottom: auto; left: auto; top: calc(84px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); gap: 6px; }
   body.touch #topBtns button { font-size: 10px; padding: 4px 7px; border-width: 1px; touch-action: manipulation; }
   #radar { position: fixed; left: calc(14px + env(safe-area-inset-left)); bottom: calc(56px + env(safe-area-inset-bottom)); width: 190px; height: 190px; pointer-events: none; z-index: 5; display: none; }
+  #dmgMap { position: fixed; left: calc(214px + env(safe-area-inset-left)); bottom: calc(56px + env(safe-area-inset-bottom)); width: 62px; height: 104px; pointer-events: none; z-index: 5; display: none; }
+  body.touch #dmgMap { bottom: auto; left: calc(14px + min(22vh, 92px) + 8px + env(safe-area-inset-left)); top: calc(96px + env(safe-area-inset-top)); width: min(13vh, 46px); height: min(22vh, 76px); }
+  body.intro #dmgMap, body.spec #dmgMap, body.inmenu #dmgMap { display: none !important; }
   body.touch #radar { bottom: auto; top: calc(96px + env(safe-area-inset-top)); width: min(22vh, 92px); height: min(22vh, 92px); }
   #mirror { position: fixed; top: env(safe-area-inset-top); left: 50%; transform: translateX(-50%); width: 30vw; max-width: 420px; aspect-ratio: 3.6 / 1; pointer-events: none; z-index: 5; }
   #topBtns button { font: inherit; font-size: 12px; padding: 4px 10px; background: rgba(0,0,0,.6); color: #fff; border: 2px solid #fff; cursor: pointer; }
@@ -222,7 +225,7 @@
 </div>
 
 <div id="mirror"></div>
-<canvas id="radar"></canvas>
+<canvas id="radar"></canvas><canvas id="dmgMap"></canvas>
 <div id="topBtns">
   <button id="bCam">시점 전환 (C)</button>
   <button id="bSnd">소리 켬 (M)</button>
@@ -1217,7 +1220,8 @@ function buildCourse(id) {
   world = new THREE.Group(); scene.add(world); colliders = []; PROPS = []; PGRID = new Map(); SOLIDS = []; SGRID = new Map(); seed = 7; FEST.turbines = []; FEST.time = null; FEST.anims = [];
   buildTrack(C); computeRacingLine();
   paintSky(C.sky); scene.fog.color.setHex(C.fog[0]); applyViewDist();
-  setClouds(id !== "circuit"); if (typeof POST !== "undefined" && POST.mat) POST.mat.uniforms.hatch.value = id === "circuit" ? 0.15 : 1; // 밤 서킷은 전체가 어두워서 빗금을 약하게 ground.material.color.setHex(C.ground); sun.color.setHex(C.sun[0]); sun.intensity = C.sun[1]; SUN_DIR = new THREE.Vector3(...C.sun[2]).normalize(); sun.position.copy(SUN_DIR); amb.intensity = C.amb;
+  setClouds(id !== "circuit"); if (typeof POST !== "undefined" && POST.mat) POST.mat.uniforms.hatch.value = id === "circuit" ? 0.15 : 1; /* 밤 서킷은 전체가 어두워서 빗금을 약하게 */
+  ground.material.color.setHex(C.ground); sun.color.setHex(C.sun[0]); sun.intensity = C.sun[1]; SUN_DIR = new THREE.Vector3(...C.sun[2]).normalize(); sun.position.copy(SUN_DIR); amb.intensity = C.amb;
   if (id === "desert") buildDesert(); else if (id === "dam") buildDam(); else buildCircuit();
   if (id === "dam" && lapsTotal > 3 && typeof setLaps === "function") setLaps(2);
   if (typeof clearSkid === "function") clearSkid();
@@ -3435,6 +3439,34 @@ const radarEl = document.getElementById("radar"), rctx = radarEl.getContext("2d"
 const RADAR_RANGE = 300; // 반지름 (m)
 const rivalCol = RIVALS.map(r => "#" + new THREE.Color(r.sf[1]).getHexString());
 let radarTick = 0;
+const DMG = { el: null, t: 0, prev: { F: 0, B: 0, P: 0, N: 0 }, fl: { F: 0, B: 0, P: 0, N: 0 }, key: "" };
+function drawDmgMap(dt) { /* 내 차 위에서 본 그림: 맞은 부위가 노랑→주황→빨강, 부품 떨어지면 빗금, 방금 맞으면 번쩍 */
+  const el = DMG.el || (DMG.el = document.getElementById("dmgMap")), c = player;
+  const show = (state === "race" || state === "count" || state === "end") && !DEMO.on && !REPLAY.on;
+  el.style.display = show ? "block" : "none"; if (!show || el.clientWidth < 10 || !c.zoneD) return;
+  const zs = ["F", "B", "P", "N"];
+  for (const z of zs) { if (c.zoneD[z] > DMG.prev[z] + 0.5) DMG.fl[z] = 0.5; if (c.zoneD[z] < DMG.prev[z]) DMG.fl[z] = 0; DMG.prev[z] = c.zoneD[z]; DMG.fl[z] = Math.max(0, DMG.fl[z] - dt); }
+  const d = c.mesh.userData.dmg, gone = { F: 0, B: 0, P: 0, N: 0 }; if (d) for (const g of d.gone) if (g.userData.zone && gone[g.userData.zone] !== undefined) gone[g.userData.zone]++;
+  const hp = Math.max(0, Math.round(c.hp)), key = zs.map(z => Math.round(c.zoneD[z]) + "/" + gone[z] + "/" + (DMG.fl[z] > 0 ? Math.round(DMG.fl[z] * 10) : 0)).join(",") + hp + (c.dead ? "x" : "") + el.clientWidth;
+  if (key === DMG.key) return; DMG.key = key;
+  const dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(el.clientWidth * dpr), H = Math.round(el.clientHeight * dpr); if (el.width !== W || el.height !== H) { el.width = W; el.height = H; }
+  const x = el.getContext("2d"); x.setTransform(W / 62, 0, 0, H / 104, 0, 0); x.clearRect(0, 0, 62, 104);
+  const col = z => { if (c.dead) return "#2a2622"; const k = clamp(c.zoneD[z] / 44, 0, 1); if (k < 0.02) return "#d8dde2";
+    const st = [[0, [235, 220, 120]], [0.35, [245, 170, 40]], [0.7, [235, 80, 30]], [1, [170, 20, 20]]]; let i = 0; while (i < st.length - 2 && k > st[i + 1][0]) i++; const [a, A] = st[i], [b, B] = st[i + 1], f = (k - a) / (b - a);
+    return `rgb(${A.map((v, j) => Math.round(v + (B[j] - v) * f)).join(",")})`; };
+  /* 바깥 구역: 앞(위)·뒤(아래)·왼쪽(P)·오른쪽(N) */
+  const poly = pts => { x.beginPath(); x.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) x.lineTo(pts[i][0], pts[i][1]); x.closePath(); };
+  x.fillStyle = "rgba(0,0,0,0.45)"; x.beginPath(); x.roundRect ? x.roundRect(4, 2, 54, 100, 10) : x.rect(4, 2, 54, 100); x.fill();
+  for (const [wx, wy] of [[7, 26], [55, 26], [7, 74], [55, 74]]) { x.fillStyle = c.dead ? "#222" : "#555"; x.fillRect(wx - 3, wy - 7, 6, 14); }
+  const zp = { F: [[16, 8], [46, 8], [50, 20], [44, 30], [18, 30], [12, 20]], B: [[18, 74], [44, 74], [50, 86], [46, 96], [16, 96], [12, 86]], P: [[10, 22], [17, 31], [17, 73], [10, 84]], N: [[52, 22], [45, 31], [45, 73], [52, 84]] };
+  for (const z of zs) { poly(zp[z]); x.fillStyle = col(z); x.fill();
+    if (gone[z]) { x.save(); x.clip(); x.strokeStyle = "rgba(0,0,0,0.55)"; x.lineWidth = 1.6; for (let k = -110; k < 110; k += 5 - Math.min(2, gone[z] * 0.5)) { x.beginPath(); x.moveTo(k, 0); x.lineTo(k + 104, 104); x.stroke(); } x.restore(); }
+    poly(zp[z]); x.lineWidth = DMG.fl[z] > 0 ? 2.4 : 1.2; x.strokeStyle = DMG.fl[z] > 0 ? `rgba(255,255,255,${0.5 + DMG.fl[z]})` : "rgba(0,0,0,0.8)"; x.stroke(); }
+  /* 가운데 실내: 남은 내구도 */
+  x.fillStyle = c.dead ? "#111" : hp < 40 ? "#3a1410" : "#14181d"; x.fillRect(19, 32, 24, 40); x.strokeStyle = "rgba(255,255,255,0.35)"; x.lineWidth = 1; x.strokeRect(19, 32, 24, 40);
+  x.fillStyle = c.dead ? "#ff5a3a" : hp < 40 ? "#ff7a5a" : "#fff"; x.font = "bold 13px sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(c.dead ? "✕" : hp, 31, 52);
+  x.fillStyle = "rgba(255,255,255,0.6)"; x.font = "bold 7px sans-serif"; x.fillText("▲", 31, 5);
+}
 function drawRadar() {
   const show = (state === "race" || state === "count" || state === "end") && !DEMO.on;
   radarEl.style.display = show ? "block" : "none"; if (!show || radarEl.clientWidth < 10) return; // 관전·리플레이처럼 미니맵이 숨겨졌을 땐 안 그림
@@ -3520,7 +3552,7 @@ function frame(now) {
     if (window.__show) { const all = [player.mesh, ...ais.map(x => x.mesh)], t = TRK[40], y = surfH(TRK[40].s, 0); all.forEach((m, i) => { m.visible = true; m.position.set(t.x + nx(t) * (-HALF + 1 + i * 4.6) + t.tx * (i % 2) * 5, y, t.z + nz(t) * (-HALF + 1 + i * 4.6) + t.tz * (i % 2) * 5); m.rotation.set(0, Math.atan2(t.tx, t.tz) + window.__show, 0); });
       camera.position.set(t.x + t.tx * 14 + nx(t) * 0, y + 5, t.z + t.tz * 14); camera.lookAt(t.x, y + 0.5, t.z); camera.fov = 60; camera.updateProjectionMatrix(); }
     renderMain(realDt);
-    renderMirror(); drawRadar();
+    renderMirror(); drawRadar(); drawDmgMap(realDt);
   } catch (e) { console.error(e); }
 }
 requestAnimationFrame(frame);
