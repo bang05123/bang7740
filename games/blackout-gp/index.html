@@ -113,6 +113,7 @@
   #touch .tb .bi > i { width: 9px; height: 9px; transform: rotate(45deg); border: 1.5px solid #fff; display: block; }
   #touch .tb .bi > i.full { background: #ff5a1f; box-shadow: 0 0 6px #ff5a1f; } #touch .tb .bi > i.lock { border-color: #555; }
   #touch .tb .hb { display: block; width: 40px; height: 6px; margin-top: 2px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.5); border-radius: 3px; overflow: hidden; pointer-events: none; } #touch .tb .hb i { display: block; height: 100%; transform: none; border: 0; }
+  #touch .tb.ready { border-color: #ffb040 !important; box-shadow: 0 0 14px #ff8a20; background: rgba(255,140,30,.35) !important; }
   #touch .tb .am { font-size: 10px; margin-top: 2px; letter-spacing: 1px; pointer-events: none; }
   body.touch #hudBR .barlabel, body.touch #hudBR #charges, body.touch #hudBR #wpnHud { display: none !important; } /* 폰: 부스트·무기 표시는 버튼 안으로 */
   body.touch #hudBR { bottom: calc(4px + env(safe-area-inset-bottom)) !important; }
@@ -263,7 +264,7 @@
     <p><b>키보드</b> · 가속 ↑/W · 브레이크 ↓/S · 조향 ←→/AD · 필살 부스트 Space · 드리프트 Shift<br>기관포 Z (누르고 있기) · 특수무기 X · 시점 C · 복귀 R · 소리 M · 일시정지 Esc</p>
     <p><b>게임패드</b> · 조향 왼쪽 스틱 · 가속 RT · 브레이크 LT · 부스트 A · 드리프트 B · 기관포 RB · 특수무기 X · 시점 Y</p>
     <p><b>폰</b> · 왼쪽 핸들을 엄지로 돌려 조향 · 오른쪽 브레이크·부스트·특수 버튼 (자동 가속은 준비 화면에서 켜고 끔)</p>
-    <p><b>특수무기</b> · 미사일: 앞차를 쫓아감 · 작살: 꽂히면 좌우로 휘두르고 다시 눌러 당김 · 레일건: 누르고 모았다 떼기 · 지뢰: 뒤에 깔아두면 밟은 차가 공중으로 튐</p>
+    <p><b>특수무기</b> · 미사일: 앞차를 쫓아감 · 작살: 꽂히면 좌우로 휘두르고 다시 눌러 당김 · 대구경 포: 누르고 장전했다 떼면 정면으로 관통탄 · 파일벙커: 앞차에 바짝 붙어 누르면 쇠말뚝이 튀어나가 날려버림</p>
     <p style="font-size:11px;color:#9aa">효과음: OpenGameArt — rubberduck (CC0), qubodup (CC0), Joth (CC0), TinyWorlds (CC0), StarNinjas (CC0), Nocturnal_Vanguard (CC0), Bashar3A (CC0), blacklodgegames (CC0), bart (CC0), hingydunyas (CC0), "Car tire squeal skid loop" audible-edge / Tom Haigh (CC-BY 3.0)</p>
     <p><b>규칙</b> · 부스트는 3번뿐. 차가 부서지면 수리 없이 끝까지 간다. 내구도가 0이 되면 폭발·리타이어</p>
     <button class="ghost" id="bHelpBack">뒤로</button>
@@ -285,7 +286,7 @@
     <h1>BLACKOUT <span>GP</span></h1>
     <p>레이스 준비 · 라이벌 7대</p>
     <div class="courses"><button class="csel" data-c="desert">더스트 하이웨이<small>아무도 안 쓰는 황야 고속도로</small></button><button class="csel" data-c="circuit">메가 서킷<small>거대 구조물 사이 야간 서킷</small></button><button class="csel" data-c="dam">레드워터 댐<small>미래 마을을 통째로 막고 달리는 축제</small></button></div>
-    <div class="laps">특수무기 <button class="wsel lsel" data-w="missile">미사일</button><button class="wsel lsel" data-w="harpoon">작살</button><button class="wsel lsel" data-w="rail">레일건</button><button class="wsel lsel" data-w="mine">지뢰</button></div>
+    <div class="laps">특수무기 <button class="wsel lsel" data-w="missile">미사일</button><button class="wsel lsel" data-w="harpoon">작살</button><button class="wsel lsel" data-w="rail">대구경 포</button><button class="wsel lsel" data-w="pile">파일벙커</button></div>
     <div class="laps">바퀴 수 <button class="lsel" data-l="1">1</button><button class="lsel" data-l="2">2</button><button class="lsel" data-l="3">3</button><button class="lsel" data-l="5">5</button><button class="lsel" data-l="7">7</button><button class="lsel" data-l="10">10</button></div>
     <div class="laps tonly-flex">모바일 <button class="lsel" id="oGas">자동 가속</button></div>
     <button id="bStart">출발</button><button class="ghost" id="bSetupBack">뒤로</button>
@@ -332,11 +333,11 @@ const MASS = 1350, IZ = 2400, A_ = 1.3, B_ = 1.5, WB = A_ + B_, HCG = 0.5, CNF =
 const WEAPONS = {
   missile: { name: "유도 미사일", ammo: 4, desc: "앞차를 쫓아가 폭발" },
   harpoon: { name: "작살", ammo: 4, desc: "꽂아서 끌어당기고 휘두름" },
-  rail: { name: "레일건", ammo: 3, desc: "모았다 쏘는 관통탄" },
-  mine: { name: "지뢰", ammo: 5, desc: "뒤에 깔고, 밟은 차를 날려버림" }
+  rail: { name: "대구경 포", ammo: 3, desc: "장전했다 쏘는 관통 철갑탄" },
+  pile: { name: "파일벙커", ammo: 5, desc: "앞차에 대고 쇠말뚝으로 쾅" }
 };
-const RIVAL_WPN = { "Zero": "rail", "Duke": "missile", "Scarlet": "missile", "Hex": "harpoon", "Lyle & Lena": "missile", "Bones & Jinx": "harpoon", "Gunnar & Big Mo": "mine" };
-let mySpecial = "missile"; try { mySpecial = localStorage.getItem("bgp_special") || "missile"; if (mySpecial === "shock") mySpecial = "mine"; if (!WEAPONS[mySpecial]) mySpecial = "missile"; } catch (e) {}
+const RIVAL_WPN = { "Zero": "rail", "Duke": "missile", "Scarlet": "missile", "Hex": "harpoon", "Lyle & Lena": "missile", "Bones & Jinx": "harpoon", "Gunnar & Big Mo": "pile" };
+let mySpecial = "missile"; try { mySpecial = localStorage.getItem("bgp_special") || "missile"; if (mySpecial === "shock" || mySpecial === "mine") mySpecial = "pile"; if (!WEAPONS[mySpecial]) mySpecial = "missile"; } catch (e) {}
 const PROJ = [], TETHERS = [], BEAMS = [], WRINGS = [];
 const WS = 2.2; // 월드 크기 배율 (코스·풍경 전체)
 const CS = 1.4; // 차 크기 배율 (넓은 맵에 맞게 차를 키움)
@@ -2891,7 +2892,7 @@ function collideSolids(p, tumble) { // 차 앞·가운데·뒤 세 원으로 검
 // 모두 기관포를 기본으로 달고, 특수무기 하나씩. 전부 앞만 노림
 const massOf = c => (c === player ? MASS : c.mass) * (c.boostT > 0 ? (c === player ? 5 : 3) : 1);
 function armAll() {
-  for (const c of [player, ...ais]) { const sp = c === player ? mySpecial : (RIVAL_WPN[c.name] || "missile"); c.wpn = { sp, ammo: WEAPONS[sp].ammo, heat: 0, over: false, gunCd: 0, cd: 0, charge: 0, aimT: 0, gunBurst: 0, nextOK: L * (0.2 + Math.random() * 0.3) }; }
+  for (const c of [player, ...ais]) { const sp = c === player ? mySpecial : (RIVAL_WPN[c.name] || "missile"); c.wpn = { sp, ammo: WEAPONS[sp].ammo, heat: 0, over: false, gunCd: 0, cd: 0, charge: 0, aimT: 0, gunBurst: 0, nextOK: L * (0.2 + Math.random() * 0.3) }; pileMesh(c, sp === "pile"); }
   for (const p_ of PROJ) { scene.remove(p_.mesh); if (p_.rope) scene.remove(p_.rope); } PROJ.length = 0; for (const t of TETHERS) scene.remove(t.rope); TETHERS.length = 0;
   for (const b of BEAMS) scene.remove(b.m); BEAMS.length = 0; for (const r of WRINGS) scene.remove(r.m); WRINGS.length = 0;
 }
@@ -2945,8 +2946,8 @@ function useSpecial(c) {
   else if (sp === "harpoon") { PROJ.push({ type: "harpoon", x: m[0], y: m[1], z: m[2], vx: c.vx + fx * 360, vy: 0.5, vz: c.vz + fz * 360, owner: c, target: null, life: 0.55, t: 0, idx: c.idx, mesh: (() => { const g = new THREE.Group(); const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.4, 6).rotateX(Math.PI / 2), toon(0x5a5e66)); const hd = new THREE.Mesh(new THREE.ConeGeometry(0.32, 1.0, 6).rotateX(Math.PI / 2), toon(0xd8d8d8)); hd.position.z = 1.6; g.add(sh, hd); for (const sd of [-1, 1]) { const barb = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.7), toon(0xd8d8d8)); barb.position.set(sd * 0.25, 0, 1.0); barb.rotation.y = sd * 0.5; g.add(barb); } g.scale.setScalar(1.6); scene.add(g); return g; })(), rope: (() => { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1, 5).translate(0, 0.5, 0).rotateX(Math.PI / 2), toon(0x2a2a2a)); scene.add(r); return r; })() });
     sndHarpoon(vol); if (c === player) { shake = Math.max(shake, 0.45); } if (!c.tumble) { c.vf -= 1.5; toWorld(c); } }
   else if (sp === "rail") fireRail(c);
-  else if (sp === "mine") dropMine(c, vol);
-  w.ammo--; w.cd = sp === "rail" ? 1.2 : sp === "mine" ? 0.45 : 1.6; if (c !== player) w.nextOK = c.prog + L * lapsTotal / (WEAPONS[sp].ammo + 1) * (0.4 + Math.random() * 0.4) * (sp === "mine" ? 0.3 : 1); return true;
+  else if (sp === "pile") firePile(c);
+  w.ammo--; w.cd = sp === "rail" ? 1.2 : sp === "pile" ? 0.9 : 1.6; if (c !== player) w.nextOK = c.prog + L * lapsTotal / (WEAPONS[sp].ammo + 1) * (0.4 + Math.random() * 0.4) * (sp === "pile" ? 0.45 : 1); return true;
 }
 // ================= 폭발 효과 (three.quarks 파티클 라이브러리) =================
 const QFX = (() => {
@@ -3024,20 +3025,63 @@ function stepMine(q, dt) { /* true면 제거 */
   if (q.life <= 0) { scene.remove(q.mesh); return true; }
   q.mesh.position.set(q.x, q.y, q.z); return false;
 }
+// ---- 대구경 포: 포구 화염 + 연기 + 날아가는 철갑탄 예광 + 남는 연기 줄
+function sndCannon(v) { if (v < 0.04) return; if (SFX.ready) { sfx("boom2", Math.min(1.5, v * 1.3), 0.85 + Math.random() * 0.1); sfx("gun1", v * 0.9, 0.38); } shot((ctx, t) => { tone(ctx, t, 0.5, "sine", 120, 28, 1.0 * v); nzs(ctx, t, 0.35, "lowpass", 3000, 200, 0.7 * v, 0.7); }, 0.6); }
+function cannonFx(c, m, dx, dz, len) {
+  const near = Math.hypot(c.x - player.x, c.z - player.z) < 450;
+  if (!c.tumble) { c.vf -= 3.5; toWorld(c); c.bp = (c.bp || 0) - 0.06; } /* 반동 */
+  if (c === player) { shake = Math.max(shake, 0.9); flashT = Math.max(flashT, 0.25); }
+  if (!near) return;
+  for (let k = 0; k < 26; k++) { const a = (Math.random() - 0.5) * 0.6, sp = 12 + Math.random() * 26; emit(boostFire, m[0] + dx * 1.2, m[1], m[2] + dz * 1.2, c.vx + (dx * Math.cos(a) - dz * Math.sin(a)) * sp, (Math.random() - 0.3) * 5, c.vz + (dz * Math.cos(a) + dx * Math.sin(a)) * sp, 0.18); } /* 포구 화염 */
+  for (let k = 0; k < 14; k++) emit(smoke, m[0] + dx * 2, m[1], m[2] + dz * 2, c.vx * 0.5 + dx * (4 + Math.random() * 8) + (Math.random() - 0.5) * 6, 1 + Math.random() * 3, c.vz * 0.5 + dz * (4 + Math.random() * 8) + (Math.random() - 0.5) * 6, 1.6);
+  for (const sd of [-1, 1]) for (let k = 0; k < 6; k++) emit(smoke, m[0], m[1], m[2], c.vx * 0.5 + dz * sd * (6 + Math.random() * 6), 1 + Math.random() * 2, c.vz * 0.5 - dx * sd * (6 + Math.random() * 6), 1.3); /* 옆으로 터지는 화염 가스 */
+  const shell = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 5, 6).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd080, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 7, 6).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xff7a20, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false })); shell.add(glow);
+  shell.rotation.y = Math.atan2(dx, dz); shell.position.set(m[0], m[1], m[2]); scene.add(shell);
+  const V = 650; BEAMS.push({ m: shell, t: 0, upd: (b, dt) => { const d = Math.min(len, b.t * V); b.m.position.set(m[0] + dx * d, m[1] - d * 0.002, m[2] + dz * d); if (d >= len) { if (len < 449 && QFX) QFX.boom(m[0] + dx * len, m[1] - 0.8, m[2] + dz * len, 0.3); return true; } return false; } });
+  const trail = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, len, 6, 1, true).rotateX(Math.PI / 2).translate(0, 0, len / 2), new THREE.MeshBasicMaterial({ color: 0xd8d4cc, transparent: true, opacity: 0.45, depthWrite: false }));
+  trail.layers.set(1); trail.rotation.y = Math.atan2(dx, dz); trail.position.set(m[0], m[1], m[2]); trail.scale.z = 0.001; scene.add(trail);
+  BEAMS.push({ m: trail, t: 0, upd: (b, dt) => { b.m.scale.z = Math.min(1, b.t * V / len + 0.001); const f = b.t / 1.6; b.m.material.opacity = 0.45 * (1 - f); b.m.scale.x = b.m.scale.y = 1 + f * 5; if (f >= 1) { b.m.geometry.dispose(); return true; } return false; } });
+}
+// ---- 파일벙커: 차 앞 쇠말뚝. 앞차에 바짝 대고 누르면 쾅 튀어나가 날려버림
+function pileMesh(c, on) { const u = c.mesh.userData; if (u.pb) { c.mesh.remove(u.pb); u.pb = null; } if (!on) return;
+  const g = new THREE.Group(), fz = (u.hl / 0.9) / CS, y = 0.62;
+  const hous = outlined(new THREE.BoxGeometry(0.56, 0.5, 1.3), 0x2a2c30, 0.03); hous.position.set(0, y, fz - 0.45); g.add(hous);
+  const band = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.12, 1.32), new THREE.MeshToonMaterial({ map: hazStripe(), gradientMap: grad })); band.position.set(0, y + 0.12, fz - 0.45); g.add(band);
+  for (const sx of [-0.2, 0.2]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.1, 8).rotateX(Math.PI / 2), toon(0x9a9a9a)); p.position.set(sx, y - 0.2, fz - 0.6); g.add(p); }
+  const spike = new THREE.Group(); const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.8, 10).rotateX(Math.PI / 2), toon(0xd0d0d0)); rod.position.z = -0.4; spike.add(rod);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.55, 10).rotateX(Math.PI / 2), toon(0xe8e8e8)); tip.position.z = 0.75; spike.add(tip);
+  const z0 = fz + 0.05; spike.position.set(0, y, z0); g.add(spike); g.userData = { spike, z0 };
+  g.traverse(o => { if (o.isMesh && o.material !== outlineMat) o.castShadow = true; }); c.mesh.add(g); u.pb = g; }
+function pileTarget(c) { /* 말뚝이 닿는 앞차 */
+  const u = c.mesh.userData, fx = Math.sin(c.h), fz = Math.cos(c.h), F = [c.x + fx * u.hl / 0.9, c.z + fz * u.hl / 0.9]; let best = null, bd = 1e9;
+  for (const o of [player, ...ais]) { if (o === c || o.dead) continue; const rx = o.x - F[0], rz = o.z - F[1], al = rx * fx + rz * fz, pp = Math.abs(rx * fz - rz * fx), ol = o.mesh.userData; if (al < -1 || al > (ol.hl || 3) + 4.5 || pp > (ol.hwd || 1.2) + 1.0 || Math.abs(o.y - c.y) > 3) continue; if (al < bd) { bd = al; best = o; } }
+  return best;
+}
+function firePile(c) {
+  const u = c.mesh.userData, fx = Math.sin(c.h), fz = Math.cos(c.h), F = [c.x + fx * (u.hl / 0.9 + 1.2), c.y + 0.8, c.z + fz * (u.hl / 0.9 + 1.2)], o = pileTarget(c), v = c === player ? 1 : distVol(c.x, c.z); c.pbT = 0;
+  if (v > 0.04) shot((ctx, t) => { nzs(ctx, t, 0.15, "highpass", 6000, 3000, 0.4 * v); tone(ctx, t, 0.12, "square", 220, 90, 0.25 * v); }, 0.2);
+  for (const pr of propsNear(F[0], F[2], 5)) { const dx = pr.x - F[0], dz = pr.z - F[2]; if (dx * fx + dz * fz > -1) breakProp(pr, fx * 30 + c.vx * 0.5, 7, fz * 30 + c.vz * 0.5); }
+  if (!o) { if (v > 0.04) sfx("clank" + (1 + Math.floor(Math.random() * 4)), v * 0.6, 1.3); return; }
+  o.kickT = 1.4; applyDamage(o, 28, hitLocal(o, -fx, -fz), c, "pile");
+  if (!o.dead) { if (o.tumble) { o.tv.x += fx * 22; o.tv.z += fz * 22; o.tv.y += 6; } else { toWorld(o); o.vx += fx * 24 + c.vx * 0.15; o.vz += fz * 24 + c.vz * 0.15; fromWorld(o); if (Math.random() < 0.6) enterTumble(o, fz * (Math.random() < 0.5 ? -1 : 1) * 6, -fx * (Math.random() < 0.5 ? -1 : 1) * 6, 7); else { o.vy = 6; o.ry += (Math.random() - 0.5) * 5; } } }
+  if (!c.tumble) { c.vf -= 6; toWorld(c); }
+  const hx = o.x - fx * (o.mesh.userData.hl || 3) * 0.8, hz = o.z - fz * (o.mesh.userData.hl || 3) * 0.8;
+  if (Math.hypot(hx - player.x, hz - player.z) < 400) { if (QFX) QFX.boom(hx, o.y - 0.3, hz, 0.38); for (let k = 0; k < 40; k++) emit(sparks, hx, o.y + 0.8, hz, (Math.random() - 0.5) * 22 + fx * 18, Math.random() * 10, (Math.random() - 0.5) * 22 + fz * 18, 0.5); }
+  if (v > 0.04 || distVol(o.x, o.z) > 0.04) { const vv = Math.max(v, distVol(o.x, o.z)); sfx("boom2", Math.min(1.4, vv * 1.2), 1.15); sfx("clank" + (1 + Math.floor(Math.random() * 4)), vv, 0.7); sndImpact(true, o.x, o.z); }
+  if (c === player) { shake = Math.max(shake, 1.2); flashT = Math.max(flashT, 0.3); setMsg("쾅!", 0.6); } if (o === player) { shake = Math.max(shake, 1.4); setMsg("파일벙커에 맞음!", 1); }
+}
 function fireRail(c) {
   const m = muzzle(c); let dx = Math.sin(c.h), dz = Math.cos(c.h); // 조준 보정 없이 정면으로
   let len = raySolid(m[0], m[2], dx, dz, 450, m[1]) ?? 450; /* 구조물에서 멈춤 */
   for (const o of [player, ...ais]) { if (o === c || o.dead) continue; const rx = o.x - m[0], rz = o.z - m[2], al = rx * dx + rz * dz; if (al < 0 || al > len) continue; const perp = Math.abs(rx * dz - rz * dx); if (perp > o.mesh.userData.hwd + 0.8 || Math.abs(o.y - c.y) > 5) continue;
     applyDamage(o, 24, hitLocal(o, -dx, -dz), c, "rail"); o.kickT = 1.2; const side = Math.sign(rx * dz - rz * dx) || 1;
     if (o.tumble) { o.tv.x += dx * 12; o.tv.z += dz * 12; } else { o.vx += dx * 12 + dz * side * 6; o.vz += dz * 12 - dx * side * 6; fromWorld(o); o.ry += side * 1.6; if (Math.random() < 0.2) (window.__tlog && window.__tlog.push("rail")), enterTumble(o, dx * 4 * side, dz * 4 * side, 5); }
-    if (Math.hypot(o.x - player.x, o.z - player.z) < 400) for (let k = 0; k < 30; k++) emit(sparks, o.x, o.y + 1, o.z, (Math.random() - 0.5) * 20 + dx * 15, Math.random() * 10, (Math.random() - 0.5) * 20 + dz * 15, 0.5);
+    if (Math.hypot(o.x - player.x, o.z - player.z) < 400) { if (QFX) QFX.boom(o.x, o.y - 0.4, o.z, 0.4); sndImpact(true, o.x, o.z); } if (Math.hypot(o.x - player.x, o.z - player.z) < 400) for (let k = 0; k < 30; k++) emit(sparks, o.x, o.y + 1, o.z, (Math.random() - 0.5) * 20 + dx * 15, Math.random() * 10, (Math.random() - 0.5) * 20 + dz * 15, 0.5);
     if (o === player) shake = Math.max(shake, 1); }
   { let o = 0; while (o < len) { const ph = rayProp(m[0] + dx * o, m[2] + dz * o, dx, dz, len - o, m[1]); if (!ph) break; breakProp(ph[0], dx * 30, 6, dz * 30); o += ph[1] + 0.5; } } // 레일건은 오브젝트도 관통하며 다 부숨
-  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, len, 8, 1, true).rotateX(Math.PI / 2).translate(0, 0, len / 2), new THREE.MeshBasicMaterial({ color: 0x8ff4ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
-  const core = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, len, 6, 1, true).rotateX(Math.PI / 2).translate(0, 0, len / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false })); beam.add(core);
-  beam.position.set(m[0], m[1], m[2]); beam.rotation.y = Math.atan2(dx, dz); scene.add(beam); BEAMS.push({ m: beam, t: 0, life: 0.5 });
-  if (c === player) flashT = Math.max(flashT, 0.35);
-  sndRail(c === player ? 1 : distVol(c.x, c.z));
+  cannonFx(c, m, dx, dz, len);
+  sndCannon(c === player ? 1 : distVol(c.x, c.z));
 }
 function fireShock(c) {
   const fx = Math.sin(c.h), fz = Math.cos(c.h), R = 48;
@@ -3081,7 +3125,7 @@ function stepWeapons(dt) {
   const pw = player.wpn;
   if (pw && racing && !player.dead) {
     if (input.gun) fireGun(player);
-    if (pw.sp === "rail") { if (input.sp && pw.ammo > 0 && pw.cd <= 0) pw.charge = Math.min(1, pw.charge + dt / 0.9); else { if (pw.charge >= 1) useSpecial(player); else if (pw.charge > 0.05 && !input.sp) setMsg("충전 부족", 0.5); pw.charge = 0; } }
+    if (pw.sp === "rail") { if (input.sp && pw.ammo > 0 && pw.cd <= 0) pw.charge = Math.min(1, pw.charge + dt / 0.9); else { if (pw.charge >= 1) useSpecial(player); else if (pw.charge > 0.05 && !input.sp) setMsg("장전 부족", 0.5); pw.charge = 0; } }
     else if (input.spPress) { const myT = TETHERS.find(T => T.a === player); if (myT) reelIn(myT); else useSpecial(player); }
   }
   // 라이벌 사격
@@ -3093,9 +3137,10 @@ function stepWeapons(dt) {
     if (w.sp === "missile") { const t2 = findTarget(a, 280, 0.35); if (t2 && Math.hypot(t2.x - a.x, t2.z - a.z) > 40 && !keep && Math.random() < dt * 1.0) useSpecial(a); }
     else if (w.sp === "harpoon") { const myT = TETHERS.find(T => T.a === a); if (myT) { if (myT.t > 0.8 && !myT.reeled && Math.random() < dt * 2.5) reelIn(myT); } else { const t2 = findTarget(a, 130, 0.06); if (t2 && Math.hypot(t2.x - a.x, t2.z - a.z) > 15 && !keep && Math.random() < dt * 0.7) { a.yankDir = Math.random() < 0.5 ? -1 : 1; useSpecial(a); } } }
     else if (w.sp === "rail") { const t2 = findTarget(a, 420, 0.05); if (t2 && !keep) { w.aimT += dt; if (w.aimT > 0.9 && Math.random() < dt * 2) { useSpecial(a); w.aimT = 0; } } else w.aimT = Math.max(0, w.aimT - dt * 2); }
-    else if (w.sp === "mine") { let bh = false; for (const o of [player, ...ais]) { if (o === a || o.dead) continue; const dp = a.prog - o.prog; if (dp > 8 && dp < 70 && Math.abs(o.lat - a.lat) < 4.5) { bh = true; break; } } if (bh && !keep && Math.random() < dt * 1.3) useSpecial(a); }
+    else if (w.sp === "pile") { if (pileTarget(a) && !keep && Math.random() < dt * 4) useSpecial(a); }
   }
-  for (const c of [player, ...ais]) { const w = c.wpn; if (!w) continue; w.gunCd = Math.max(0, w.gunCd - dt); w.cd = Math.max(0, w.cd - dt); w.heat = Math.max(0, w.heat - dt * (w.over ? 0.55 : 0.4)); if (w.over && w.heat <= 0.3) w.over = false; }
+  for (const c of [player, ...ais]) { const pb = c.mesh.userData.pb; if (pb) { c.pbT = (c.pbT ?? 9) + dt; const t_ = c.pbT, ex = t_ < 0.05 ? t_ / 0.05 : Math.max(0, 1 - (t_ - 0.05) / 0.5); pb.userData.spike.position.z = pb.userData.z0 + ex * 1.9; }
+    const w = c.wpn; if (!w) continue; w.gunCd = Math.max(0, w.gunCd - dt); w.cd = Math.max(0, w.cd - dt); w.heat = Math.max(0, w.heat - dt * (w.over ? 0.55 : 0.4)); if (w.over && w.heat <= 0.3) w.over = false; }
   // 날아가는 것들
   for (let i = PROJ.length - 1; i >= 0; i--) {
     const q = PROJ[i]; q.t += dt; q.life -= dt; let boom = q.life <= 0, hit = null;
@@ -3131,7 +3176,7 @@ function stepWeapons(dt) {
     const ma_ = muzzle(a), mb_ = [b.x, b.y + 1, b.z], L_ = Math.hypot(mb_[0] - ma_[0], mb_[1] - ma_[1], mb_[2] - ma_[2]);
     T.rope.position.set(ma_[0], ma_[1], ma_[2]); T.rope.scale.set(1, 1, L_); T.rope.lookAt(mb_[0], mb_[1], mb_[2]);
   }
-  for (let i = BEAMS.length - 1; i >= 0; i--) { const b = BEAMS[i]; b.t += dt; b.m.material.opacity = 0.95 * (1 - b.t / b.life); b.m.children[0].material.opacity = 1 - b.t / b.life; b.m.scale.x = b.m.scale.y = 1 + b.t * 3; if (b.t > b.life) { scene.remove(b.m); b.m.geometry.dispose(); BEAMS.splice(i, 1); } }
+  for (let i = BEAMS.length - 1; i >= 0; i--) { const b = BEAMS[i]; b.t += dt; if (b.upd) { if (b.upd(b, dt)) { scene.remove(b.m); BEAMS.splice(i, 1); } continue; } b.m.material.opacity = 0.95 * (1 - b.t / b.life); b.m.children[0].material.opacity = 1 - b.t / b.life; b.m.scale.x = b.m.scale.y = 1 + b.t * 3; if (b.t > b.life) { scene.remove(b.m); b.m.geometry.dispose(); BEAMS.splice(i, 1); } }
   for (let i = WRINGS.length - 1; i >= 0; i--) { const r = WRINGS[i]; r.t += dt; const sc = 3 + r.t * 90; r.m.scale.set(sc, sc, 1.5); r.m.position.x += r.vx * dt; r.m.position.z += r.vz * dt; r.m.material.opacity = Math.max(0, 0.7 - r.t * 2.2); if (r.t > 0.32) { scene.remove(r.m); WRINGS.splice(i, 1); } }
   for (let i = 0; i < TR_N; i++) if (trLife[i] > 0) { trLife[i] -= dt; if (trLife[i] <= 0) { trPos[i * 6 + 1] = trPos[i * 6 + 4] = -9999; } } tracerGeo.attributes.position.needsUpdate = true;
 }
@@ -3220,7 +3265,8 @@ function drawReticle() { // 조준 표시와 미사일 경고
     for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { fctx.beginPath(); fctx.moveTo(x + sx * r, y + sy * r * 0.6); fctx.lineTo(x + sx * r, y + sy * r); fctx.lineTo(x + sx * r * 0.6, y + sy * r); fctx.stroke(); } } }
   const inc = PROJ.find(q => q.type === "missile" && q.target === player);
   if (inc) { fctx.fillStyle = performance.now() % 300 < 150 ? "#ff3b3b" : "#ffd23a"; fctx.font = "900 italic 28px sans-serif"; fctx.textAlign = "center"; fctx.fillText("⚠ 미사일 접근", w / 2, h * 0.2); fctx.textAlign = "left"; }
-  if (player.wpn.sp === "rail" && player.wpn.charge > 0) { fctx.strokeStyle = `rgba(143,244,255,${0.3 + player.wpn.charge * 0.6})`; fctx.lineWidth = 2; fctx.beginPath(); fctx.moveTo(w / 2, h * 0.62); fctx.lineTo(w / 2, h * 0.38); fctx.stroke(); }
+  if (player.wpn.sp === "pile" && state === "race" && player.wpn.ammo > 0 && player.wpn.cd <= 0 && pileTarget(player)) { fctx.fillStyle = performance.now() % 240 < 120 ? "#ffb040" : "#fff"; fctx.font = "900 italic 22px sans-serif"; fctx.textAlign = "center"; fctx.fillText("▶ 파일벙커 사정거리!", w / 2, h * 0.64); fctx.textAlign = "left"; }
+  if (player.wpn.sp === "rail" && player.wpn.charge > 0) { fctx.strokeStyle = `rgba(255,170,60,${0.3 + player.wpn.charge * 0.6})`; fctx.lineWidth = 2; fctx.beginPath(); fctx.moveTo(w / 2, h * 0.62); fctx.lineTo(w / 2, h * 0.38); fctx.stroke(); }
 }
 function drawFx(dt) {
   const w = fx.width, h = fx.height; fctx.clearRect(0, 0, w, h); drawReticle();
@@ -3332,9 +3378,9 @@ function updateHud() {
   setHTML("speed", `${kmh}<small> km/h</small>`);
   const maxC = Math.round(P.charges); let ch = ""; for (let i = 0; i < 3; i++) ch += `<i class="${i >= maxC ? "lock" : (i < player.charges ? "full" : "used")}"></i>`;
   const ce = document.getElementById("charges"); if (ce.innerHTML !== ch) ce.innerHTML = ch;
-  if (isTouch) { setHTML("tNitroI", ch); /* 폰: 버튼 안에 남은 부스트 */
+  if (isTouch) { setHTML("tNitroI", ch); { const rd = player.wpn && player.wpn.sp === "pile" && player.wpn.ammo > 0 && player.wpn.cd <= 0 && state === "race" && !!pileTarget(player); if (rd !== updateHud._rd) { updateHud._rd = rd; document.getElementById("tSp").classList.toggle("ready", rd); } } /* 폰: 버튼 안에 남은 부스트 */
     if (player.wpn) { const w = player.wpn; setHTML("tGunI", `<span class="hb"><i style="width:${Math.round(w.heat * 100)}%;background:${w.over ? "#ff3b3b" : "#ffd23a"}"></i></span>`);
-      setHTML("tSpI", `<span class="am">${"●".repeat(w.ammo)}${"○".repeat(Math.max(0, WEAPONS[w.sp].ammo - w.ammo))}${w.sp === "rail" && w.charge > 0 ? ` <b style="color:#8ff4ff">${w.charge >= 1 ? "!" : Math.round(w.charge * 100) + "%"}</b>` : ""}</span>`); } }
+      setHTML("tSpI", `<span class="am">${"●".repeat(w.ammo)}${"○".repeat(Math.max(0, WEAPONS[w.sp].ammo - w.ammo))}${w.sp === "rail" && w.charge > 0 ? ` <b style="color:#ffb040">${w.charge >= 1 ? "!" : Math.round(w.charge * 100) + "%"}</b>` : ""}</span>`); } }
   if (player.wpn) { const w = player.wpn, hc2 = w.over ? "#ff3b3b" : "#ffd23a"; const wh = `기관포 <span style="display:inline-block;width:60px;height:7px;background:rgba(0,0,0,.5);vertical-align:middle"><i style="display:block;height:100%;width:${Math.round(w.heat * 100)}%;background:${hc2}"></i></span><br>${WEAPONS[w.sp].name} ${"●".repeat(w.ammo)}${"○".repeat(Math.max(0, WEAPONS[w.sp].ammo - w.ammo))}${w.sp === "rail" && w.charge > 0 ? ` <b style="color:#8ff4ff">${w.charge >= 1 ? "발사!" : Math.round(w.charge * 100) + "%"}</b>` : ""}`; const we = document.getElementById("wpnHud"); if (we.innerHTML !== wh) we.innerHTML = wh; }
   flashT = Math.max(0, flashT - 0.05); const fe = document.getElementById("flash"); fe.style.opacity = flashT * 0.85; fe.style.background = flashT > 0.5 ? "#fff" : "#ff9a3a";
   if (camMode === "cockpit") {
