@@ -263,7 +263,7 @@
     <p><b>키보드</b> · 가속 ↑/W · 브레이크 ↓/S · 조향 ←→/AD · 필살 부스트 Space · 드리프트 Shift<br>기관포 Z (누르고 있기) · 특수무기 X · 시점 C · 복귀 R · 소리 M · 일시정지 Esc</p>
     <p><b>게임패드</b> · 조향 왼쪽 스틱 · 가속 RT · 브레이크 LT · 부스트 A · 드리프트 B · 기관포 RB · 특수무기 X · 시점 Y</p>
     <p><b>폰</b> · 왼쪽 핸들을 엄지로 돌려 조향 · 오른쪽 브레이크·부스트·특수 버튼 (자동 가속은 준비 화면에서 켜고 끔)</p>
-    <p><b>특수무기</b> · 미사일: 앞차를 쫓아감 · 작살: 꽂히면 좌우로 휘두르고 다시 눌러 당김 · 레일건: 누르고 모았다 떼기 · 충격파: 앞을 통째로 날림</p>
+    <p><b>특수무기</b> · 미사일: 앞차를 쫓아감 · 작살: 꽂히면 좌우로 휘두르고 다시 눌러 당김 · 레일건: 누르고 모았다 떼기 · 지뢰: 뒤에 깔아두면 밟은 차가 공중으로 튐</p>
     <p style="font-size:11px;color:#9aa">효과음: OpenGameArt — rubberduck (CC0), qubodup (CC0), Joth (CC0), TinyWorlds (CC0), StarNinjas (CC0), Nocturnal_Vanguard (CC0), Bashar3A (CC0), blacklodgegames (CC0), bart (CC0), hingydunyas (CC0), "Car tire squeal skid loop" audible-edge / Tom Haigh (CC-BY 3.0)</p>
     <p><b>규칙</b> · 부스트는 3번뿐. 차가 부서지면 수리 없이 끝까지 간다. 내구도가 0이 되면 폭발·리타이어</p>
     <button class="ghost" id="bHelpBack">뒤로</button>
@@ -285,7 +285,7 @@
     <h1>BLACKOUT <span>GP</span></h1>
     <p>레이스 준비 · 라이벌 7대</p>
     <div class="courses"><button class="csel" data-c="desert">더스트 하이웨이<small>아무도 안 쓰는 황야 고속도로</small></button><button class="csel" data-c="circuit">메가 서킷<small>거대 구조물 사이 야간 서킷</small></button><button class="csel" data-c="dam">레드워터 댐<small>미래 마을을 통째로 막고 달리는 축제</small></button></div>
-    <div class="laps">특수무기 <button class="wsel lsel" data-w="missile">미사일</button><button class="wsel lsel" data-w="harpoon">작살</button><button class="wsel lsel" data-w="rail">레일건</button><button class="wsel lsel" data-w="shock">충격파</button></div>
+    <div class="laps">특수무기 <button class="wsel lsel" data-w="missile">미사일</button><button class="wsel lsel" data-w="harpoon">작살</button><button class="wsel lsel" data-w="rail">레일건</button><button class="wsel lsel" data-w="mine">지뢰</button></div>
     <div class="laps">바퀴 수 <button class="lsel" data-l="1">1</button><button class="lsel" data-l="2">2</button><button class="lsel" data-l="3">3</button><button class="lsel" data-l="5">5</button><button class="lsel" data-l="7">7</button><button class="lsel" data-l="10">10</button></div>
     <div class="laps tonly-flex">모바일 <button class="lsel" id="oGas">자동 가속</button></div>
     <button id="bStart">출발</button><button class="ghost" id="bSetupBack">뒤로</button>
@@ -333,10 +333,10 @@ const WEAPONS = {
   missile: { name: "유도 미사일", ammo: 4, desc: "앞차를 쫓아가 폭발" },
   harpoon: { name: "작살", ammo: 4, desc: "꽂아서 끌어당기고 휘두름" },
   rail: { name: "레일건", ammo: 3, desc: "모았다 쏘는 관통탄" },
-  shock: { name: "충격파 캐논", ammo: 4, desc: "앞쪽을 통째로 날려버림" }
+  mine: { name: "지뢰", ammo: 5, desc: "뒤에 깔고, 밟은 차를 날려버림" }
 };
-const RIVAL_WPN = { "Zero": "rail", "Duke": "missile", "Scarlet": "missile", "Hex": "harpoon", "Lyle & Lena": "missile", "Bones & Jinx": "harpoon", "Gunnar & Big Mo": "shock" };
-let mySpecial = "missile"; try { mySpecial = localStorage.getItem("bgp_special") || "missile"; if (!WEAPONS[mySpecial]) mySpecial = "missile"; } catch (e) {}
+const RIVAL_WPN = { "Zero": "rail", "Duke": "missile", "Scarlet": "missile", "Hex": "harpoon", "Lyle & Lena": "missile", "Bones & Jinx": "harpoon", "Gunnar & Big Mo": "mine" };
+let mySpecial = "missile"; try { mySpecial = localStorage.getItem("bgp_special") || "missile"; if (mySpecial === "shock") mySpecial = "mine"; if (!WEAPONS[mySpecial]) mySpecial = "missile"; } catch (e) {}
 const PROJ = [], TETHERS = [], BEAMS = [], WRINGS = [];
 const WS = 2.2; // 월드 크기 배율 (코스·풍경 전체)
 const CS = 1.4; // 차 크기 배율 (넓은 맵에 맞게 차를 키움)
@@ -2945,8 +2945,8 @@ function useSpecial(c) {
   else if (sp === "harpoon") { PROJ.push({ type: "harpoon", x: m[0], y: m[1], z: m[2], vx: c.vx + fx * 360, vy: 0.5, vz: c.vz + fz * 360, owner: c, target: null, life: 0.55, t: 0, idx: c.idx, mesh: (() => { const g = new THREE.Group(); const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.4, 6).rotateX(Math.PI / 2), toon(0x5a5e66)); const hd = new THREE.Mesh(new THREE.ConeGeometry(0.32, 1.0, 6).rotateX(Math.PI / 2), toon(0xd8d8d8)); hd.position.z = 1.6; g.add(sh, hd); for (const sd of [-1, 1]) { const barb = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.7), toon(0xd8d8d8)); barb.position.set(sd * 0.25, 0, 1.0); barb.rotation.y = sd * 0.5; g.add(barb); } g.scale.setScalar(1.6); scene.add(g); return g; })(), rope: (() => { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1, 5).translate(0, 0.5, 0).rotateX(Math.PI / 2), toon(0x2a2a2a)); scene.add(r); return r; })() });
     sndHarpoon(vol); if (c === player) { shake = Math.max(shake, 0.45); } if (!c.tumble) { c.vf -= 1.5; toWorld(c); } }
   else if (sp === "rail") fireRail(c);
-  else if (sp === "shock") fireShock(c);
-  w.ammo--; w.cd = sp === "rail" ? 1.2 : 1.6; if (c !== player) w.nextOK = c.prog + L * lapsTotal / (WEAPONS[sp].ammo + 1) * (0.4 + Math.random() * 0.4); return true;
+  else if (sp === "mine") dropMine(c, vol);
+  w.ammo--; w.cd = sp === "rail" ? 1.2 : sp === "mine" ? 0.45 : 1.6; if (c !== player) w.nextOK = c.prog + L * lapsTotal / (WEAPONS[sp].ammo + 1) * (0.4 + Math.random() * 0.4) * (sp === "mine" ? 0.3 : 1); return true;
 }
 // ================= 폭발 효과 (three.quarks 파티클 라이브러리) =================
 const QFX = (() => {
@@ -2995,6 +2995,34 @@ function blast(x, y, z, owner, direct) { // 미사일 폭발: 직격은 크게, 
   for (const pr of propsNear(x, z, 10)) { const d = Math.hypot(pr.x - x, pr.z - z); if (d < 9) { const k = 1 - d / 9; breakProp(pr, (pr.x - x) / (d || 1) * 18 * k, 6 + 8 * k, (pr.z - z) / (d || 1) * 18 * k); } }
   const near = Math.hypot(x - player.x, z - player.z);
   if (near < 400) { if (QFX) QFX.boom(x, y - 0.8, z, 0.6); else { for (let k = 0; k < 70; k++) emit(boostFire, x, y, z, (Math.random() - 0.5) * 22, Math.random() * 12, (Math.random() - 0.5) * 22, 0.6); for (let k = 0; k < 25; k++) emit(smokeD, x, y + 0.5, z, (Math.random() - 0.5) * 6, 2 + Math.random() * 4, (Math.random() - 0.5) * 6, 1.8); } sndImpact(26, x, z); sfx("boom2", distVol(x, z) * 1.1, 0.9 + Math.random() * 0.2); shot((ctx, t) => tone(ctx, t, 0.9, "sine", 110, 30, 0.8 * distVol(x, z)), 1); }
+}
+// ---- 지뢰: 차 뒤에 떨어뜨림 → 1초 뒤 무장(빨간 불 깜빡) → 밟으면 폭발하며 차가 공중으로
+function makeMineMesh() { const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.72, 0.22, 16), toon(0x2a2c30)); base.position.y = 0.11; g.add(base);
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.66, 0.66, 0.06, 16, 1, true), new THREE.MeshToonMaterial({ map: hazStripe(), gradientMap: grad, side: THREE.DoubleSide })); ring.position.y = 0.16; g.add(ring);
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 0.12, 12), toon(0x44474e)); top.position.y = 0.27; g.add(top);
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffaa00 })); lamp.position.y = 0.36; g.add(lamp); g.userData.lamp = lamp;
+  for (let k = 0; k < 4; k++) { const p = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.18, 6), toon(0x8a8a8a)); const a = k * Math.PI / 2 + 0.4; p.position.set(Math.cos(a) * 0.36, 0.37, Math.sin(a) * 0.36); g.add(p); }
+  g.scale.setScalar(1.35); scene.add(g); return g; }
+let _hzStripe = null; function hazStripe() { if (_hzStripe) return _hzStripe; const c = document.createElement("canvas"); c.width = 64; c.height = 16; const x = c.getContext("2d"); x.fillStyle = "#151515"; x.fillRect(0, 0, 64, 16); x.fillStyle = "#f2c21a"; for (let k = -16; k < 80; k += 16) { x.beginPath(); x.moveTo(k, 16); x.lineTo(k + 8, 16); x.lineTo(k + 16, 0); x.lineTo(k + 8, 0); x.closePath(); x.fill(); } _hzStripe = new THREE.CanvasTexture(c); _hzStripe.wrapS = THREE.RepeatWrapping; _hzStripe.repeat.set(3, 1); return _hzStripe; }
+function mineGround(q) { q.idx = nearest(q.x, q.z, q.idx); const t = TRK[q.idx], lat = (q.x - t.x) * nx(t) + (q.z - t.z) * nz(t); q.y = surfH(t.s, lat); }
+function dropMine(c, vol) {
+  const fx = Math.sin(c.h), fz = Math.cos(c.h), hl = c.mesh.userData.hl || 3, q = { type: "mine", x: c.x - fx * (hl + 1.4), y: c.y, z: c.z - fz * (hl + 1.4), vx: c.vx * 0.25, vy: 0, vz: c.vz * 0.25, owner: c, life: 50, t: 0, idx: c.idx, mesh: makeMineMesh() };
+  mineGround(q); q.mesh.position.set(q.x, q.y, q.z); PROJ.push(q);
+  const mines = PROJ.filter(p => p.type === "mine"); if (mines.length > 14) { const o = mines[0]; scene.remove(o.mesh); PROJ.splice(PROJ.indexOf(o), 1); } /* 너무 많이 깔리면 오래된 것부터 치움 */
+  if (vol > 0.04) shot((ctx, t) => { tone(ctx, t, 0.08, "square", 420, 260, 0.14 * vol); tone(ctx, t, 0.18, "sine", 140, 70, 0.3 * vol, 0.06); }, 0.3);
+}
+function stepMine(q, dt) { /* true면 제거 */
+  if (q.t < 0.7) { q.x += q.vx * dt; q.z += q.vz * dt; q.vx *= Math.pow(0.02, dt); q.vz *= Math.pow(0.02, dt); mineGround(q); }
+  const armed = q.t > 1.0, lamp = q.mesh.userData.lamp; lamp.material.color.setHex(!armed ? 0xffaa00 : Math.floor(q.t * 3.5) % 2 ? 0xff2020 : 0x380000);
+  if (armed && !q.beeped) { q.beeped = true; const v = distVol(q.x, q.z); if (v > 0.06) shot((ctx, t) => tone(ctx, t, 0.07, "square", 1500, 1500, 0.08 * v), 0.1); }
+  let hit = null; if (armed) for (const o of [player, ...ais]) { if (o.dead || (o === q.owner && q.t < 3)) continue; if (Math.abs(o.y - q.y) > 2.5) continue; const r = Math.max(2.0, (o.mesh.userData.hwd || 1.2) + 0.7); if ((o.x - q.x) ** 2 + (o.z - q.z) ** 2 < r * r) { hit = o; break; } }
+  if (hit) { blast(q.x, q.y + 0.8, q.z, q.owner, hit);
+    if (!hit.dead) { if (hit.tumble) { hit.tv.y += 7; } else if (Math.random() < 0.55) enterTumble(hit, (Math.random() - 0.5) * 7, (Math.random() - 0.5) * 7, 9); else { hit.vy = 8; hit.ry += (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 2); hit.vf *= 0.75; } }
+    if (hit === player) { setMsg("지뢰!", 1); shake = Math.max(shake, 1.3); } else if (q.owner === player) setMsg(`${hit.name} 지뢰 밟음!`, 1.2);
+    scene.remove(q.mesh); return true; }
+  if (q.life <= 0) { scene.remove(q.mesh); return true; }
+  q.mesh.position.set(q.x, q.y, q.z); return false;
 }
 function fireRail(c) {
   const m = muzzle(c); let dx = Math.sin(c.h), dz = Math.cos(c.h); // 조준 보정 없이 정면으로
@@ -3065,12 +3093,13 @@ function stepWeapons(dt) {
     if (w.sp === "missile") { const t2 = findTarget(a, 280, 0.35); if (t2 && Math.hypot(t2.x - a.x, t2.z - a.z) > 40 && !keep && Math.random() < dt * 1.0) useSpecial(a); }
     else if (w.sp === "harpoon") { const myT = TETHERS.find(T => T.a === a); if (myT) { if (myT.t > 0.8 && !myT.reeled && Math.random() < dt * 2.5) reelIn(myT); } else { const t2 = findTarget(a, 130, 0.06); if (t2 && Math.hypot(t2.x - a.x, t2.z - a.z) > 15 && !keep && Math.random() < dt * 0.7) { a.yankDir = Math.random() < 0.5 ? -1 : 1; useSpecial(a); } } }
     else if (w.sp === "rail") { const t2 = findTarget(a, 420, 0.05); if (t2 && !keep) { w.aimT += dt; if (w.aimT > 0.9 && Math.random() < dt * 2) { useSpecial(a); w.aimT = 0; } } else w.aimT = Math.max(0, w.aimT - dt * 2); }
-    else if (w.sp === "shock") { const t2 = findTarget(a, 32, 0.5); if (t2 && !keep && Math.random() < dt * 1.5) useSpecial(a); }
+    else if (w.sp === "mine") { let bh = false; for (const o of [player, ...ais]) { if (o === a || o.dead) continue; const dp = a.prog - o.prog; if (dp > 8 && dp < 70 && Math.abs(o.lat - a.lat) < 4.5) { bh = true; break; } } if (bh && !keep && Math.random() < dt * 1.3) useSpecial(a); }
   }
   for (const c of [player, ...ais]) { const w = c.wpn; if (!w) continue; w.gunCd = Math.max(0, w.gunCd - dt); w.cd = Math.max(0, w.cd - dt); w.heat = Math.max(0, w.heat - dt * (w.over ? 0.55 : 0.4)); if (w.over && w.heat <= 0.3) w.over = false; }
   // 날아가는 것들
   for (let i = PROJ.length - 1; i >= 0; i--) {
     const q = PROJ[i]; q.t += dt; q.life -= dt; let boom = q.life <= 0, hit = null;
+    if (q.type === "mine") { if (stepMine(q, dt)) PROJ.splice(i, 1); continue; }
     if (q.type === "missile") {
       if (q.target && !q.target.dead) { const tx = q.target.x + q.target.vx * 0.15, tz = q.target.z + q.target.vz * 0.15, ty = q.target.y + 0.8, sp = Math.hypot(q.vx, q.vz), want = Math.atan2(tx - q.x, tz - q.z), cur = Math.atan2(q.vx, q.vz); let dh = want - cur; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI; const nh = cur + clamp(dh, -1.7 * dt, 1.7 * dt), ns = Math.min(255, sp + 90 * dt); q.vx = Math.sin(nh) * ns; q.vz = Math.cos(nh) * ns; q.vy += (ty - q.y) * 3 * dt - q.vy * 2 * dt; }
       else { q.vy -= 2 * dt; const sp = Math.hypot(q.vx, q.vz), ns = Math.min(255, sp + 90 * dt); q.vx *= ns / sp; q.vz *= ns / sp; }
