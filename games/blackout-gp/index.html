@@ -253,7 +253,7 @@
     <p><b>게임패드</b> · 조향 왼쪽 스틱 · 가속 RT · 브레이크 LT · 부스트 A · 드리프트 B · 기관포 RB · 특수무기 X · 시점 Y</p>
     <p><b>폰</b> · 왼쪽 핸들을 엄지로 돌려 조향 · 오른쪽 브레이크·부스트·특수 버튼 (자동 가속은 준비 화면에서 켜고 끔)</p>
     <p><b>특수무기</b> · 미사일: 앞차를 쫓아감 · 작살: 꽂히면 좌우로 휘두르고 다시 눌러 당김 · 레일건: 누르고 모았다 떼기 · 충격파: 앞을 통째로 날림</p>
-    <p style="font-size:11px;color:#9aa">효과음: OpenGameArt — rubberduck (CC0), qubodup (CC0), Joth (CC0), TinyWorlds (CC0), StarNinjas (CC0), Nocturnal_Vanguard (CC0), Bashar3A (CC0), "Car tire squeal skid loop" audible-edge / Tom Haigh (CC-BY 3.0)</p>
+    <p style="font-size:11px;color:#9aa">효과음: OpenGameArt — rubberduck (CC0), qubodup (CC0), Joth (CC0), TinyWorlds (CC0), StarNinjas (CC0), Nocturnal_Vanguard (CC0), Bashar3A (CC0), blacklodgegames (CC0), bart (CC0), hingydunyas (CC0), "Car tire squeal skid loop" audible-edge / Tom Haigh (CC-BY 3.0)</p>
     <p><b>규칙</b> · 부스트는 3번뿐. 차가 부서지면 수리 없이 끝까지 간다. 내구도가 0이 되면 폭발·리타이어</p>
     <button class="ghost" id="bHelpBack">뒤로</button>
   </div>
@@ -1467,7 +1467,7 @@ function audioInit() {
 }
 // ---- 녹음된 효과음 (OpenGameArt 무료 소리, sfx 폴더) — 못 불러오면 합성음으로
 const SFX = { buf: {}, ready: false, loops: {} };
-const SFX_LIST = ["hit1", "hit2", "hit3", "hit4", "hit5", "hit6", "crash1", "crash2", "crash3", "clank1", "clank2", "clank3", "clank4", "wood1", "wood2", "glass1", "boom", "boom2", "squeal", "wind", "crowd", "ooh"];
+const SFX_LIST = ["hit1", "hit2", "hit3", "hit4", "hit5", "hit6", "hit7", "hit8", "gun1", "gun2", "crash1", "crash2", "crash3", "clank1", "clank2", "clank3", "clank4", "wood1", "wood2", "glass1", "boom", "boom2", "squeal", "wind", "crowd", "ooh"];
 function sfxLoad() {
   if (SFX.loading || !SND.ctx) return; SFX.loading = true; let n = 0;
   for (const k of SFX_LIST) fetch("sfx/" + k + ".ogg").then(r => { if (!r.ok) throw 0; return r.arrayBuffer(); }).then(a => new Promise((res, rej) => SND.ctx.decodeAudioData(a, res, rej))).then(b => { SFX.buf[k] = b; if (++n >= 6) SFX.ready = true; if (k === "squeal" || k === "wind" || k === "crowd") sfxLoop(k); }).catch(() => {});
@@ -1522,8 +1522,8 @@ function sndBoost(v = 1) { // 부스트 점화: 빨아들이는 쉭 → 쿵 → 
 }
 function sndImpact(hard, x, z, metal = 1) { // 충돌: 둔탁한 쿵 + 금속이 찌그러지는 울림
   const v = Math.min(1.2, hard / 18) * (x === undefined ? 1 : distVol(x, z)); if (v < 0.03) return;
-  if (SFX.ready && sfx(pick("hit", 6), (0.55 + v * 0.7) * (metal ? 1 : 0.6), 0.8 + Math.random() * 0.35)) { // 녹음된 금속 충돌음 + 합성 저음(무게감)
-    if (v > 0.55) sfx(pick("crash", 3), v * 0.9, 0.85 + Math.random() * 0.3, 0.02); if (v > 0.9) sfx(pick("clank", 4), v * 0.5, 0.9, 0.12);
+  if (SFX.ready && sfx(pick("hit", 8), (0.6 + v * 0.75) * (metal ? 1 : 0.6), 0.72 + Math.random() * 0.3)) { // 녹음된 금속 충돌음 + 합성 저음(무게감)
+    if (v > 0.55) sfx(pick("crash", 3), v * 0.85, 0.7 + Math.random() * 0.25, 0.02); if (v > 0.9) sfx(pick("clank", 4), v * 0.5, 0.9, 0.12);
     shot((ctx, t) => tone(ctx, t, 0.25 + v * 0.2, "sine", 95, 38, 0.75 * v), 0.5); return; }
   shot((ctx, t) => {
     tone(ctx, t, 0.25 + v * 0.2, "sine", 95, 38, 0.9 * v); nzs(ctx, t, 0.18 + v * 0.35, "lowpass", 2500 + v * 3000, 300, 0.75 * v, 0.8);
@@ -2734,7 +2734,7 @@ function findTarget(c, maxD, cone) { // 앞쪽 원뿔 안에서 가장 노리기
 }
 const muzzle = c => { const u = c.mesh.userData, fx = Math.sin(c.h), fz = Math.cos(c.h); return [c.x + fx * u.hl * 0.9, c.y + 1.1, c.z + fz * u.hl * 0.9]; };
 // ---- 소리
-function sndGun(v) { if (v < 0.04) return; shot((ctx, t) => { tone(ctx, t, 0.11, "sine", 150, 48, 0.75 * v); tone(ctx, t, 0.07, "triangle", 95, 40, 0.35 * v); nzs(ctx, t, 0.06, "lowpass", 900, 200, 0.45 * v, 0.9); }, 0.12); } // 퉁퉁 하는 묵직한 포
+function sndGun(v) { if (v < 0.04) return; if (SFX.ready && sfx(Math.random() < 0.6 ? "gun1" : "gun2", v * 0.75, 0.62 + Math.random() * 0.12)) { shot((ctx, t) => tone(ctx, t, 0.1, "sine", 140, 46, 0.6 * v), 0.12); return; } shot((ctx, t) => { tone(ctx, t, 0.11, "sine", 150, 48, 0.75 * v); tone(ctx, t, 0.07, "triangle", 95, 40, 0.35 * v); nzs(ctx, t, 0.06, "lowpass", 900, 200, 0.45 * v, 0.9); }, 0.12); } // 퉁퉁 하는 묵직한 포
 function sndLaunch(v) { if (v < 0.04) return; shot((ctx, t) => { nzs(ctx, t, 0.7, "bandpass", 500, 2600, 0.4 * v, 1.5); tone(ctx, t, 0.3, "sawtooth", 160, 60, 0.15 * v); }, 0.8); }
 function sndRail(v) { if (v < 0.04) return; shot((ctx, t) => { tone(ctx, t, 0.45, "sine", 2600, 180, 0.35 * v); tone(ctx, t, 0.5, "sawtooth", 90, 40, 0.3 * v); nzs(ctx, t, 0.3, "highpass", 5000, 2000, 0.4 * v); }, 0.6); }
 function sndTwang(v) { if (v < 0.04) return; shot((ctx, t) => { tone(ctx, t, 0.3, "triangle", 320, 110, 0.35 * v); nzs(ctx, t, 0.12, "bandpass", 3000, 1500, 0.25 * v, 2); }, 0.35); }
