@@ -879,7 +879,14 @@ function buildFestival() {
   // 울타리: 마을·광장·댐 구간 길가
   const fenceOn = t => { const z = zoneAt(t.s); return z === "town" || z === "plaza" || z === "dam"; };
   for (const t of TRK) t.fence = fenceOn(t); // 가드레일 충돌용
-  for (const sd of [-1, 1]) { ribbon(sd * (HALF + 5.5), sd * (HALF + 5.5), 0, 0xf1efe8, { y0: (t, l) => surfH(t.s, l), y1: (t, l) => surfH(t.s, l) + 1.2, only: fenceOn }); ribbon(sd * (HALF + 5.5), sd * (HALF + 5.5), 0, 0xe2283a, { y0: (t, l) => surfH(t.s, l) + 0.5, y1: (t, l) => surfH(t.s, l) + 0.8, only: fenceOn, mat: new THREE.MeshBasicMaterial({ color: 0xe2283a, side: THREE.DoubleSide }) }); }
+  for (const sd of [-1, 1]) { // 가드레일: 기둥 위에 가로 빔 + 빨간 반사띠 (띠를 빔보다 살짝 앞에 둬서 겹쳐 깜빡이지 않게)
+    const B = sd * (HALF + 5.5);
+    ribbon(B, B, 0, 0xdfe3e6, { y0: (t, l) => surfH(t.s, l) + 0.42, y1: (t, l) => surfH(t.s, l) + 0.98, only: fenceOn });
+    ribbon(B - sd * 0.12, B - sd * 0.12, 0, 0xe2283a, { y0: (t, l) => surfH(t.s, l) + 0.6, y1: (t, l) => surfH(t.s, l) + 0.8, only: fenceOn, mat: new THREE.MeshBasicMaterial({ color: 0xe2283a, side: THREE.DoubleSide }) });
+    const spots = []; for (let i = 0; i < N; i += 3) if (fenceOn(TRK[i])) spots.push(i);
+    const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 1, 0.16), toon(0x8a8f96), spots.length), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), Sc = new THREE.Vector3(1, 1, 1);
+    spots.forEach((i, k) => { const t = TRK[i], l = mapLat(t, B + sd * 0.22), y = surfH(t.s, l), h = 1.0; Q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(t.tx, t.tz)); Sc.set(1, h, 1); M.compose(new THREE.Vector3(t.x + nx(t) * l, y + h / 2, t.z + nz(t) * l), Q, Sc); posts.setMatrixAt(k, M); });
+    posts.castShadow = true; posts.receiveShadow = true; world.add(posts); }
   // 길을 가로지르는 만국기 줄
   const FC = [0xff4a1a, 0xffd23a, 0x38d8ff, 0xffffff, 0x7cff8a, 0xff4fa8];
   const poleList = [];
