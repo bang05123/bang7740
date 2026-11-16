@@ -46,6 +46,15 @@
   #specName { min-width: 150px; text-align: center; font-size: 15px; } #specName small { display: block; font-size: 11px; color: #bbb; font-weight: 600; }
   #specTag { position: fixed; left: 16px; top: calc(14px + env(safe-area-inset-top)); z-index: 22; display: none; color: #fff; font: 900 italic 15px sans-serif; background: #d85a30; padding: 4px 10px; letter-spacing: 1px; }
   body.spec #specTag { display: block; }
+  #repBar { position: fixed; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: none; flex-direction: column; gap: 5px; z-index: 22; background: rgba(0,0,0,.65); border: 2px solid #fff; padding: 6px 8px; color: #fff; font-weight: 800; width: min(96vw, 760px); box-sizing: border-box; }
+  body.replay #repBar { display: flex; } body.replay #specBar { display: none !important; } body.spec #topBtns { display: none !important; }
+  #repBar .row { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; justify-content: center; }
+  #repBar button { font: inherit; font-size: 14px; font-weight: 800; padding: 6px 9px; background: rgba(255,255,255,.08); color: #fff; border: 2px solid #fff; cursor: pointer; white-space: nowrap; }
+  #repBar button.on { background: #d85a30; }
+  #repTime { font-size: 12px; min-width: 92px; text-align: center; font-variant-numeric: tabular-nums; }
+  #repSeek { flex: 1; accent-color: #d85a30; min-width: 80px; }
+  #repName { min-width: 120px; text-align: center; font-size: 13px; }
+  @media (max-width: 700px) { #repBar button { font-size: 12px; padding: 5px 6px; } #repName { min-width: 84px; font-size: 11px; } }
   @media (max-width: 700px) { #specBar { gap: 4px; padding: 4px 5px; } #specBar button { font-size: 13px; padding: 6px 8px; } #specName { min-width: 104px; font-size: 12px; } #specName small { font-size: 10px; } }
   body.demo #bigMsg { display: none !important; }
   body.inmenu .hud, body.inmenu #radar, body.inmenu #mirror, body.inmenu #touch, body.inmenu #fx { display: none !important; }
@@ -268,11 +277,15 @@
     <h1 id="endTitle">FINISH</h1>
     <table class="res" id="resTable"></table>
     <p id="endInfo"></p>
-    <button id="bSpec">📺 관전</button><button id="bAgain">다시 달리기</button><button class="ghost" id="bMenu">코스 선택</button><button class="ghost" id="bTitle">타이틀</button>
+    <button id="bRep">🎬 리플레이</button><button id="bSpec">📺 관전</button><button id="bAgain">다시 달리기</button><button class="ghost" id="bMenu">코스 선택</button><button class="ghost" id="bTitle">타이틀</button>
   </div>
 </div>
 
 <div id="specTag">● LIVE</div>
+<div id="repBar">
+  <div class="row"><span id="repTime">0:00</span><input type="range" id="repSeek" min="0" max="1000" value="0"><button id="rpHi">⏭ 하이라이트</button></div>
+  <div class="row"><button id="rpBack">−5초</button><button id="rpPlay">❚❚</button><button id="rpSpd">×1</button><button id="rpPrev">◀</button><div id="repName">-</div><button id="rpNext">▶</button><button id="rpAuto" class="on">자동</button><button id="rpChase">체이스</button><button id="rpTv">TV</button><button id="rpClose">닫기</button></div>
+</div>
 <div id="specBar"><button id="spPrev">◀</button><div id="specName">-</div><button id="spNext">▶</button><button id="spChase" class="on">체이스</button><button id="spTv">TV</button><button id="spBack">결과</button></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
@@ -1401,6 +1414,7 @@ const keys = {};
 const input = { steer: 0, gas: 0, brake: 0, nitro: false, boostPress: false, drift: false, analog: false, gun: false, sp: false, spPress: false };
 addEventListener("keydown", e => {
   if (!keys[e.code]) {
+    if (REPLAY.on) { if (e.code === "Space") document.getElementById("rpPlay").onclick(); if (e.code === "ArrowLeft" || e.code === "KeyA") repPick(-1); if (e.code === "ArrowRight" || e.code === "KeyD") repPick(1); if (e.code === "KeyH") repNextHi(); if (e.code === "KeyC") document.getElementById(SPEC.mode === "chase" ? "rpTv" : "rpChase").onclick(); if (e.code === "Escape") repStop(true); keys[e.code] = true; e.preventDefault(); return; }
     if (SPEC.on) { if (e.code === "ArrowLeft" || e.code === "KeyA") specStep(-1); if (e.code === "ArrowRight" || e.code === "KeyD") specStep(1); if (e.code === "KeyC" || e.code === "KeyV") specMode(SPEC.mode === "chase" ? "tv" : "chase"); if (e.code === "Escape" || e.code === "Enter") specOff(true); keys[e.code] = true; return; }
     if (DEMO.on && (e.code === "KeyC" || e.code === "KeyR")) { keys[e.code] = true; return; }
     if (e.code === "KeyC") toggleCam();
@@ -1505,7 +1519,7 @@ function placeGrid(shuffle = true) {
   suspReset(player, p.y);
 }
 function startRace() {
-  demoStop(); specOff(); audioInit(); clearTimeout(endTimer); setMsg("", 0.01); flashT = 0; slowT = 0;
+  repStop(); demoStop(); specOff(); recReset(true); audioInit(); clearTimeout(endTimer); setMsg("", 0.01); flashT = 0; slowT = 0;
   placeGrid(!gridFresh); gridFresh = false; raceT = 0; countdown = 3.2; state = "count"; // 메뉴에서 보던 자리 그대로 출발
   showScreen(null); hideBig(); kos.clear();
 }
@@ -1514,7 +1528,7 @@ function showScreen(id) { if (id === "titleScreen" || id === "helpScreen" || id 
 // ---- 타이틀 데모 플레이: 내 차도 봇이 몰고, 카메라가 알아서 이 차 저 차 비춤
 const DEMO = { on: false, camT: 0, n: 0 };
 function demoStart() {
-  DEMO.on = true; document.body.classList.add("demo"); placeGrid(true); kos.clear(); raceT = 0; state = "race"; player.mesh.visible = true; camMode = "chase";
+  recReset(false); DEMO.on = true; document.body.classList.add("demo"); placeGrid(true); kos.clear(); raceT = 0; state = "race"; player.mesh.visible = true; camMode = "chase";
   DEMO.camT = 0; DEMO.n = 0; SPEC.car = null;
 }
 function demoStop() {
@@ -1539,6 +1553,109 @@ function demoTick(dt) {
     SPEC.car = best || alive[0]; DEMO.n++; SPEC.mode = DEMO.n % 3 === 0 ? "chase" : "tv"; SPEC.tv = null; SPEC.tvDone = false; SPEC.fresh = true; DEMO.camT = 7 + Math.random() * 3;
   }
 }
+// ---- 리플레이: 레이스 동안 차 위치·자세를 0.05초마다 기록, 떨어진 부품·부서진 오브젝트·폭발까지
+const REC = { ts: [], fr: [], wr: [], ev: [], next: 0, on: false };
+const REC_STRIDE = 10; // 차 하나당 x y z qx qy qz qw h prog vf
+function recReset(on) { REC.ts.length = 0; REC.fr.length = 0; REC.wr.length = 0; REC.ev.length = 0; REC.next = 0; REC.on = on; }
+function recCars() { return [player, ...ais]; }
+function recFrame() {
+  if (!REC.on || REPLAY.on || raceT < REC.next || REC.ts.length > 16000) return; REC.next = raceT + 0.05;
+  const cars = recCars(), f = new Float32Array(cars.length * REC_STRIDE);
+  cars.forEach((c, i) => { const m = c.mesh, o = i * REC_STRIDE; f[o] = m.position.x; f[o + 1] = m.position.y; f[o + 2] = m.position.z; f[o + 3] = m.quaternion.x; f[o + 4] = m.quaternion.y; f[o + 5] = m.quaternion.z; f[o + 6] = m.quaternion.w; f[o + 7] = c.h; f[o + 8] = c.prog; f[o + 9] = c.vf || 0; });
+  REC.ts.push(raceT); REC.fr.push(f);
+  for (const e of REC.wr) { if (e.fin) continue; const g = e.w.obj; e.fr.push([raceT, g.position.x, g.position.y, g.position.z, g.quaternion.x, g.quaternion.y, g.quaternion.z, g.quaternion.w]); if (e.w.rest) e.fin = true; }
+}
+const _rm = new THREE.Matrix4(), _rm2 = new THREE.Matrix4();
+function recWreck(w, car) { // 새 파편 등록: 차 부품이면 떨어지기 전까지 차에 붙어 있던 자리(차 기준 위치)를 기억
+  if (!REC.on || REPLAY.on) return; const g = w.obj; g.updateMatrixWorld(true); let local = null;
+  if (car) { car.mesh.updateMatrixWorld(true); local = _rm.copy(car.mesh.matrixWorld).invert().multiply(g.matrixWorld).clone(); }
+  REC.wr.push({ w, car, born: raceT, local, fr: [[raceT, g.position.x, g.position.y, g.position.z, g.quaternion.x, g.quaternion.y, g.quaternion.z, g.quaternion.w]], fin: false });
+}
+function recEvent(type, c, big) { if (!REC.on || REPLAY.on) return; const last = REC.ev.filter(e => e.car === c).pop(); if (type === "hit" && last && raceT - last.t < 2) return; REC.ev.push({ t: raceT, type, car: c, x: c.x, y: c.y, z: c.z, big }); }
+const REPLAY = { on: false, t: 0, speed: 1, paused: false, auto: true, view: new Map(), saved: null, camT: 0, hiEnd: 0, lastT: 0, charred: new Map() };
+function repIdx(t) { const T = REC.ts; let lo = 0, hi = T.length - 1; if (t <= T[0]) return 0; if (t >= T[hi]) return hi; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (T[m] <= t) lo = m; else hi = m; } return lo; }
+const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _p1 = new THREE.Vector3(), _s1 = new THREE.Vector3(1, 1, 1);
+function repApply(t, dt) {
+  const T = REC.ts, i = repIdx(t), j = Math.min(T.length - 1, i + 1), f = j > i ? clamp((t - T[i]) / (T[j] - T[i]), 0, 1) : 0, A = REC.fr[i], B = REC.fr[j];
+  recCars().forEach((c, k) => { const o = k * REC_STRIDE, m = c.mesh;
+    m.position.set(A[o] + (B[o] - A[o]) * f, A[o + 1] + (B[o + 1] - A[o + 1]) * f, A[o + 2] + (B[o + 2] - A[o + 2]) * f);
+    _q1.set(A[o + 3], A[o + 4], A[o + 5], A[o + 6]); _q2.set(B[o + 3], B[o + 4], B[o + 5], B[o + 6]); m.quaternion.copy(_q1).slerp(_q2, f);
+    let dh = B[o + 7] - A[o + 7]; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI;
+    const vf = A[o + 9] + (B[o + 9] - A[o + 9]) * f; REPLAY.view.set(c, { h: A[o + 7] + dh * f, prog: A[o + 8] + (B[o + 8] - A[o + 8]) * f, vf, tumble: false, dead: false });
+    m.userData.wheels.forEach(w => { if (w.parent === m) w.userData.spin.rotation.x += vf * dt / w.userData.r; });
+    for (const fl of m.userData.flames) fl.visible = false;
+    const boom = REC.ev.find(e => e.type === "boom" && e.car === c); if (boom) repChar(c, t >= boom.t); // 터지기 전엔 원래 색, 터진 뒤엔 그을린 색
+  });
+  for (const e of REC.wr) { const g = e.w.obj; g.visible = true;
+    if (t < e.born) { if (e.car) { e.car.mesh.updateMatrixWorld(true); _rm2.multiplyMatrices(e.car.mesh.matrixWorld, e.local); _rm2.decompose(g.position, g.quaternion, _p1); } else { const a = e.fr[0]; g.position.set(a[1], a[2], a[3]); g.quaternion.set(a[4], a[5], a[6], a[7]); } continue; }
+    const F = e.fr; let lo = 0; while (lo < F.length - 1 && F[lo + 1][0] <= t) lo++; const a = F[lo], b = F[Math.min(F.length - 1, lo + 1)], u = b[0] > a[0] ? clamp((t - a[0]) / (b[0] - a[0]), 0, 1) : 0;
+    g.position.set(a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, a[3] + (b[3] - a[3]) * u); _q1.set(a[4], a[5], a[6], a[7]); _q2.set(b[4], b[5], b[6], b[7]); g.quaternion.copy(_q1).slerp(_q2, u); }
+  if (REPLAY.speed > 0 && !REPLAY.paused) for (const e of REC.ev) if (e.t > REPLAY.lastT && e.t <= t && t - e.t < 0.5) { // 지나가는 순간 효과 다시
+    if (e.type === "boom") { for (let k = 0; k < 120; k++) emit(boostFire, e.x, e.y + 1, e.z, (Math.random() - 0.5) * 30, Math.random() * 16, (Math.random() - 0.5) * 30, 0.9); for (let k = 0; k < 40; k++) emit(smokeD, e.x, e.y + 1.5, e.z, (Math.random() - 0.5) * 8, 2 + Math.random() * 4, (Math.random() - 0.5) * 8, 2.5); sndExplode(e.x, e.z); }
+    else for (let k = 0; k < 24; k++) emit(sparks, e.x, e.y + 1, e.z, (Math.random() - 0.5) * 14, Math.random() * 7, (Math.random() - 0.5) * 14, 0.4); }
+  REPLAY.lastT = t;
+}
+function repChar(c, on) { const d = ensureDmg(c), st = REPLAY.charred.get(c); if (st === on) return; REPLAY.charred.set(c, on);
+  for (const pair of d.chars) { const [mesh, orig] = pair; if (!pair[2]) pair[2] = mesh.material; mesh.material = on ? pair[2] : orig; }
+  for (const k in d.fr) d.fr[k].visible = on; }
+function repStart() {
+  if (REC.ts.length < 20) { setMsg("기록이 너무 짧아요", 1.2); return; }
+  specOff(); REPLAY.on = true; REPLAY.t = REC.ts[0]; REPLAY.lastT = REPLAY.t; REPLAY.paused = false; REPLAY.speed = 1; REPLAY.auto = true; REPLAY.camT = 0; REPLAY.hiEnd = 0; REPLAY.charred.clear();
+  REPLAY.saved = REC.wr.map(e => [e.w.obj.position.clone(), e.w.obj.quaternion.clone()]);
+  document.getElementById("endScreen").style.display = "none"; document.body.classList.add("spec", "replay"); document.getElementById("specTag").textContent = "▶ REPLAY";
+  SPEC.car = null; SPEC.on = false; repUI(); repDirector(0, true);
+}
+function repStop(showRes) {
+  if (!REPLAY.on) return; REPLAY.on = false;
+  REC.wr.forEach((e, i) => { const sv = REPLAY.saved && REPLAY.saved[i]; if (sv) { e.w.obj.position.copy(sv[0]); e.w.obj.quaternion.copy(sv[1]); } });
+  for (const c of recCars()) if (REC.ev.some(e => e.type === "boom" && e.car === c)) repChar(c, true); REPLAY.charred.clear();
+  document.body.classList.remove("spec", "replay"); document.getElementById("specTag").textContent = "● LIVE"; firstFrame = true; player.mesh.visible = camMode !== "cockpit";
+  if (showRes && state === "end") document.getElementById("endScreen").style.display = "flex";
+}
+function repNextHi() { // 다음 하이라이트(폭발·큰 충돌)로 점프: 3초 전부터
+  const evs = REC.ev.filter(e => e.t > REPLAY.t + 4); const e = evs.find(x => x.type === "boom") && evs[0]; const pick = e || evs[0];
+  if (!pick) { setMsg("더 볼 하이라이트가 없어요", 1.2); return; }
+  REPLAY.t = Math.max(REC.ts[0], pick.t - 3); REPLAY.lastT = REPLAY.t - 0.01; REPLAY.paused = false; if (REPLAY.auto) { SPEC.car = pick.car; SPEC.mode = Math.random() < 0.6 ? "tv" : "chase"; SPEC.tv = null; SPEC.fresh = true; REPLAY.camT = 7; REPLAY.hiEnd = pick.t + 3; } repUI();
+}
+function repDirector(dt, force) { // 자동 카메라: 곧 사고 날 차 > 서로 붙은 차, TV 캠 위주
+  if (!REPLAY.auto && !force && SPEC.car) return;
+  REPLAY.camT -= dt; const t = REPLAY.t;
+  const soon = REC.ev.find(e => e.t > t && e.t - t < 3.5 && (e.type === "boom" || e.big));
+  if (soon && SPEC.car !== soon.car && REPLAY.auto) { SPEC.car = soon.car; SPEC.mode = "tv"; SPEC.tv = null; SPEC.fresh = true; REPLAY.camT = 6; repUI(); return; }
+  const over = SPEC.mode === "tv" ? (SPEC.tvDone || REPLAY.camT < -12) : REPLAY.camT <= 0;
+  if (force || !SPEC.car || over) {
+    const cars = recCars(), V = REPLAY.view; let best = null, bs = -1e9;
+    for (const c of cars) { const v = V.get(c); if (!v) continue; let near = 1e9; for (const o of cars) { if (o === c) continue; const w = V.get(o); if (w) near = Math.min(near, Math.abs(w.prog - v.prog)); } const sc = -near + Math.random() * 30 + (c === SPEC.car ? -40 : 0) + (c === player ? 15 : 0); if (sc > bs) { bs = sc; best = c; } }
+    SPEC.car = best || player; REPLAY.n = (REPLAY.n || 0) + 1; SPEC.mode = REPLAY.n % 3 === 0 ? "chase" : "tv"; SPEC.tv = null; SPEC.tvDone = false; SPEC.fresh = true; REPLAY.camT = 6 + Math.random() * 3; repUI();
+  }
+}
+function repTick(dt) {
+  const T0 = REC.ts[0], T1 = REC.ts[REC.ts.length - 1];
+  if (!REPLAY.paused) REPLAY.t = Math.min(T1, REPLAY.t + dt * REPLAY.speed);
+  if (REPLAY.t >= T1) REPLAY.paused = true;
+  repApply(REPLAY.t, REPLAY.paused ? 0 : dt * REPLAY.speed); repDirector(REPLAY.paused ? 0 : dt * REPLAY.speed);
+  if ((REPLAY.uiT = (REPLAY.uiT || 0) + dt) > 0.2) { REPLAY.uiT = 0; repUI(); }
+}
+function repUI() {
+  const T0 = REC.ts[0] || 0, T1 = REC.ts[REC.ts.length - 1] || 1, t = REPLAY.t, mm = x => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, "0")}`;
+  document.getElementById("repTime").textContent = `${mm(t - T0)} / ${mm(T1 - T0)}`;
+  const sk = document.getElementById("repSeek"); if (!sk.dragging) sk.value = Math.round((t - T0) / Math.max(0.01, T1 - T0) * 1000);
+  document.getElementById("rpPlay").textContent = REPLAY.paused ? "▶" : "❚❚"; document.getElementById("rpSpd").textContent = REPLAY.speed === 1 ? "×1" : REPLAY.speed === 0.25 ? "×¼" : "×" + REPLAY.speed;
+  const c = SPEC.car; document.getElementById("repName").textContent = c ? c.name.split(" ")[0] + (c === player ? " (나)" : "") : "-";
+  document.getElementById("rpAuto").classList.toggle("on", REPLAY.auto); document.getElementById("rpChase").classList.toggle("on", !REPLAY.auto && SPEC.mode === "chase"); document.getElementById("rpTv").classList.toggle("on", !REPLAY.auto && SPEC.mode === "tv");
+}
+document.getElementById("bRep").onclick = repStart; document.getElementById("rpClose").onclick = () => repStop(true);
+document.getElementById("rpPlay").onclick = () => { if (REPLAY.t >= REC.ts[REC.ts.length - 1] - 0.05) { REPLAY.t = REC.ts[0]; REPLAY.lastT = REPLAY.t; } REPLAY.paused = !REPLAY.paused; repUI(); };
+document.getElementById("rpBack").onclick = () => { REPLAY.t = Math.max(REC.ts[0], REPLAY.t - 5); REPLAY.lastT = REPLAY.t; SPEC.tv = null; SPEC.fresh = true; repUI(); };
+document.getElementById("rpSpd").onclick = () => { const L_ = [1, 2, 0.25, 0.5]; REPLAY.speed = L_[(L_.indexOf(REPLAY.speed) + 1) % L_.length]; repUI(); };
+document.getElementById("rpHi").onclick = repNextHi;
+document.getElementById("rpPrev").onclick = () => repPick(-1); document.getElementById("rpNext").onclick = () => repPick(1);
+document.getElementById("rpAuto").onclick = () => { REPLAY.auto = true; repDirector(0, true); };
+document.getElementById("rpChase").onclick = () => { REPLAY.auto = false; SPEC.mode = "chase"; SPEC.fresh = true; repUI(); };
+document.getElementById("rpTv").onclick = () => { REPLAY.auto = false; SPEC.mode = "tv"; SPEC.tv = null; SPEC.fresh = true; repUI(); };
+function repPick(d) { const cars = recCars(); let i = cars.indexOf(SPEC.car); i = (i + d + cars.length) % cars.length; SPEC.car = cars[i]; REPLAY.auto = false; SPEC.tv = null; SPEC.fresh = true; repUI(); }
+{ const sk = document.getElementById("repSeek"); sk.addEventListener("pointerdown", () => sk.dragging = true); sk.addEventListener("pointerup", () => sk.dragging = false);
+  sk.addEventListener("input", () => { const T0 = REC.ts[0], T1 = REC.ts[REC.ts.length - 1]; REPLAY.t = T0 + sk.value / 1000 * (T1 - T0); REPLAY.lastT = REPLAY.t; SPEC.tv = null; SPEC.fresh = true; }); }
 // ---- 관전: 결승 뒤 다른 차를 체이스 캠 / TV 캠으로 보기
 const SPEC = { on: false, car: null, mode: "chase", tv: null, h: 0, pos: new THREE.Vector3(), look: new THREE.Vector3(), fresh: true, side: 1 };
 function specCars() { return [player, ...ais].filter(c => !c.dead); }
@@ -1560,20 +1677,21 @@ function specLabel() {
   document.getElementById("specName").innerHTML = `${pos}위 · ${c.name}<small>${c.done ? "완주" : `랩 ${lap}/${lapsTotal} · ${Math.round(Math.abs(c.vf || 0) * 3.6)} km/h`}</small>`;
 }
 function specCam(dt) {
-  let c = SPEC.car; if (!c || (c.dead && specCars().length)) { specStep(1); c = SPEC.car; } if (!c) return;
+  let c = SPEC.car; if (!REPLAY.on && (!c || (c.dead && specCars().length))) { specStep(1); c = SPEC.car; } if (!c) return;
+  const cv = REPLAY.on ? (REPLAY.view.get(c) || c) : c; // 리플레이 중엔 기록된 방향·위치·속도
   const m = c.mesh.position, k = SPEC.fresh ? 1 : 0;
   if (SPEC.mode === "chase") {
-    let dh = c.h - SPEC.h; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI; SPEC.h += dh * (k || Math.min(1, (c.tumble ? 1.5 : 6) * dt));
+    let dh = cv.h - SPEC.h; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI; SPEC.h += dh * (k || Math.min(1, (cv.tumble ? 1.5 : 6) * dt));
     const big = (c.mesh.userData.topH || 3.5) / 3.5, back = 12.5 * big + 1.5, up = 4 * big, fx_ = Math.sin(SPEC.h), fz_ = Math.cos(SPEC.h);
     const want = _sv.set(m.x - fx_ * back, m.y + up, m.z - fz_ * back), look = _sv2.set(m.x + fx_ * 10, m.y + 1.3, m.z + fz_ * 10);
     SPEC.pos.lerp(want, k || 1 - Math.exp(-6 * dt)); SPEC.look.lerp(look, k || 1 - Math.exp(-10 * dt));
     camera.position.copy(SPEC.pos); camera.lookAt(SPEC.look); camera.fov = 64;
   } else { // TV 캠: 길가에 세운 카메라가 다가오는 차를 줌으로 따라감. 지나가면 다음 카메라로
-    const ahead = c.prog - (SPEC.tv ? SPEC.tv.prog : -1e9), v = Math.max(30, Math.abs(c.vf || 0));
+    const ahead = cv.prog - (SPEC.tv ? SPEC.tv.prog : -1e9), v = Math.max(30, Math.abs(cv.vf || 0));
     // 차가 카메라 앞을 지나 뒷모습이 멀어질 때까지 붙잡고 있다가 다음 카메라로
     if (SPEC.tv && ahead > SPEC.tv.past) SPEC.tvDone = true;
-    if (!SPEC.tv || ahead > SPEC.tv.past + (DEMO.on ? 1e9 : 0) || ahead < -SPEC.tv.lead - 150) {
-      SPEC.tv = tvPick(c, v); SPEC.look.set(m.x, m.y + 1, m.z); SPEC.tvDone = false;
+    if (!SPEC.tv || ahead > SPEC.tv.past + (DEMO.on || (REPLAY.on && REPLAY.auto) ? 1e9 : 0) || ahead < -SPEC.tv.lead - 150) {
+      SPEC.tv = tvPick(cv, v); SPEC.look.set(m.x, m.y + 1, m.z); SPEC.tvDone = false;
     }
     const T = SPEC.tv; camera.position.set(T.x, T.y, T.z); SPEC.look.lerp(_sv.set(m.x, m.y + 1, m.z), k || 1 - Math.exp(-9 * dt)); camera.lookAt(SPEC.look);
     const d = Math.max(1, camera.position.distanceTo(SPEC.look)); camera.fov = clamp(2 * Math.atan(11 / d) * 180 / Math.PI, 12, 60); // 멀면 당겨 찍고 가까우면 넓게
@@ -1600,8 +1718,8 @@ function tvPick(c, v) { // 길가 카메라 자리 고르기: 차가 다가오�
 document.getElementById("bSpec").onclick = specOn; document.getElementById("spBack").onclick = () => specOff(true);
 document.getElementById("spPrev").onclick = () => specStep(-1); document.getElementById("spNext").onclick = () => specStep(1);
 document.getElementById("spChase").onclick = () => specMode("chase"); document.getElementById("spTv").onclick = () => specMode("tv");
-function toMenu() { specOff(); clearTimeout(endTimer); state = "menu"; placeGrid(); gridFresh = true; showScreen("startScreen"); }
-function toTitle() { specOff(); clearTimeout(endTimer); state = "menu"; placeGrid(); gridFresh = true; showScreen("titleScreen"); }
+function toMenu() { repStop(); specOff(); clearTimeout(endTimer); state = "menu"; placeGrid(); gridFresh = true; showScreen("startScreen"); }
+function toTitle() { repStop(); specOff(); clearTimeout(endTimer); state = "menu"; placeGrid(); gridFresh = true; showScreen("titleScreen"); }
 function isTouchDev() { return matchMedia("(pointer: coarse)").matches || "ontouchstart" in window; }
 const SET = { vol: 60, shake: 1, gfx: isTouchDev() ? "low" : "high" }; try { Object.assign(SET, JSON.parse(localStorage.getItem("bgp_set") || "{}")); } catch (e) {}
 function applySet() {
@@ -2193,6 +2311,7 @@ function applyDamage(c, amt, loc, by, src) {
   if (by === player && c !== player) { const big = src !== "gun"; HITFX.mark = 0.18; if (big) HITFX.big = 0.4; if (HITFX.tickCd <= 0 || big) { sndTick(big); HITFX.tickCd = 0.06; } }
   if (c === player && amt >= 0.2) { const src2 = by && by !== player ? by : null, ang = src2 ? Math.atan2(src2.x - player.x, src2.z - player.z) : (loc ? Math.atan2(loc.x - (ensureDmg(c).C0.x), loc.z - ensureDmg(c).C0.z) + player.h : null);
     if (ang !== null) { HITFX.hurt.push({ ang, t: 0.6, k: Math.min(1, 0.25 + amt / 15) }); if (HITFX.hurt.length > 8) HITFX.hurt.shift(); } if (amt >= 1.5 || src === "gun") sndHurt(Math.min(1, 0.3 + amt / 20)); }
+  if (amt >= 9) recEvent("hit", c, amt >= 16);
   const d = ensureDmg(c); c.hp -= amt; if (by) c.lastHit = { by, t: raceT };
   c.hpMul = 1 - 0.1 * clamp((40 - c.hp) / 40, 0, 1);
   if (loc) {
@@ -2218,6 +2337,7 @@ function detachPart(c, pt, zone, power) {
   const bs = new THREE.Box3().setFromObject(pt), r = Math.max(0.35, bs.getSize(new THREE.Vector3()).length() * 0.35);
   const pg_ = pivotize(pt);
   WRECK.push({ obj: pg_, x: pg_.position.x, y: pg_.position.y, z: pg_.position.z, vx: c.vx * 0.8 + ox / ol * kick, vy: 3 + Math.random() * 5 * power, vz: c.vz * 0.8 + oz / ol * kick, wx: (Math.random() - 0.5) * 12, wy: (Math.random() - 0.5) * 12, wz: (Math.random() - 0.5) * 12, r, idx: c.idx, rest: false, hitT: 0.6, wheel: !!pt.userData.isWheel });
+  recWreck(WRECK[WRECK.length - 1], c);
   sndClank(1, P_.x, P_.z);
   if (Math.hypot(c.x - player.x, c.z - player.z) < 300) for (let k = 0; k < 8; k++) emit(sparks, P_.x, P_.y, P_.z, (Math.random() - 0.5) * 10 + c.vx * 0.5, Math.random() * 6, (Math.random() - 0.5) * 10 + c.vz * 0.5, 0.4);
 }
@@ -2235,6 +2355,7 @@ function dentAt(c, loc, depth) { // 맞은 자리 근처 꼭짓점을 안쪽으�
   }
 }
 function explode(c) {
+  recEvent("boom", c, true);
   const d = ensureDmg(c), u = c.mesh.userData; c.dead = true; c.hp = 0; c.deadT = 0; c.boostT = 0;
   for (const z of ["F", "B", "P", "N"]) while (d.det[z].length) detachPart(c, d.det[z].shift(), z, 2.2);
   for (const w of u.wheels) { w.userData.isWheel = true; detachPart(c, w, null, 1.6); }
@@ -2317,6 +2438,7 @@ function breakProp(pr, vx, vy, vz, quiet) {
   const big = pr.kind === "board" || pr.kind === "lamp" || pr.kind === "pole";
   const pm_ = pivotize(mesh);
   WRECK.push({ obj: pm_, x: pm_.position.x, y: pm_.position.y, z: pm_.position.z, vx, vy, vz, wx: (Math.random() - 0.5) * (big ? 4 : 14), wy: (Math.random() - 0.5) * 8, wz: (Math.random() - 0.5) * (big ? 4 : 14), r: Math.min(1.6, Math.max(0.35, pr.r * 0.5)), idx: fullNearest(pm_.position.x, pm_.position.z), rest: false, hitT: 0.5, prop: true });
+  recWreck(WRECK[WRECK.length - 1], null);
   if (!quiet && Math.hypot(pr.x - player.x, pr.z - player.z) < 260) { for (let k = 0; k < 8; k++) emit(pr.kind === "bush" || pr.kind === "cactus" ? dust : sparks, pr.x, pr.y + 1, pr.z, (Math.random() - 0.5) * 8 + vx * 0.3, Math.random() * 5, (Math.random() - 0.5) * 8 + vz * 0.3, 0.5); sndClank(big ? 1 : 0.6, pr.x, pr.z); if (big) sndImpact(14, pr.x, pr.z); }
   if (pr.link) for (const q of pr.link) breakProp(q, vx * 0.8, vy + 2, vz * 0.8, true);
 }
@@ -2665,7 +2787,7 @@ function updateCamera(dt) {
     camera.position.set(p.x + Math.sin(a) * R - Math.sin(p.h) * 12, p.y + 4.5 + Math.sin(t * 0.15) * 1.5, p.z + Math.cos(a) * R - Math.cos(p.h) * 12); camera.lookAt(p.x - Math.sin(p.h) * 14, p.y + 1, p.z - Math.cos(p.h) * 14);
     if (camera.fov !== 55) { camera.fov = 55; camera.updateProjectionMatrix(); } fov = 55; firstFrame = true; return;
   }
-  if ((SPEC.on && state === "end") || DEMO.on) { specCam(dt); return; }
+  if ((SPEC.on && state === "end") || DEMO.on || REPLAY.on) { specCam(dt); return; }
   if (player.dead && camMode === "chase") { // 리타이어: 잔해 주위를 천천히 돌며 멀어짐
     const p = player, t = p.camRetT = (p.camRetT || 0) + dt, a = camH + 0.6 + t * 0.22, dist = 11 + Math.min(14, t * 2.2), up = 3.5 + Math.min(6, t * 0.9);
     camPos.lerp(new THREE.Vector3(p.x - Math.sin(a) * dist, p.y + up, p.z - Math.cos(a) * dist), 1 - Math.exp(-3 * dt)); camera.position.copy(camPos);
@@ -2929,11 +3051,12 @@ function frame(now) {
       document.getElementById("center").textContent = countdown > 0.2 ? (n > 0 ? n : "") : "GO!";
       if (countdown <= 0) { state = "race"; raceT = 0; player.lapStart = 0; sndBeep(true); setTimeout(() => { if (state === "race") document.getElementById("center").textContent = ""; }, 700); }
     }
-    if (state === "race" || state === "end") { raceT += dt; /* 결승 뒤에도 시계는 계속 (라이벌 기록 재려고) */ stepPlayer(dt); stepAI(dt); stepWeapons(dt); lapLogic(); }
+    if (REPLAY.on) repTick(realDt);
+    else if (state === "race" || state === "end") { raceT += dt; /* 결승 뒤에도 시계는 계속 (라이벌 기록 재려고) */ stepPlayer(dt); stepAI(dt); stepWeapons(dt); lapLogic(); }
     else if (state === "count" || state === "menu") { stepPlayer(dt); stepAI(dt); }
-    stepParticles(smoke, dt, -1.5, 1.2); stepParticles(sparks, dt, 18, 0.5); stepParticles(dust, dt, -0.6, 0.8); stepParticles(debris, dt, 22, 0.3); stepParticles(boostCore, dt, 0, 3); stepParticles(boostFire, dt, -2, 2.2); stepParticles(smokeD, dt, -1.2, 1.1); stepParticles(fireP, dt, -6, 3); if (state === "race" || state === "end") stepProps(); stepWreck(dt); stepDamageFx(dt); stepBoostFx(dt); stepParticles(streaks, dt, 0, 0);
+    stepParticles(smoke, dt, -1.5, 1.2); stepParticles(sparks, dt, 18, 0.5); stepParticles(dust, dt, -0.6, 0.8); stepParticles(debris, dt, 22, 0.3); stepParticles(boostCore, dt, 0, 3); stepParticles(boostFire, dt, -2, 2.2); stepParticles(smokeD, dt, -1.2, 1.1); stepParticles(fireP, dt, -6, 3); if (!REPLAY.on) { if (state === "race" || state === "end") stepProps(); stepWreck(dt); stepDamageFx(dt); } stepBoostFx(dt); stepParticles(streaks, dt, 0, 0);
     if (msgT > 0) { msgT -= realDt; if (msgT <= 0) document.getElementById("msg").textContent = ""; }
-    syncMeshes(dt); updateCamera(realDt); drawFx(dt); updateHud(); updateSound(realDt);
+    if (!REPLAY.on) { syncMeshes(dt); recFrame(); } updateCamera(realDt); drawFx(dt); updateHud(); updateSound(realDt);
     if (window.__hb && !window.__hbDone) { window.__hbDone = 1; for (const o of [player, ...ais]) for (const b of o.mesh.userData.boxes) { const e = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(b[3] * 2 / CS, 3 / CS, b[2] * 2 / CS)), new THREE.LineBasicMaterial({ color: 0xff00ff, depthTest: false })); e.position.set(b[0] / CS, 1.5 / CS, b[1] / CS); o.mesh.add(e); } }
     if (window.__hero) { const [ang, dist, hgt, idx] = window.__hero, tgt = idx === undefined ? player : ais[idx], m = tgt.mesh; [player, ...ais].forEach(o => o.mesh.visible = o === tgt);
       if (idx !== undefined) { m.position.set(player.x, player.y, player.z); m.rotation.set(0, player.h, 0); }
@@ -2949,10 +3072,10 @@ function frame(now) {
 requestAnimationFrame(frame);
 function simulate(secs, driver) {
   const dt = 1 / 60;
-  for (let t = 0; t < secs; t += dt) { if (state !== "race" && state !== "end") break; const d = driver(player); Object.assign(input, d); raceT += dt; stepPlayer(dt); stepAI(dt); stepWeapons(dt); stepProps(); stepWreck(dt); lapLogic(); }
+  for (let t = 0; t < secs; t += dt) { if (state !== "race" && state !== "end") break; const d = driver(player); Object.assign(input, d); raceT += dt; stepPlayer(dt); stepAI(dt); stepWeapons(dt); stepProps(); stepWreck(dt); lapLogic(); syncMeshes(dt); recFrame(); }
 }
 window.__cam = () => { updateCamera(1 / 30); return camera.position.distanceTo(new THREE.Vector3(player.x, player.y, player.z)); };
-window.__SND = SND; window.__upd = updateSound; window.__inp = input; window.__bgp = { get camera() { return camera; }, raySolid, get SOLIDS() { return SOLIDS; }, useSpecial, fireGun, PROJ, TETHERS, setSpecial, enterTumble, applyDamage, explode, hitLocal, WRECK, get GAP() { return GAP; }, player, ais, get state() { return state; }, get L() { return L; }, get HALF() { return HALF; }, P, startRace, simulate, get TRK() { return TRK; }, idxAtS, posAt, surfH, setCourse(id) { buildCourse(id); loadBest(); placeGrid(); }, skipCount() { countdown = 0.01; } };
+window.__SND = SND; window.__upd = updateSound; window.__inp = input; window.__bgp = { get camera() { return camera; }, get REC() { return REC; }, raySolid, get SOLIDS() { return SOLIDS; }, useSpecial, fireGun, PROJ, TETHERS, setSpecial, enterTumble, applyDamage, explode, hitLocal, WRECK, get GAP() { return GAP; }, player, ais, get state() { return state; }, get L() { return L; }, get HALF() { return HALF; }, P, startRace, simulate, get TRK() { return TRK; }, idxAtS, posAt, surfH, setCourse(id) { buildCourse(id); loadBest(); placeGrid(); }, skipCount() { countdown = 0.01; } };
 })();
 </script>
 </body>
