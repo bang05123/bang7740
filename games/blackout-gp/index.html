@@ -1681,7 +1681,8 @@ function tone(ctx, t, dur, type, f0, f1, vol, delay = 0) {
   const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t + delay); o.frequency.exponentialRampToValueAtTime(Math.max(15, f1), t + delay + dur);
   g.gain.setValueAtTime(0.0001, t + delay); g.gain.linearRampToValueAtTime(vol, t + delay + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + delay + dur); o.connect(g); g.connect(SND.master); o.start(t + delay); o.stop(t + delay + dur + 0.05);
 }
-const distVol = (x, z) => { const d = Math.hypot(x - player.x, z - player.z); return 1 / (1 + Math.pow(d / 30, 1.4)); };
+function viewD(x, z) { const v = (SPEC.on || REPLAY.on || DEMO.on) ? camera.position : player; return Math.hypot(x - v.x, z - v.z); } /* 효과·소리는 지금 보고 있는 곳 기준 (관전·리플레이에서도 보이게) */
+const distVol = (x, z) => { const d = viewD(x, z); return 1 / (1 + Math.pow(d / 30, 1.4)); };
 function sndBurst(dur, freq, vol, type = "lowpass") { shot((ctx, t) => nzs(ctx, t, dur, type, freq, freq * 0.6, vol), dur); }
 function sndBoom() { sndBoost(1); }
 function sndBoost(v = 1) { // 부스트 점화: 빨아들이는 쉭 → 쿵 → 불꽃 갈라지는 소리
@@ -1921,15 +1922,18 @@ function demoTick(dt) {
   }
 }
 // ---- 리플레이: 레이스 동안 차 위치·자세를 0.05초마다 기록, 떨어진 부품·부서진 오브젝트·폭발까지
-const REC = { ts: [], fr: [], wr: [], ev: [], next: 0, on: false };
-const REC_STRIDE = 10; // 차 하나당 x y z qx qy qz qw h prog vf
-function recReset(on) { REC.ts.length = 0; REC.fr.length = 0; REC.wr.length = 0; REC.ev.length = 0; REC.next = 0; REC.on = on; }
+const REC = { ts: [], fr: [], wr: [], ev: [], fx: [], pj: [], th: [], next: 0, on: false };
+const REC_STRIDE = 11; // 차 하나당 x y z qx qy qz qw h prog vf 부스트
+function recReset(on) { REC.ts.length = 0; REC.fr.length = 0; REC.wr.length = 0; REC.ev.length = 0; REC.fx.length = 0; for (const e of REC.pj) if (e.rm) scene.remove(e.rm); REC.pj.length = 0; for (const e of REC.th) if (e.rm) scene.remove(e.rm); REC.th.length = 0; REC.next = 0; REC.on = on; }
+function recFx(e) { if (!REC.on || REPLAY.on) return; e.t = raceT; REC.fx.push(e); } /* 리플레이용: 총·포·파일벙커·폭발·부스트 */
+function recProj(q) { if (!REC.on || REPLAY.on) return; q.rec = { type: q.type, born: raceT, end: 1e9, fr: [], q }; REC.pj.push(q.rec); }
 function recCars() { return [player, ...ais]; }
 function recFrame() {
   if (!REC.on || REPLAY.on || raceT < REC.next || REC.ts.length > 16000) return; REC.next = raceT + 0.05;
   const cars = recCars(), f = new Float32Array(cars.length * REC_STRIDE);
-  cars.forEach((c, i) => { const m = c.mesh, o = i * REC_STRIDE; f[o] = m.position.x; f[o + 1] = m.position.y; f[o + 2] = m.position.z; f[o + 3] = m.quaternion.x; f[o + 4] = m.quaternion.y; f[o + 5] = m.quaternion.z; f[o + 6] = m.quaternion.w; f[o + 7] = c.h; f[o + 8] = c.prog; f[o + 9] = c.vf || 0; });
+  cars.forEach((c, i) => { const m = c.mesh, o = i * REC_STRIDE; f[o] = m.position.x; f[o + 1] = m.position.y; f[o + 2] = m.position.z; f[o + 3] = m.quaternion.x; f[o + 4] = m.quaternion.y; f[o + 5] = m.quaternion.z; f[o + 6] = m.quaternion.w; f[o + 7] = c.h; f[o + 8] = c.prog; f[o + 9] = c.vf || 0; f[o + 10] = c.boostT > 0 ? 1 : 0; });
   REC.ts.push(raceT); REC.fr.push(f);
+  for (const e of REC.pj) { if (e.end < 1e9) continue; const q = e.q; if (!PROJ.includes(q)) { e.end = raceT; e.q = null; continue; } e.fr.push([raceT, q.x, q.y, q.z, Math.atan2(q.vx, q.vz)]); }
   for (const e of REC.wr) { if (e.fin) continue; const g = e.w.obj; e.fr.push([raceT, g.position.x, g.position.y, g.position.z, g.quaternion.x, g.quaternion.y, g.quaternion.z, g.quaternion.w]); if (e.w.rest) e.fin = true; }
 }
 const _rm = new THREE.Matrix4(), _rm2 = new THREE.Matrix4();
@@ -1950,30 +1954,48 @@ function repApply(t, dt) {
     let dh = B[o + 7] - A[o + 7]; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI;
     const vf = A[o + 9] + (B[o + 9] - A[o + 9]) * f; REPLAY.view.set(c, { h: A[o + 7] + dh * f, prog: A[o + 8] + (B[o + 8] - A[o + 8]) * f, vf, tumble: false, dead: false });
     m.userData.wheels.forEach(w => { if (w.parent === m) w.userData.spin.rotation.x += vf * dt / w.userData.r; });
-    for (const fl of m.userData.flames) fl.visible = false;
+    pileAnim(c, dt);     const bo = A[o + 10] > 0.5; REPLAY.view.get(c).boost = bo; for (const fl of m.userData.flames) fl.visible = bo;
     const boom = REC.ev.find(e => e.type === "boom" && e.car === c); if (boom) repChar(c, t >= boom.t); // 터지기 전엔 원래 색, 터진 뒤엔 그을린 색
   });
   for (const e of REC.wr) { const g = e.w.obj; g.visible = true;
     if (t < e.born) { if (e.car) { e.car.mesh.updateMatrixWorld(true); _rm2.multiplyMatrices(e.car.mesh.matrixWorld, e.local); _rm2.decompose(g.position, g.quaternion, _p1); } else { const a = e.fr[0]; g.position.set(a[1], a[2], a[3]); g.quaternion.set(a[4], a[5], a[6], a[7]); } continue; }
     const F = e.fr; let lo = 0; while (lo < F.length - 1 && F[lo + 1][0] <= t) lo++; const a = F[lo], b = F[Math.min(F.length - 1, lo + 1)], u = b[0] > a[0] ? clamp((t - a[0]) / (b[0] - a[0]), 0, 1) : 0;
     g.position.set(a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, a[3] + (b[3] - a[3]) * u); _q1.set(a[4], a[5], a[6], a[7]); _q2.set(b[4], b[5], b[6], b[7]); g.quaternion.copy(_q1).slerp(_q2, u); }
+  for (const e of REC.pj) { const show = t >= e.born && t <= e.end && e.fr.length; if (!show) { if (e.rm) e.rm.visible = false; continue; }
+    if (!e.rm) { if (e.type === "missile") e.rm = makeMissileMesh(0xff3b3b); else { e.rm = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.4, 6).rotateX(Math.PI / 2), toon(0x9a9a9a)); scene.add(e.rm); } }
+    const F = e.fr; let lo = 0; while (lo < F.length - 1 && F[lo + 1][0] <= t) lo++; const a = F[lo], b = F[Math.min(F.length - 1, lo + 1)], u = b[0] > a[0] ? clamp((t - a[0]) / (b[0] - a[0]), 0, 1) : 0;
+    e.rm.visible = true; e.rm.position.set(a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, a[3] + (b[3] - a[3]) * u); e.rm.rotation.y = a[4];
+    if (e.type === "missile" && dt > 0 && viewD(e.rm.position.x, e.rm.position.z) < 400) emit(boostFire, e.rm.position.x, e.rm.position.y, e.rm.position.z, (Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3, 0.25); }
+  for (const e of REC.th) { const show = t >= e.t0 && t <= e.t1; if (!show) { if (e.rm) e.rm.visible = false; continue; }
+    if (!e.rm) { e.rm = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1, 5).translate(0, 0.5, 0).rotateX(Math.PI / 2), toon(0x2a2a2a)); scene.add(e.rm); }
+    const pa = e.a.mesh.position, pb = e.b.mesh.position; e.rm.visible = true; e.rm.position.set(pa.x, pa.y + 1.1, pa.z); e.rm.scale.set(1, 1, Math.hypot(pb.x - pa.x, pb.y - pa.y, pb.z - pa.z)); e.rm.lookAt(pb.x, pb.y + 1.1, pb.z); }
+  { const FX = REC.fx; if (REPLAY.fxi === undefined || t < REPLAY.fxT || t - REPLAY.fxT > 1.0) { let lo = 0, hi = FX.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (FX[mid].t <= t) lo = mid + 1; else hi = mid; } REPLAY.fxi = lo; }
+    else if (REPLAY.speed > 0 && !REPLAY.paused) while (REPLAY.fxi < FX.length && FX[REPLAY.fxi].t <= t) repFx(FX[REPLAY.fxi++]);
+    REPLAY.fxT = t; }
   if (REPLAY.speed > 0 && !REPLAY.paused) for (const e of REC.ev) if (e.t > REPLAY.lastT && e.t <= t && t - e.t < 0.5) { // 지나가는 순간 효과 다시
     if (e.type === "boom") { if (QFX) QFX.boom(e.x, e.y, e.z, 1); else for (let k = 0; k < 120; k++) emit(boostFire, e.x, e.y + 1, e.z, (Math.random() - 0.5) * 30, Math.random() * 16, (Math.random() - 0.5) * 30, 0.9); for (let k = 0; k < 40; k++) emit(smokeD, e.x, e.y + 1.5, e.z, (Math.random() - 0.5) * 8, 2 + Math.random() * 4, (Math.random() - 0.5) * 8, 2.5); sndExplode(e.x, e.z); }
     else for (let k = 0; k < 24; k++) emit(sparks, e.x, e.y + 1, e.z, (Math.random() - 0.5) * 14, Math.random() * 7, (Math.random() - 0.5) * 14, 0.4); }
   REPLAY.lastT = t;
+}
+function repFx(e) { /* 리플레이에서 공격·부스트 다시 */
+  if (e.k === "gun") { if (viewD(e.a[0], e.a[2]) < 300) { addTracer(e.a, e.b); sndGun(distVol(e.a[0], e.a[2]) * 0.8); } }
+  else if (e.k === "can") { cannonFx(e.c, e.m, e.dx, e.dz, e.len, true); sndCannon(distVol(e.m[0], e.m[2])); }
+  else if (e.k === "pile") { e.c.pbT = 0; if (e.hit) { if (QFX && viewD(e.hit[0], e.hit[2]) < 400) QFX.boom(e.hit[0], e.hit[1] - 0.3, e.hit[2], 0.38); const v = distVol(e.hit[0], e.hit[2]); if (v > 0.04) { sfx("boom2", Math.min(1.4, v * 1.2), 1.15); sndImpact(true, e.hit[0], e.hit[2]); } } }
+  else if (e.k === "blast") { if (viewD(e.x, e.z) < 400) { if (QFX) QFX.boom(e.x, e.y - 0.8, e.z, 0.6); else for (let k = 0; k < 70; k++) emit(boostFire, e.x, e.y, e.z, (Math.random() - 0.5) * 22, Math.random() * 12, (Math.random() - 0.5) * 22, 0.6); } const v = distVol(e.x, e.z); if (v > 0.04) sfx("boom2", Math.min(1.2, v * 1.3), 1 + Math.random() * 0.1); }
+  else if (e.k === "bst") { if (viewD(e.c.mesh.position.x, e.c.mesh.position.z) < 600) { boostBurst(e.c); sndBoost(distVol(e.c.mesh.position.x, e.c.mesh.position.z) * 0.9); } }
 }
 function repChar(c, on) { const d = ensureDmg(c), st = REPLAY.charred.get(c); if (st === on) return; REPLAY.charred.set(c, on); unmergeCar(c.mesh);
   for (const pair of d.chars) { const [mesh, orig] = pair; if (!pair[2]) pair[2] = mesh.material; mesh.material = on ? pair[2] : orig; }
   for (const k in d.fr) d.fr[k].visible = on; }
 function repStart() {
   if (REC.ts.length < 20) { setMsg("기록이 너무 짧아요", 1.2); return; }
-  specOff(); REPLAY.on = true; REPLAY.t = REC.ts[0]; REPLAY.lastT = REPLAY.t; REPLAY.paused = false; REPLAY.speed = 1; REPLAY.auto = true; REPLAY.camT = 0; REPLAY.hiEnd = 0; REPLAY.charred.clear();
+  specOff(); REPLAY.on = true; REPLAY.fxi = undefined; REPLAY.t = REC.ts[0]; REPLAY.lastT = REPLAY.t; REPLAY.paused = false; REPLAY.speed = 1; REPLAY.auto = true; REPLAY.camT = 0; REPLAY.hiEnd = 0; REPLAY.charred.clear();
   REPLAY.saved = REC.wr.map(e => [e.w.obj.position.clone(), e.w.obj.quaternion.clone()]);
   document.getElementById("endScreen").style.display = "none"; document.body.classList.add("spec", "replay"); document.getElementById("specTag").textContent = "▶ REPLAY";
   SPEC.car = null; SPEC.on = false; repUI(); repDirector(0, true);
 }
 function repStop(showRes) {
-  if (!REPLAY.on) return; REPLAY.on = false;
+  if (!REPLAY.on) return; REPLAY.on = false; REPLAY.fxi = undefined; for (const e of REC.pj) if (e.rm) e.rm.visible = false; for (const e of REC.th) if (e.rm) e.rm.visible = false; for (const c of recCars()) for (const fl of c.mesh.userData.flames) fl.visible = false;
   REC.wr.forEach((e, i) => { const sv = REPLAY.saved && REPLAY.saved[i]; if (sv) { e.w.obj.position.copy(sv[0]); e.w.obj.quaternion.copy(sv[1]); } });
   for (const c of recCars()) if (REC.ev.some(e => e.type === "boom" && e.car === c)) repChar(c, true); REPLAY.charred.clear();
   document.body.classList.remove("spec", "replay"); document.getElementById("specTag").textContent = "● LIVE"; firstFrame = true; player.mesh.visible = camMode !== "cockpit";
@@ -2379,8 +2401,8 @@ function stepTumble(p, dt) {
   const f = _v.set(0, 0, 1).applyQuaternion(p.tq); p.h = Math.atan2(f.x, f.z); p.ry = p.tw.y;
   p.x = p.tc.x; p.z = p.tc.z; p.vx = p.tv.x; p.vz = p.tv.z; fromWorld(p);
   const up = _w.set(0, 1, 0).applyQuaternion(p.tq); p.y = p.tc.y - hh * up.y; p.air = contacts ? 0 : p.air + dt; p.contact = 0;
-  if (bigHit > 9) { const dm = Math.min((bigHit - 9) * 0.5, Math.max(0, 20 - (p.rollDmg || 0))); p.rollDmg = (p.rollDmg || 0) + dm; applyDamage(p, dm, null, null, 'roll'); /* 한 번 구를 때 최대 45 */ sndImpact(bigHit * 1.2, p.x, p.z); if (Math.hypot(p.x - player.x, p.z - player.z) < 250) for (let k = 0; k < 10; k++) emit(sparks, p.x, p.y + 0.5, p.z, (Math.random() - 0.5) * 10 + p.vx * 0.3, Math.random() * 6, (Math.random() - 0.5) * 10 + p.vz * 0.3, 0.4); if (isP) shake = Math.max(shake, Math.min(1.2, bigHit / 12)); }
-  if (contacts && Math.hypot(p.tv.x, p.tv.z) > 8 && Math.random() < 0.5 && Math.hypot(p.x - player.x, p.z - player.z) < 250) emit(sparks, p.x, p.y + 0.2, p.z, -p.vx * 0.2 + (Math.random() - 0.5) * 6, Math.random() * 3, -p.vz * 0.2 + (Math.random() - 0.5) * 6, 0.3);
+  if (bigHit > 9) { const dm = Math.min((bigHit - 9) * 0.5, Math.max(0, 20 - (p.rollDmg || 0))); p.rollDmg = (p.rollDmg || 0) + dm; applyDamage(p, dm, null, null, 'roll'); /* 한 번 구를 때 최대 45 */ sndImpact(bigHit * 1.2, p.x, p.z); if (viewD(p.x, p.z) < 250) for (let k = 0; k < 10; k++) emit(sparks, p.x, p.y + 0.5, p.z, (Math.random() - 0.5) * 10 + p.vx * 0.3, Math.random() * 6, (Math.random() - 0.5) * 10 + p.vz * 0.3, 0.4); if (isP) shake = Math.max(shake, Math.min(1.2, bigHit / 12)); }
+  if (contacts && Math.hypot(p.tv.x, p.tv.z) > 8 && Math.random() < 0.5 && viewD(p.x, p.z) < 250) emit(sparks, p.x, p.y + 0.2, p.z, -p.vx * 0.2 + (Math.random() - 0.5) * 6, Math.random() * 3, -p.vz * 0.2 + (Math.random() - 0.5) * 6, 0.3);
   if (contacts && p.tv.length() < 4 && p.tw.length() < 1.5) p.stillT += dt; else p.stillT = 0;
   p.tumbleT += dt;
   // 바로 서서 멈추면 다시 달림, 뒤집혀 멈추면 코스 복귀
@@ -2484,7 +2506,7 @@ function stepAI(dt) {
         if (a.save && a.left <= 1 && (!finalLap || toFinish > 1700)) want = false; // 마지막 1개는 결승 직선용
         // 마지막 직선: 결승까지 남은 거리가 직선이면 남은 걸 다 쏟아부음
         if (finalLap && toFinish < 1700) { let clear = true; for (let d = 0; d < Math.min(toFinish, 1700); d += 25) if (TRK[idxAtS(a.prog + d)].k > 0.0016) { clear = false; break; } if (clear) want = true; }
-        if (want) { if (Math.hypot(a.x - player.x, a.z - player.z) < 600) { boostBurst(a); sndBoost(distVol(a.x, a.z) * 0.9); } a.left--; a.used = (a.used || 0) + 1; a.nextOK = a.prog + L * lapsTotal / 4; a.boostT = BOOST_TIME * 0.9; if (Math.abs(a.prog - player.prog) < 160) { setMsg(`${a.name} 필살 부스트!`, 1.3); sndBurst(0.6, 900, 0.35); } }
+        if (want) { if (viewD(a.x, a.z) < 600) { boostBurst(a); sndBoost(distVol(a.x, a.z) * 0.9); } else recFx({ k: "bst", c: a }); a.left--; a.used = (a.used || 0) + 1; a.nextOK = a.prog + L * lapsTotal / 4; a.boostT = BOOST_TIME * 0.9; if (Math.abs(a.prog - player.prog) < 160) { setMsg(`${a.name} 필살 부스트!`, 1.3); sndBurst(0.6, 900, 0.35); } }
       }
     }
     const bst = a.boostT > 0, dec = bst ? 17 : 28; // 더 늦게 브레이크 // 부스트 중엔 제동이 덜 먹으니 더 일찍 줄임
@@ -2591,11 +2613,11 @@ function stepAI(dt) {
       if (me.boostT > 0 && hard > 4 && !other.hitMsg) { setMsg(`${other.name} 날려버림!`, 1.2); other.hitMsg = 1; setTimeout(() => other.hitMsg = 0, 1500); sndImpact(30, other.x, other.z); for (let k = 0; k < 30; k++) emit(sparks, other.x, other.y + 1, other.z, (Math.random() - 0.5) * 20, Math.random() * 10, (Math.random() - 0.5) * 20, 0.6); }
     }
     if (hard > 1.5) sndImpact(hard, cp[0], cp[1]);
-    if ((isA || isB || Math.hypot(cp[0] - player.x, cp[1] - player.z) < 250) && hard > 2) for (let k = 0; k < Math.min(18, hard * 1.5); k++) emit(sparks, cp[0], (A.y + B.y) / 2 + 0.8, cp[1], (Math.random() - 0.5) * 10 + (A.vx + B.vx) * 0.4, Math.random() * 6, (Math.random() - 0.5) * 10 + (A.vz + B.vz) * 0.4, 0.4);
+    if ((isA || isB || viewD(cp[0], cp[1]) < 250) && hard > 2) for (let k = 0; k < Math.min(18, hard * 1.5); k++) emit(sparks, cp[0], (A.y + B.y) / 2 + 0.8, cp[1], (Math.random() - 0.5) * 10 + (A.vx + B.vx) * 0.4, Math.random() * 6, (Math.random() - 0.5) * 10 + (A.vz + B.vz) * 0.4, 0.4);
   }
 }
 function aiFx(p, lat, fx, fz, rx, rz, spd) { // 라이벌: 미끄러지면 연기, 흙에선 먼지 (가까이 있을 때만)
-  if (p.contact <= 0 || Math.hypot(p.x - player.x, p.z - player.z) > 300 || (p.tick = (p.tick || 0) + 1) % 3) return;
+  if (p.contact <= 0 || viewD(p.x, p.z) > 300 || (p.tick = (p.tick || 0) + 1) % 3) return;
   const onDirt = Math.abs(lat) > hwAt(p.s) + 0.8, back = p.mesh.userData.hl * 0.7;
   if (onDirt && spd > 8) emit(dust, p.x - fx * back, p.y + 0.6, p.z - fz * back, -p.vx * 0.12 + (Math.random() - 0.5) * 4, 2 + Math.random() * 3, -p.vz * 0.12 + (Math.random() - 0.5) * 4, 1.4);
   else if (p.slipR > 0.12 && spd > 12) emit(smoke, p.x - fx * back, p.y + 0.4, p.z - fz * back, (Math.random() - 0.5) * 2, 1, (Math.random() - 0.5) * 2, 1.1);
@@ -2718,7 +2740,7 @@ function detachPart(c, pt, zone, power) {
   recWreck(WRECK[WRECK.length - 1], c);
   if (!pt.userData.isWheel) cascadeParts(c);
   sndClank(1, P_.x, P_.z);
-  if (Math.hypot(c.x - player.x, c.z - player.z) < 300) for (let k = 0; k < 8; k++) emit(sparks, P_.x, P_.y, P_.z, (Math.random() - 0.5) * 10 + c.vx * 0.5, Math.random() * 6, (Math.random() - 0.5) * 10 + c.vz * 0.5, 0.4);
+  if (viewD(c.x, c.z) < 300) for (let k = 0; k < 8; k++) emit(sparks, P_.x, P_.y, P_.z, (Math.random() - 0.5) * 10 + c.vx * 0.5, Math.random() * 6, (Math.random() - 0.5) * 10 + c.vz * 0.5, 0.4);
 }
 function dentAt(c, loc, depth) { // 맞은 자리 근처 꼭짓점을 안쪽으로 밀어 찌그러뜨림
   unmergeCar(c.mesh); const d = ensureDmg(c), R = Math.max(0.9, d.S.x * 0.55), dir = new THREE.Vector3(d.C0.x - loc.x, 0, d.C0.z - loc.z).normalize(), inv = new THREE.Matrix4(), pL = new THREE.Vector3(), dL = new THREE.Vector3();
@@ -2742,7 +2764,7 @@ function explode(c) {
   (window.__tlog && window.__tlog.push("explode")), enterTumble(c, (Math.random() - 0.5) * 7, (Math.random() - 0.5) * 7, 7 + Math.random() * 5);
   u.body.traverse(o => { if (o.isMesh && o.material && o.material !== outlineMat && (o.material.isMeshToonMaterial || o.material.isMeshStandardMaterial)) { d.chars.push([o, o.material]); const m2 = o.material.clone(); m2.color.lerp(new THREE.Color(0x1a1612), 0.85); if (m2.emissive) m2.emissive.setHex(0); if (m2.isMeshStandardMaterial) { m2.metalness = 0.1; m2.roughness = 0.95; m2.envMapIntensity = 0.08; } o.material = m2; } });
   for (const f of u.flames) f.visible = false;
-  const near = Math.hypot(c.x - player.x, c.z - player.z);
+  const near = viewD(c.x, c.z);
   if (near < 400 && QFX) { QFX.boom(c.x, c.y, c.z, 1); for (let k = 0; k < 40; k++) emit(boostFire, c.x, c.y + 1, c.z, (Math.random() - 0.5) * 20 + c.vx * 0.4, Math.random() * 10, (Math.random() - 0.5) * 20 + c.vz * 0.4, 0.6); }
   if (near < 400 && !QFX) { for (let k = 0; k < 160; k++) emit(boostFire, c.x, c.y + 1, c.z, (Math.random() - 0.5) * 30 + c.vx * 0.4, Math.random() * 16, (Math.random() - 0.5) * 30 + c.vz * 0.4, 0.9); for (let k = 0; k < 60; k++) emit(smokeD, c.x, c.y + 1.5, c.z, (Math.random() - 0.5) * 8, 2 + Math.random() * 6, (Math.random() - 0.5) * 8, 2.5); for (let k = 0; k < 40; k++) emit(sparks, c.x, c.y + 1, c.z, (Math.random() - 0.5) * 30, Math.random() * 15, (Math.random() - 0.5) * 30, 0.7); sndExplode(c.x, c.z); shake = Math.max(shake, Math.min(1.4, 120 / (near + 30))); }
   if (c === player && !DEMO.on) { setMsg("RETIRED", 4); flashT = 0.6; clearTimeout(endTimer); endTimer = setTimeout(showEnd, 4800); }
@@ -2779,7 +2801,7 @@ function stepWreck(dt) {
 function stepDamageFx(dt) { // 연기·불꽃 (가까운 차만)
   for (const c of [player, ...ais]) {
     if (c.hp === undefined || c.hp >= 70) continue;
-    if (Math.hypot(c.x - player.x, c.z - player.z) > 350) continue;
+    if (viewD(c.x, c.z) > 350) continue;
     c.dmgFxT = (c.dmgFxT || 0) + dt; if (c.dead) c.deadT += dt;
     const fx = Math.sin(c.h), fz = Math.cos(c.h), hl = c.mesh.userData.hl, ex = c.x + fx * hl * 0.35, ez = c.z + fz * hl * 0.35, ey = c.y + 1.3;
     const rate = c.dead ? 30 : c.hp < 15 ? 40 : c.hp < 40 ? 22 : 8 + (70 - c.hp) * 0.3;
@@ -2819,10 +2841,10 @@ function breakProp(pr, vx, vy, vz, quiet) {
   const pm_ = pivotize(mesh);
   WRECK.push({ obj: pm_, x: pm_.position.x, y: pm_.position.y, z: pm_.position.z, vx, vy, vz, wx: (Math.random() - 0.5) * (big ? 4 : 14), wy: (Math.random() - 0.5) * 8, wz: (Math.random() - 0.5) * (big ? 4 : 14), r: Math.min(1.6, Math.max(0.35, pr.r * 0.5)), idx: fullNearest(pm_.position.x, pm_.position.z), rest: false, hitT: 0.5, prop: true });
   recWreck(WRECK[WRECK.length - 1], null);
-  if (!quiet && Math.hypot(pr.x - player.x, pr.z - player.z) < 260) { for (let k = 0; k < 8; k++) emit(pr.kind === "bush" || pr.kind === "cactus" ? dust : sparks, pr.x, pr.y + 1, pr.z, (Math.random() - 0.5) * 8 + vx * 0.3, Math.random() * 5, (Math.random() - 0.5) * 8 + vz * 0.3, 0.5); { const dv = distVol(pr.x, pr.z), soft = pr.kind === "bush" || pr.kind === "cactus" || pr.kind === "bale" || pr.kind === "post" || pr.kind === "board"; if (!(SFX.ready && sfx(soft ? pick("wood", 2) : pr.kind === "lamp" ? "glass1" : pick("clank", 4), dv * (big ? 0.9 : 0.6), 0.85 + Math.random() * 0.3))) sndClank(big ? 1 : 0.6, pr.x, pr.z); } if (big) sndImpact(14, pr.x, pr.z); /* 부서지는 오브젝트 재질에 맞는 소리 */ }
+  if (!quiet && viewD(pr.x, pr.z) < 260) { for (let k = 0; k < 8; k++) emit(pr.kind === "bush" || pr.kind === "cactus" ? dust : sparks, pr.x, pr.y + 1, pr.z, (Math.random() - 0.5) * 8 + vx * 0.3, Math.random() * 5, (Math.random() - 0.5) * 8 + vz * 0.3, 0.5); { const dv = distVol(pr.x, pr.z), soft = pr.kind === "bush" || pr.kind === "cactus" || pr.kind === "bale" || pr.kind === "post" || pr.kind === "board"; if (!(SFX.ready && sfx(soft ? pick("wood", 2) : pr.kind === "lamp" ? "glass1" : pick("clank", 4), dv * (big ? 0.9 : 0.6), 0.85 + Math.random() * 0.3))) sndClank(big ? 1 : 0.6, pr.x, pr.z); } if (big) sndImpact(14, pr.x, pr.z); /* 부서지는 오브젝트 재질에 맞는 소리 */ }
   if (pr.link) for (const q of pr.link) breakProp(q, vx * 0.8, vy + 2, vz * 0.8, true);
 }
-function damageProp(pr, amt, dx, dz, push) { if (pr.broken) return; pr.hp -= amt; if (Math.hypot(pr.x - player.x, pr.z - player.z) < 220) emit(sparks, pr.x, pr.y + 1, pr.z, (Math.random() - 0.5) * 6 - dx * 3, Math.random() * 4, (Math.random() - 0.5) * 6 - dz * 3, 0.25); if (pr.hp <= 0) breakProp(pr, dx * push, 3 + Math.random() * 4, dz * push); }
+function damageProp(pr, amt, dx, dz, push) { if (pr.broken) return; pr.hp -= amt; if (viewD(pr.x, pr.z) < 220) emit(sparks, pr.x, pr.y + 1, pr.z, (Math.random() - 0.5) * 6 - dx * 3, Math.random() * 4, (Math.random() - 0.5) * 6 - dz * 3, 0.25); if (pr.hp <= 0) breakProp(pr, dx * push, 3 + Math.random() * 4, dz * push); }
 function rayProp(ox, oz, dx, dz, maxL, y) { // 정면 선에 처음 걸리는 오브젝트
   let best = null, bl = maxL; const seen = new Set();
   for (let d = 0; d <= maxL + PCELL; d += PCELL * 0.8) for (const pr of propsNear(ox + dx * d, oz + dz * d, PCELL * 0.6)) { if (seen.has(pr)) continue; seen.add(pr); const rx = pr.x - ox, rz = pr.z - oz, al = rx * dx + rz * dz; if (al < 0 || al > bl) continue; if (Math.abs(rx * dz - rz * dx) > pr.r * 0.7) continue; if (y !== undefined && (y < pr.y - 1 || y > pr.y + pr.h + 1)) continue; bl = al; best = pr; }
@@ -2884,7 +2906,7 @@ function collideSolids(p, tumble) { // 차 앞·가운데·뒤 세 원으로 검
       if (-vn > 8) applyDamage(p, dmgWall(-vn) * SMASH, hitLocal(p, -nx_, -nz_), null, "solid");
       if (-vn > 26 && !p.dead) { const rr = vn * 0.12; enterTumble(p, -nz_ * rr, nx_ * rr, -vn * 0.2); }
       if (-vn > 4) sndImpact(-vn * 1.1, p.x, p.z); if (isP) shake = Math.max(shake, Math.min(1.2, -vn / 18));
-      if (-vn > 6 && Math.hypot(p.x - player.x, p.z - player.z) < 250) for (let k = 0; k < Math.min(20, -vn); k++) emit(sparks, px - nx_ * rad, p.y + 0.8, pz - nz_ * rad, (Math.random() - 0.5) * 10 + nx_ * 5, Math.random() * 6, (Math.random() - 0.5) * 10 + nz_ * 5, 0.4); }
+      if (-vn > 6 && viewD(p.x, p.z) < 250) for (let k = 0; k < Math.min(20, -vn); k++) emit(sparks, px - nx_ * rad, p.y + 0.8, pz - nz_ * rad, (Math.random() - 0.5) * 10 + nx_ * 5, Math.random() * 6, (Math.random() - 0.5) * 10 + nz_ * 5, 0.4); }
   }
 }
 
@@ -2932,19 +2954,20 @@ function fireGun(c) {
   if (ph) { hit = null; const [pr, L_] = ph; end = [m[0] + dx * L_, m[1] + (Math.random() - 0.5) * 0.5, m[2] + dz * L_]; damageProp(pr, 1, dx, dz, 14); if (c === player) { HITFX.mark = 0.12; } }
   if (hit) { const [tg, L_] = hit; end = [m[0] + dx * L_, tg.y + 0.9 + (Math.random() - 0.5) * 0.6, m[2] + dz * L_];
     applyDamage(tg, 0.22, hitLocal(tg, -dx, -dz), c, "gun"); tg.vx += dx * 0.12; tg.vz += dz * 0.12; fromWorld(tg);
-    if (Math.hypot(tg.x - player.x, tg.z - player.z) < 220) for (let k = 0; k < 3; k++) emit(sparks, end[0], end[1], end[2], (Math.random() - 0.5) * 8 - dx * 4, Math.random() * 5, (Math.random() - 0.5) * 8 - dz * 4, 0.25);
+    if (viewD(tg.x, tg.z) < 220) for (let k = 0; k < 3; k++) emit(sparks, end[0], end[1], end[2], (Math.random() - 0.5) * 8 - dx * 4, Math.random() * 5, (Math.random() - 0.5) * 8 - dz * 4, 0.25);
     if (tg === player) shake = Math.max(shake, 0.12); }
-  else if (!end) { end = [m[0] + dx * rng, m[1] + (Math.random() - 0.5) * 1.2, m[2] + dz * rng]; if (wallD !== null && Math.hypot(end[0] - player.x, end[2] - player.z) < 200) emit(sparks, end[0], end[1], end[2], -dx * 5 + (Math.random() - 0.5) * 6, Math.random() * 4, -dz * 5 + (Math.random() - 0.5) * 6, 0.25); }
-  if (Math.hypot(c.x - player.x, c.z - player.z) < 300) { addTracer(m, end); emit(sparks, m[0], m[1], m[2], c.vx + dx * 12, Math.random() * 2, c.vz + dz * 12, 0.08); sndGun(c === player ? 0.7 : distVol(c.x, c.z) * 0.8); if (c === player) shake = Math.max(shake, 0.05); }
+  else if (!end) { end = [m[0] + dx * rng, m[1] + (Math.random() - 0.5) * 1.2, m[2] + dz * rng]; if (wallD !== null && viewD(end[0], end[2]) < 200) emit(sparks, end[0], end[1], end[2], -dx * 5 + (Math.random() - 0.5) * 6, Math.random() * 4, -dz * 5 + (Math.random() - 0.5) * 6, 0.25); }
+  recFx({ k: "gun", c, a: m.slice(), b: end.slice() });
+  if (viewD(c.x, c.z) < 300) { addTracer(m, end); emit(sparks, m[0], m[1], m[2], c.vx + dx * 12, Math.random() * 2, c.vz + dz * 12, 0.08); sndGun(c === player ? 0.7 : distVol(c.x, c.z) * 0.8); if (c === player) shake = Math.max(shake, 0.05); }
 }
 // ---- 특수무기
 function makeMissileMesh(col) { const g = new THREE.Group(); const b = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 2.2, 8).rotateX(Math.PI / 2), toon(0xe8e8e8)); const n = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.7, 8).rotateX(Math.PI / 2), toon(col)); n.position.z = 1.45; g.add(b, n);
   for (const r of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) { const f = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 0.5), toon(col)); f.position.set(Math.sin(r) * 0.28, Math.cos(r) * 0.28, -0.9); f.rotation.z = -r; g.add(f); } g.scale.setScalar(1.3); scene.add(g); return g; }
 function useSpecial(c) {
-  const w = c.wpn; if (w.ammo <= 0 || w.cd > 0 || c.dead || c.tumble) return false; const sp = w.sp, m = muzzle(c), fx = Math.sin(c.h), fz = Math.cos(c.h), near = Math.hypot(c.x - player.x, c.z - player.z) < 400, vol = c === player ? 1 : distVol(c.x, c.z);
-  if (sp === "missile") { const tg = findTarget(c, 320, 0.45); const sp0 = Math.max(60, Math.hypot(c.vx, c.vz) + 30); PROJ.push({ type: "missile", x: m[0], y: m[1], z: m[2], vx: fx * sp0, vy: 2, vz: fz * sp0, owner: c, target: tg, life: 6.5, t: 0, idx: c.idx, mesh: makeMissileMesh(0xff3b3b) }); sndLaunch(vol); if (tg === player) setMsg("⚠ 미사일 접근!", 1.2); }
+  const w = c.wpn; if (w.ammo <= 0 || w.cd > 0 || c.dead || c.tumble) return false; const sp = w.sp, m = muzzle(c), fx = Math.sin(c.h), fz = Math.cos(c.h), near = viewD(c.x, c.z) < 400, vol = c === player ? 1 : distVol(c.x, c.z);
+  if (sp === "missile") { const tg = findTarget(c, 320, 0.45); const sp0 = Math.max(60, Math.hypot(c.vx, c.vz) + 30); PROJ.push({ type: "missile", x: m[0], y: m[1], z: m[2], vx: fx * sp0, vy: 2, vz: fz * sp0, owner: c, target: tg, life: 6.5, t: 0, idx: c.idx, mesh: makeMissileMesh(0xff3b3b) }); recProj(PROJ[PROJ.length - 1]); sndLaunch(vol); if (tg === player) setMsg("⚠ 미사일 접근!", 1.2); }
   else if (sp === "harpoon") { PROJ.push({ type: "harpoon", x: m[0], y: m[1], z: m[2], vx: c.vx + fx * 360, vy: 0.5, vz: c.vz + fz * 360, owner: c, target: null, life: 0.55, t: 0, idx: c.idx, mesh: (() => { const g = new THREE.Group(); const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.4, 6).rotateX(Math.PI / 2), toon(0x5a5e66)); const hd = new THREE.Mesh(new THREE.ConeGeometry(0.32, 1.0, 6).rotateX(Math.PI / 2), toon(0xd8d8d8)); hd.position.z = 1.6; g.add(sh, hd); for (const sd of [-1, 1]) { const barb = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.7), toon(0xd8d8d8)); barb.position.set(sd * 0.25, 0, 1.0); barb.rotation.y = sd * 0.5; g.add(barb); } g.scale.setScalar(1.6); scene.add(g); return g; })(), rope: (() => { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1, 5).translate(0, 0.5, 0).rotateX(Math.PI / 2), toon(0x2a2a2a)); scene.add(r); return r; })() });
-    sndHarpoon(vol); if (c === player) { shake = Math.max(shake, 0.45); } if (!c.tumble) { c.vf -= 1.5; toWorld(c); } }
+    recProj(PROJ[PROJ.length - 1]); sndHarpoon(vol); if (c === player) { shake = Math.max(shake, 0.45); } if (!c.tumble) { c.vf -= 1.5; toWorld(c); } }
   else if (sp === "rail") fireRail(c);
   else if (sp === "pile") firePile(c);
   w.ammo--; w.cd = sp === "rail" ? 1.2 : sp === "pile" ? 0.9 : 1.6; if (c !== player) w.nextOK = c.prog + L * lapsTotal / (WEAPONS[sp].ammo + 1) * (0.4 + Math.random() * 0.4) * (sp === "pile" ? 0.45 : 1); return true;
@@ -2987,6 +3010,7 @@ const QFX = (() => {
   } catch (e) { console.warn("quarks 초기화 실패", e); return null; }
 })();
 function blast(x, y, z, owner, direct) { // 미사일 폭발: 직격은 크게, 주변은 조금
+  recFx({ k: "blast", x, y, z });
   for (const o of [player, ...ais]) { if (o.dead) continue; const d = Math.hypot(o.x - x, o.z - z, (o.y + 0.8) - y); if (d > 11) continue;
     if (o !== direct && d > 1 && raySolid(x, z, (o.x - x) / d, (o.z - z) / d, d, y) !== null) continue;
     const k = o === direct ? 1 : (1 - d / 11) * 0.45, ux = (o.x - x) / (d || 1), uz = (o.z - z) / (d || 1); o.kickT = 1.2;
@@ -2994,7 +3018,7 @@ function blast(x, y, z, owner, direct) { // 미사일 폭발: 직격은 크게, 
     if (o.tumble) { o.tv.x += ux * 8 * k; o.tv.z += uz * 8 * k; o.tv.y += 7 * k; } else { o.vx += ux * 10 * k; o.vz += uz * 10 * k; fromWorld(o); o.ry += (Math.random() - 0.5) * 3 * k; if (k > 0.6 && Math.random() < 0.25) (window.__tlog && window.__tlog.push("missile")), enterTumble(o, (Math.random() - 0.5) * 6 * k, (Math.random() - 0.5) * 6 * k, 7 * k); else o.vy = (o.vy || 0) + 5 * k; }
     if (o === player) shake = Math.max(shake, 1.1 * k + 0.2); }
   for (const pr of propsNear(x, z, 10)) { const d = Math.hypot(pr.x - x, pr.z - z); if (d < 9) { const k = 1 - d / 9; breakProp(pr, (pr.x - x) / (d || 1) * 18 * k, 6 + 8 * k, (pr.z - z) / (d || 1) * 18 * k); } }
-  const near = Math.hypot(x - player.x, z - player.z);
+  const near = viewD(x, z);
   if (near < 400) { if (QFX) QFX.boom(x, y - 0.8, z, 0.6); else { for (let k = 0; k < 70; k++) emit(boostFire, x, y, z, (Math.random() - 0.5) * 22, Math.random() * 12, (Math.random() - 0.5) * 22, 0.6); for (let k = 0; k < 25; k++) emit(smokeD, x, y + 0.5, z, (Math.random() - 0.5) * 6, 2 + Math.random() * 4, (Math.random() - 0.5) * 6, 1.8); } sndImpact(26, x, z); sfx("boom2", distVol(x, z) * 1.1, 0.9 + Math.random() * 0.2); shot((ctx, t) => tone(ctx, t, 0.9, "sine", 110, 30, 0.8 * distVol(x, z)), 1); }
 }
 // ---- 지뢰: 차 뒤에 떨어뜨림 → 1초 뒤 무장(빨간 불 깜빡) → 밟으면 폭발하며 차가 공중으로
@@ -3027,12 +3051,12 @@ function stepMine(q, dt) { /* true면 제거 */
 }
 // ---- 대구경 포: 포구 화염 + 연기 + 날아가는 철갑탄 예광 + 남는 연기 줄
 function sndCannon(v) { if (v < 0.04) return; if (SFX.ready) { sfx("boom2", Math.min(1.5, v * 1.3), 0.85 + Math.random() * 0.1); sfx("gun1", v * 0.9, 0.38); } shot((ctx, t) => { tone(ctx, t, 0.5, "sine", 120, 28, 1.0 * v); nzs(ctx, t, 0.35, "lowpass", 3000, 200, 0.7 * v, 0.7); }, 0.6); }
-function cannonFx(c, m, dx, dz, len) {
-  const near = Math.hypot(c.x - player.x, c.z - player.z) < 450;
-  if (!c.tumble) { c.vf -= 3.5; toWorld(c); c.bp = (c.bp || 0) - 0.06; } /* 반동 */
-  if (c === player) { shake = Math.max(shake, 0.9); flashT = Math.max(flashT, 0.25); }
+function cannonFx(c, m, dx, dz, len, vis) {
+  const near = viewD(m[0], m[2]) < 450;
+  if (!vis) { recFx({ k: "can", c, m: m.slice(), dx, dz, len }); if (!c.tumble) { c.vf -= 2; toWorld(c); } /* 반동 (차가 들리지 않게 살짝만) */
+  if (c === player) { shake = Math.max(shake, 0.9); flashT = Math.max(flashT, 0.25); } }
   if (!near) return;
-  for (let k = 0; k < 26; k++) { const a = (Math.random() - 0.5) * 0.6, sp = 12 + Math.random() * 26; emit(boostFire, m[0] + dx * 1.2, m[1], m[2] + dz * 1.2, c.vx + (dx * Math.cos(a) - dz * Math.sin(a)) * sp, (Math.random() - 0.3) * 5, c.vz + (dz * Math.cos(a) + dx * Math.sin(a)) * sp, 0.18); } /* 포구 화염 */
+  for (let k = 0; k < 26; k++) { const a = (Math.random() - 0.5) * 0.6, sp = 12 + Math.random() * 26; emit(boostFire, m[0] + dx * 1.2, m[1], m[2] + dz * 1.2, (vis ? 0 : c.vx) + (dx * Math.cos(a) - dz * Math.sin(a)) * sp, (Math.random() - 0.3) * 5, c.vz + (dz * Math.cos(a) + dx * Math.sin(a)) * sp, 0.18); } /* 포구 화염 */
   for (let k = 0; k < 14; k++) emit(smoke, m[0] + dx * 2, m[1], m[2] + dz * 2, c.vx * 0.5 + dx * (4 + Math.random() * 8) + (Math.random() - 0.5) * 6, 1 + Math.random() * 3, c.vz * 0.5 + dz * (4 + Math.random() * 8) + (Math.random() - 0.5) * 6, 1.6);
   for (const sd of [-1, 1]) for (let k = 0; k < 6; k++) emit(smoke, m[0], m[1], m[2], c.vx * 0.5 + dz * sd * (6 + Math.random() * 6), 1 + Math.random() * 2, c.vz * 0.5 - dx * sd * (6 + Math.random() * 6), 1.3); /* 옆으로 터지는 화염 가스 */
   const shell = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 5, 6).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd080, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -3053,6 +3077,7 @@ function pileMesh(c, on) { const u = c.mesh.userData; if (u.pb) { c.mesh.remove(
   const tip = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.55, 10).rotateX(Math.PI / 2), toon(0xe8e8e8)); tip.position.z = 0.75; spike.add(tip);
   const z0 = fz + 0.05; spike.position.set(0, y, z0); g.add(spike); g.userData = { spike, z0 };
   g.traverse(o => { if (o.isMesh && o.material !== outlineMat) o.castShadow = true; }); c.mesh.add(g); u.pb = g; }
+function pileAnim(c, dt) { const pb = c.mesh.userData.pb; if (!pb) return; c.pbT = (c.pbT ?? 9) + dt; const t_ = c.pbT, ex = t_ < 0.05 ? t_ / 0.05 : Math.max(0, 1 - (t_ - 0.05) / 0.5); pb.userData.spike.position.z = pb.userData.z0 + ex * 1.9; }
 function pileTarget(c) { /* 말뚝이 닿는 앞차 */
   const u = c.mesh.userData, fx = Math.sin(c.h), fz = Math.cos(c.h), F = [c.x + fx * u.hl / 0.9, c.z + fz * u.hl / 0.9]; let best = null, bd = 1e9;
   for (const o of [player, ...ais]) { if (o === c || o.dead) continue; const rx = o.x - F[0], rz = o.z - F[1], al = rx * fx + rz * fz, pp = Math.abs(rx * fz - rz * fx), ol = o.mesh.userData; if (al < -1 || al > (ol.hl || 3) + 4.5 || pp > (ol.hwd || 1.2) + 1.0 || Math.abs(o.y - c.y) > 3) continue; if (al < bd) { bd = al; best = o; } }
@@ -3062,12 +3087,14 @@ function firePile(c) {
   const u = c.mesh.userData, fx = Math.sin(c.h), fz = Math.cos(c.h), F = [c.x + fx * (u.hl / 0.9 + 1.2), c.y + 0.8, c.z + fz * (u.hl / 0.9 + 1.2)], o = pileTarget(c), v = c === player ? 1 : distVol(c.x, c.z); c.pbT = 0;
   if (v > 0.04) shot((ctx, t) => { nzs(ctx, t, 0.15, "highpass", 6000, 3000, 0.4 * v); tone(ctx, t, 0.12, "square", 220, 90, 0.25 * v); }, 0.2);
   for (const pr of propsNear(F[0], F[2], 5)) { const dx = pr.x - F[0], dz = pr.z - F[2]; if (dx * fx + dz * fz > -1) breakProp(pr, fx * 30 + c.vx * 0.5, 7, fz * 30 + c.vz * 0.5); }
+  if (!o) recFx({ k: "pile", c, hit: null });
   if (!o) { if (v > 0.04) sfx("clank" + (1 + Math.floor(Math.random() * 4)), v * 0.6, 1.3); return; }
   o.kickT = 1.4; applyDamage(o, 28, hitLocal(o, -fx, -fz), c, "pile");
   if (!o.dead) { if (o.tumble) { o.tv.x += fx * 22; o.tv.z += fz * 22; o.tv.y += 6; } else { toWorld(o); o.vx += fx * 24 + c.vx * 0.15; o.vz += fz * 24 + c.vz * 0.15; fromWorld(o); if (Math.random() < 0.6) enterTumble(o, fz * (Math.random() < 0.5 ? -1 : 1) * 6, -fx * (Math.random() < 0.5 ? -1 : 1) * 6, 7); else { o.vy = 6; o.ry += (Math.random() - 0.5) * 5; } } }
   if (!c.tumble) { c.vf -= 6; toWorld(c); }
   const hx = o.x - fx * (o.mesh.userData.hl || 3) * 0.8, hz = o.z - fz * (o.mesh.userData.hl || 3) * 0.8;
-  if (Math.hypot(hx - player.x, hz - player.z) < 400) { if (QFX) QFX.boom(hx, o.y - 0.3, hz, 0.38); for (let k = 0; k < 40; k++) emit(sparks, hx, o.y + 0.8, hz, (Math.random() - 0.5) * 22 + fx * 18, Math.random() * 10, (Math.random() - 0.5) * 22 + fz * 18, 0.5); }
+  recFx({ k: "pile", c, hit: [hx, o.y, hz] });
+  if (viewD(hx, hz) < 400) { if (QFX) QFX.boom(hx, o.y - 0.3, hz, 0.38); for (let k = 0; k < 40; k++) emit(sparks, hx, o.y + 0.8, hz, (Math.random() - 0.5) * 22 + fx * 18, Math.random() * 10, (Math.random() - 0.5) * 22 + fz * 18, 0.5); }
   if (v > 0.04 || distVol(o.x, o.z) > 0.04) { const vv = Math.max(v, distVol(o.x, o.z)); sfx("boom2", Math.min(1.4, vv * 1.2), 1.15); sfx("clank" + (1 + Math.floor(Math.random() * 4)), vv, 0.7); sndImpact(true, o.x, o.z); }
   if (c === player) { shake = Math.max(shake, 1.2); flashT = Math.max(flashT, 0.3); setMsg("쾅!", 0.6); } if (o === player) { shake = Math.max(shake, 1.4); setMsg("파일벙커에 맞음!", 1); }
 }
@@ -3077,7 +3104,7 @@ function fireRail(c) {
   for (const o of [player, ...ais]) { if (o === c || o.dead) continue; const rx = o.x - m[0], rz = o.z - m[2], al = rx * dx + rz * dz; if (al < 0 || al > len) continue; const perp = Math.abs(rx * dz - rz * dx); if (perp > o.mesh.userData.hwd + 0.8 || Math.abs(o.y - c.y) > 5) continue;
     applyDamage(o, 24, hitLocal(o, -dx, -dz), c, "rail"); o.kickT = 1.2; const side = Math.sign(rx * dz - rz * dx) || 1;
     if (o.tumble) { o.tv.x += dx * 12; o.tv.z += dz * 12; } else { o.vx += dx * 12 + dz * side * 6; o.vz += dz * 12 - dx * side * 6; fromWorld(o); o.ry += side * 1.6; if (Math.random() < 0.2) (window.__tlog && window.__tlog.push("rail")), enterTumble(o, dx * 4 * side, dz * 4 * side, 5); }
-    if (Math.hypot(o.x - player.x, o.z - player.z) < 400) { if (QFX) QFX.boom(o.x, o.y - 0.4, o.z, 0.4); sndImpact(true, o.x, o.z); } if (Math.hypot(o.x - player.x, o.z - player.z) < 400) for (let k = 0; k < 30; k++) emit(sparks, o.x, o.y + 1, o.z, (Math.random() - 0.5) * 20 + dx * 15, Math.random() * 10, (Math.random() - 0.5) * 20 + dz * 15, 0.5);
+    if (viewD(o.x, o.z) < 400) { if (QFX) QFX.boom(o.x, o.y - 0.4, o.z, 0.4); sndImpact(true, o.x, o.z); } if (viewD(o.x, o.z) < 400) for (let k = 0; k < 30; k++) emit(sparks, o.x, o.y + 1, o.z, (Math.random() - 0.5) * 20 + dx * 15, Math.random() * 10, (Math.random() - 0.5) * 20 + dz * 15, 0.5);
     if (o === player) shake = Math.max(shake, 1); }
   { let o = 0; while (o < len) { const ph = rayProp(m[0] + dx * o, m[2] + dz * o, dx, dz, len - o, m[1]); if (!ph) break; breakProp(ph[0], dx * 30, 6, dz * 30); o += ph[1] + 0.5; } } // 레일건은 오브젝트도 관통하며 다 부숨
   cannonFx(c, m, dx, dz, len);
@@ -3094,12 +3121,12 @@ function fireShock(c) {
   for (const pr of propsNear(c.x, c.z, R)) { const dx = pr.x - c.x, dz = pr.z - c.z, d = Math.hypot(dx, dz); if (d > R || d < 1 || (dx * fx + dz * fz) / d < Math.cos(0.6)) continue; const k = 1 - d / R; breakProp(pr, dx / d * 25 * k + c.vx, 5 + 6 * k, dz / d * 25 * k + c.vz); }
   const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.35, 6, 32, Math.PI * 0.75), new THREE.MeshBasicMaterial({ color: 0xffd8a0, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
   ring.rotation.order = "YXZ"; ring.rotation.set(-Math.PI / 2, c.h, Math.PI * 0.125 + Math.PI / 2); ring.position.set(c.x + fx * 3, c.y + 1, c.z + fz * 3); scene.add(ring); WRINGS.push({ m: ring, t: 0, vx: c.vx, vz: c.vz });
-  if (Math.hypot(c.x - player.x, c.z - player.z) < 350) for (let k = 0; k < 30; k++) { const a = c.h + (Math.random() - 0.5) * 1.2, sp = 20 + Math.random() * 25; emit(dust, c.x + fx * 4, c.y + 0.6, c.z + fz * 4, Math.sin(a) * sp + c.vx, Math.random() * 3, Math.cos(a) * sp + c.vz, 0.8); }
+  if (viewD(c.x, c.z) < 350) for (let k = 0; k < 30; k++) { const a = c.h + (Math.random() - 0.5) * 1.2, sp = 20 + Math.random() * 25; emit(dust, c.x + fx * 4, c.y + 0.6, c.z + fz * 4, Math.sin(a) * sp + c.vx, Math.random() * 3, Math.cos(a) * sp + c.vz, 0.8); }
   sndShock(c === player ? 1 : distVol(c.x, c.z));
 }
 function attachTether(a, b) {
   const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1, 5).translate(0, 0.5, 0).rotateX(Math.PI / 2), toon(0x2a2a2a)); scene.add(rope);
-  TETHERS.push({ a, b, t: 0, life: 2.8, len: Math.hypot(b.x - a.x, b.z - a.z), rope });
+  TETHERS.push({ a, b, t: 0, life: 2.8, len: Math.hypot(b.x - a.x, b.z - a.z), rope }); if (REC.on && !REPLAY.on) { const r = { a, b, t0: raceT, t1: 1e9 }; REC.th.push(r); TETHERS[TETHERS.length - 1].rec = r; }
   applyDamage(b, 4, hitLocal(b, (a.x - b.x) / 10, (a.z - b.z) / 10), a, "harpoon"); sndImpact(10, b.x, b.z); if (b === player) { setMsg("작살에 걸림!", 1); shake = Math.max(shake, 0.5); } if (a === player) setMsg("걸었다! 좌우로 휘두르고 X로 당겨", 1.4);
 }
 function reelIn(T) { // 다시 누르면 확 당김: 상대는 내 쪽으로 끌려오고 나는 앞으로 튀어나감, 잠시 뒤 줄이 끊어짐
@@ -3113,7 +3140,7 @@ function reelIn(T) { // 다시 누르면 확 당김: 상대는 내 쪽으로 끌
   if (a === player) { shake = Math.max(shake, 0.7); setMsg("당겨!", 0.6); } if (b === player) shake = Math.max(shake, 0.9);
 }
 function releaseTether(T, snap) {
-  const { a, b } = T; scene.remove(T.rope); TETHERS.splice(TETHERS.indexOf(T), 1);
+  const { a, b } = T; scene.remove(T.rope); TETHERS.splice(TETHERS.indexOf(T), 1); if (T.rec) T.rec.t1 = raceT;
   if (snap && !a.dead && !b.dead) { // 놓는 순간: 나는 앞으로 튕겨나가고, 상대는 옆으로 휙
     const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz) || 1; if (!a.tumble) { a.vx += dx / d * 9; a.vz += dz / d * 9; fromWorld(a); }
     const st = a === player ? input.steer : (a.yankDir || 1); if (!b.tumble && Math.abs(st) > 0.3) { const rx = Math.cos(a.h), rz = -Math.sin(a.h), J = 15 * Math.sign(st); b.vx += rx * J; b.vz += rz * J; fromWorld(b); b.ry += Math.sign(st) * 2; const lat = Math.abs(rx * Math.cos(b.h) - rz * Math.sin(b.h)) * 15; if (lat > 11) { const rr = -Math.sign(st) * 5; (window.__tlog && window.__tlog.push("harpoon")), enterTumble(b, Math.sin(b.h) * rr, Math.cos(b.h) * rr, 4); } }
@@ -3139,7 +3166,7 @@ function stepWeapons(dt) {
     else if (w.sp === "rail") { const t2 = findTarget(a, 420, 0.05); if (t2 && !keep) { w.aimT += dt; if (w.aimT > 0.9 && Math.random() < dt * 2) { useSpecial(a); w.aimT = 0; } } else w.aimT = Math.max(0, w.aimT - dt * 2); }
     else if (w.sp === "pile") { if (pileTarget(a) && !keep && Math.random() < dt * 4) useSpecial(a); }
   }
-  for (const c of [player, ...ais]) { const pb = c.mesh.userData.pb; if (pb) { c.pbT = (c.pbT ?? 9) + dt; const t_ = c.pbT, ex = t_ < 0.05 ? t_ / 0.05 : Math.max(0, 1 - (t_ - 0.05) / 0.5); pb.userData.spike.position.z = pb.userData.z0 + ex * 1.9; }
+  for (const c of [player, ...ais]) { pileAnim(c, dt);
     const w = c.wpn; if (!w) continue; w.gunCd = Math.max(0, w.gunCd - dt); w.cd = Math.max(0, w.cd - dt); w.heat = Math.max(0, w.heat - dt * (w.over ? 0.55 : 0.4)); if (w.over && w.heat <= 0.3) w.over = false; }
   // 날아가는 것들
   for (let i = PROJ.length - 1; i >= 0; i--) {
@@ -3149,7 +3176,7 @@ function stepWeapons(dt) {
       if (q.target && !q.target.dead) { const tx = q.target.x + q.target.vx * 0.15, tz = q.target.z + q.target.vz * 0.15, ty = q.target.y + 0.8, sp = Math.hypot(q.vx, q.vz), want = Math.atan2(tx - q.x, tz - q.z), cur = Math.atan2(q.vx, q.vz); let dh = want - cur; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI; const nh = cur + clamp(dh, -1.7 * dt, 1.7 * dt), ns = Math.min(255, sp + 90 * dt); q.vx = Math.sin(nh) * ns; q.vz = Math.cos(nh) * ns; q.vy += (ty - q.y) * 3 * dt - q.vy * 2 * dt; }
       else { q.vy -= 2 * dt; const sp = Math.hypot(q.vx, q.vz), ns = Math.min(255, sp + 90 * dt); q.vx *= ns / sp; q.vz *= ns / sp; }
       if (q.target === player && Math.floor(q.t * 6) !== Math.floor((q.t - dt) * 6)) sndWarn();
-      if (Math.hypot(q.x - player.x, q.z - player.z) < 400) { emit(boostFire, q.x - q.vx * 0.012, q.y, q.z - q.vz * 0.012, (Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3, 0.25); if (Math.random() < 0.5) emit(smoke, q.x, q.y, q.z, (Math.random() - 0.5), 0.5, (Math.random() - 0.5), 0.9); }
+      if (viewD(q.x, q.z) < 400) { emit(boostFire, q.x - q.vx * 0.012, q.y, q.z - q.vz * 0.012, (Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3, 0.25); if (Math.random() < 0.5) emit(smoke, q.x, q.y, q.z, (Math.random() - 0.5), 0.5, (Math.random() - 0.5), 0.9); }
     }
     const px0 = q.x, pz0 = q.z; q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt; q.idx = nearest(q.x, q.z, q.idx); if (q.type === "harpoon") q.vy -= 3 * dt;
     const t = TRK[q.idx], lat = (q.x - t.x) * nx(t) + (q.z - t.z) * nz(t), gy = surfH(t.s, lat); if (q.y < gy + 0.3) { if (q.type === "missile") boom = true; else q.y = gy + 0.3; }
@@ -3407,8 +3434,10 @@ const BFX = { rings: [], trail: null };
   gr.addColorStop(0, "rgba(160,245,255,1)"); gr.addColorStop(0.25, "rgba(255,150,40,0.85)"); gr.addColorStop(1, "rgba(255,60,0,0)"); x.fillStyle = gr; x.fillRect(0, 0, 16, 256);
   BFX.trail = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   BFX.trail.visible = false; scene.add(BFX.trail); }
-function carState(o) { return o === player ? { x: o.x, y: o.y, z: o.z, h: o.h, vx: o.vx, vz: o.vz, v: o.vf, on: o.boostT > 0 } : { x: o.x, y: o.y, z: o.z, h: o.h, vx: Math.sin(o.h) * o.v, vz: Math.cos(o.h) * o.v, v: o.v, on: o.boostT > 0 }; }
+function carState(o) { if (REPLAY.on) { const v = REPLAY.view.get(o), p = o.mesh.position; if (v) return { x: p.x, y: p.y, z: p.z, h: v.h, vx: Math.sin(v.h) * v.vf, vz: Math.cos(v.h) * v.vf, v: v.vf, on: !!v.boost }; }
+  return o === player ? { x: o.x, y: o.y, z: o.z, h: o.h, vx: o.vx, vz: o.vz, v: o.vf, on: o.boostT > 0 } : { x: o.x, y: o.y, z: o.z, h: o.h, vx: Math.sin(o.h) * o.v, vz: Math.cos(o.h) * o.v, v: o.v, on: o.boostT > 0 }; }
 function boostBurst(o) { // 켜는 순간: 충격파 고리 + 불꽃 폭발 (모든 차 공통)
+  recFx({ k: "bst", c: o });
   const c = carState(o), mine = o === player;
   for (const [col, sp] of [[0xffffff, 70], [0x38d8ff, 45], [0xff7a1a, 30]]) {
     const r = new THREE.Mesh(new THREE.TorusGeometry(1, 0.18, 8, 48), new THREE.MeshBasicMaterial({ color: col, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -3428,7 +3457,7 @@ function stepBoostFx(dt) {
   BFX.trail.visible = false;
   for (const o of [player, ...ais]) {
     const ud = o.mesh.userData; if (!ud.trail) ud.trail = makeTrail();
-    const c = carState(o), near = Math.hypot(c.x - player.x, c.z - player.z) < 700;
+    const c = carState(o), near = viewD(c.x, c.z) < 700;
     ud.trail.visible = c.on && near; if (!ud.trail.visible) continue;
     const fx = Math.sin(c.h), fz = Math.cos(c.h), sr = Math.abs(c.v) / P.top, fl = 0.75 + Math.random() * 0.5, back = ud.hl * 0.85;
     ud.trail.position.set(c.x - fx * back, c.y + 0.25, c.z - fz * back); ud.trail.rotation.y = c.h; ud.trail.scale.set(ud.hwd * 1.6 * fl, 1, 28 + sr * 30);
@@ -3582,7 +3611,7 @@ function renderMain(dt) {
   if (renderMain.n % 3 === 0) carLod();
   if (FEST.time) FEST.time.value += dt; for (const h of FEST.turbines) h.rotation.z += dt * 0.9; for (const f of FEST.anims) f(dt);
   sky.position.copy(camera.position); ground.position.x = camera.position.x; ground.position.z = camera.position.z;
-  const sr = clamp(Math.abs(player.vf) / P.top, 0, 1.6), boost = player.boostT > 0 ? 1 : 0, active = state === "race" || state === "end";
+  const sr = clamp(Math.abs(player.vf) / P.top, 0, 1.6), boost = player.boostT > 0 ? 1 : 0, active = (state === "race" || state === "end") && !SPEC.on && !REPLAY.on && !DEMO.on; /* 관전·리플레이·데모에선 내 차 속도로 화면이 흐려지지 않게 */
   const tBlur = active ? (Math.max(0, sr - 0.45) * 0.07 + boost * 0.06) * SET.blur + (slowT > 0 ? 0.03 : 0) : 0; // 설정의 '속도 흐림'으로 조절 (기본 약하게)
   const tWarp = active ? Math.max(0, sr - 0.3) * 0.13 + boost * 0.13 : 0;
   const tCa = active ? Math.max(0, sr - 0.6) * 0.4 + boost * 0.6 + Math.min(1, shake) * 0.3 : 0;
@@ -3735,7 +3764,7 @@ function simulate(secs, driver) {
   for (let t = 0; t < secs; t += dt) { if (state !== "race" && state !== "end") break; const d = driver(player); Object.assign(input, d); raceT += dt; stepPlayer(dt); stepAI(dt); stepWeapons(dt); stepProps(); stepWreck(dt); lapLogic(); syncMeshes(dt); recFrame(); }
 }
 window.__cam = () => { updateCamera(1 / 30); return camera.position.distanceTo(new THREE.Vector3(player.x, player.y, player.z)); };
-window.__SND = SND; window.__upd = updateSound; window.__inp = input; window.__bgp = { get SFX() { return SFX; }, get renderer() { return renderer; }, get scene() { return scene; }, get camera() { return camera; }, get REC() { return REC; }, detachPart, ensureDmg, raySolid, get SOLIDS() { return SOLIDS; }, useSpecial, fireGun, PROJ, TETHERS, setSpecial, enterTumble, applyDamage, explode, hitLocal, repairAll, WRECK, get GAP() { return GAP; }, player, ais, get state() { return state; }, get L() { return L; }, get HALF() { return HALF; }, P, startRace, simulate, get TRK() { return TRK; }, idxAtS, posAt, surfH, setCourse(id) { buildCourse(id); loadBest(); placeGrid(); }, skipCount() { if (state === "intro") introEnd(); countdown = 0.01; } };
+window.__SND = SND; window.__upd = updateSound; window.__inp = input; window.__bgp = { get SFX() { return SFX; }, get renderer() { return renderer; }, get scene() { return scene; }, get camera() { return camera; }, get REC() { return REC; }, detachPart, ensureDmg, raySolid, get SOLIDS() { return SOLIDS; }, useSpecial, fireGun, PROJ, TETHERS, setSpecial, enterTumble, applyDamage, explode, hitLocal, repairAll, get REPLAY() { return REPLAY; }, WRECK, get GAP() { return GAP; }, player, ais, get state() { return state; }, get L() { return L; }, get HALF() { return HALF; }, P, startRace, simulate, get TRK() { return TRK; }, idxAtS, posAt, surfH, setCourse(id) { buildCourse(id); loadBest(); placeGrid(); }, skipCount() { if (state === "intro") introEnd(); countdown = 0.01; } };
 })();
 </script>
 </body>
