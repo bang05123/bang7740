@@ -289,6 +289,7 @@
 <div id="specBar"><button id="spPrev">◀</button><div id="specName">-</div><button id="spNext">▶</button><button id="spChase" class="on">체이스</button><button id="spTv">TV</button><button id="spBack">결과</button></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three.quarks@0.10.0/dist/three.quarks.min.js"></script>
 <script>
 (() => {
 "use strict";
@@ -1591,7 +1592,7 @@ function repApply(t, dt) {
     const F = e.fr; let lo = 0; while (lo < F.length - 1 && F[lo + 1][0] <= t) lo++; const a = F[lo], b = F[Math.min(F.length - 1, lo + 1)], u = b[0] > a[0] ? clamp((t - a[0]) / (b[0] - a[0]), 0, 1) : 0;
     g.position.set(a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, a[3] + (b[3] - a[3]) * u); _q1.set(a[4], a[5], a[6], a[7]); _q2.set(b[4], b[5], b[6], b[7]); g.quaternion.copy(_q1).slerp(_q2, u); }
   if (REPLAY.speed > 0 && !REPLAY.paused) for (const e of REC.ev) if (e.t > REPLAY.lastT && e.t <= t && t - e.t < 0.5) { // 지나가는 순간 효과 다시
-    if (e.type === "boom") { for (let k = 0; k < 120; k++) emit(boostFire, e.x, e.y + 1, e.z, (Math.random() - 0.5) * 30, Math.random() * 16, (Math.random() - 0.5) * 30, 0.9); for (let k = 0; k < 40; k++) emit(smokeD, e.x, e.y + 1.5, e.z, (Math.random() - 0.5) * 8, 2 + Math.random() * 4, (Math.random() - 0.5) * 8, 2.5); sndExplode(e.x, e.z); }
+    if (e.type === "boom") { if (QFX) QFX.boom(e.x, e.y, e.z, 1); else for (let k = 0; k < 120; k++) emit(boostFire, e.x, e.y + 1, e.z, (Math.random() - 0.5) * 30, Math.random() * 16, (Math.random() - 0.5) * 30, 0.9); for (let k = 0; k < 40; k++) emit(smokeD, e.x, e.y + 1.5, e.z, (Math.random() - 0.5) * 8, 2 + Math.random() * 4, (Math.random() - 0.5) * 8, 2.5); sndExplode(e.x, e.z); }
     else for (let k = 0; k < 24; k++) emit(sparks, e.x, e.y + 1, e.z, (Math.random() - 0.5) * 14, Math.random() * 7, (Math.random() - 0.5) * 14, 0.4); }
   REPLAY.lastT = t;
 }
@@ -2364,7 +2365,8 @@ function explode(c) {
   u.body.traverse(o => { if (o.isMesh && o.material && o.material !== outlineMat && (o.material.isMeshToonMaterial || o.material.isMeshStandardMaterial)) { d.chars.push([o, o.material]); const m2 = o.material.clone(); m2.color.lerp(new THREE.Color(0x1a1612), 0.85); if (m2.emissive) m2.emissive.setHex(0); if (m2.isMeshStandardMaterial) { m2.metalness = 0.1; m2.roughness = 0.95; m2.envMapIntensity = 0.08; } o.material = m2; } });
   for (const f of u.flames) f.visible = false;
   const near = Math.hypot(c.x - player.x, c.z - player.z);
-  if (near < 400) { for (let k = 0; k < 160; k++) emit(boostFire, c.x, c.y + 1, c.z, (Math.random() - 0.5) * 30 + c.vx * 0.4, Math.random() * 16, (Math.random() - 0.5) * 30 + c.vz * 0.4, 0.9); for (let k = 0; k < 60; k++) emit(smokeD, c.x, c.y + 1.5, c.z, (Math.random() - 0.5) * 8, 2 + Math.random() * 6, (Math.random() - 0.5) * 8, 2.5); for (let k = 0; k < 40; k++) emit(sparks, c.x, c.y + 1, c.z, (Math.random() - 0.5) * 30, Math.random() * 15, (Math.random() - 0.5) * 30, 0.7); sndExplode(c.x, c.z); shake = Math.max(shake, Math.min(1.4, 120 / (near + 30))); }
+  if (near < 400 && QFX) { QFX.boom(c.x, c.y, c.z, 1); for (let k = 0; k < 40; k++) emit(boostFire, c.x, c.y + 1, c.z, (Math.random() - 0.5) * 20 + c.vx * 0.4, Math.random() * 10, (Math.random() - 0.5) * 20 + c.vz * 0.4, 0.6); }
+  if (near < 400 && !QFX) { for (let k = 0; k < 160; k++) emit(boostFire, c.x, c.y + 1, c.z, (Math.random() - 0.5) * 30 + c.vx * 0.4, Math.random() * 16, (Math.random() - 0.5) * 30 + c.vz * 0.4, 0.9); for (let k = 0; k < 60; k++) emit(smokeD, c.x, c.y + 1.5, c.z, (Math.random() - 0.5) * 8, 2 + Math.random() * 6, (Math.random() - 0.5) * 8, 2.5); for (let k = 0; k < 40; k++) emit(sparks, c.x, c.y + 1, c.z, (Math.random() - 0.5) * 30, Math.random() * 15, (Math.random() - 0.5) * 30, 0.7); sndExplode(c.x, c.z); shake = Math.max(shake, Math.min(1.4, 120 / (near + 30))); }
   if (c === player && !DEMO.on) { setMsg("RETIRED", 4); flashT = 0.6; clearTimeout(endTimer); endTimer = setTimeout(showEnd, 4800); }
   if (c.lastHit && c.lastHit.by && c.lastHit.by !== c && raceT - c.lastHit.t < 4) kos.set(c.lastHit.by, (kos.get(c.lastHit.by) || 0) + 1);
   if (c !== player) { const mine = c.lastHit && c.lastHit.by === player && raceT - c.lastHit.t < 4; setMsg(mine ? `${c.name} 격파!` : `${c.name} 리타이어!`, 1.6); }
@@ -2569,6 +2571,43 @@ function useSpecial(c) {
   else if (sp === "shock") fireShock(c);
   w.ammo--; w.cd = sp === "rail" ? 1.2 : 1.6; if (c !== player) w.nextOK = c.prog + L * lapsTotal / (WEAPONS[sp].ammo + 1) * (0.4 + Math.random() * 0.4); return true;
 }
+// ================= 폭발 효과 (three.quarks 파티클 라이브러리) =================
+const QFX = (() => {
+  const Q = THREE.QUARKS; if (!Q) return null; // 라이브러리를 못 불러오면 예전 파티클로
+  try {
+    const br = new Q.BatchedRenderer(); scene.add(br);
+    const tex = (draw) => { const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d"); draw(g); const t = new THREE.CanvasTexture(c); return t; };
+    const soft = tex(g => { const r = g.createRadialGradient(64, 64, 0, 64, 64, 64); r.addColorStop(0, "rgba(255,255,255,1)"); r.addColorStop(0.35, "rgba(255,255,255,.75)"); r.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = r; g.fillRect(0, 0, 128, 128); });
+    const puff = tex(g => { for (let k = 0; k < 9; k++) { const x = 34 + Math.random() * 60, y = 34 + Math.random() * 60, rr = 22 + Math.random() * 20, r = g.createRadialGradient(x, y, 0, x, y, rr); r.addColorStop(0, "rgba(255,255,255,.55)"); r.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = r; g.fillRect(0, 0, 128, 128); } }); // 뭉게뭉게 연기
+    const ring = tex(g => { const r = g.createRadialGradient(64, 64, 34, 64, 64, 62); r.addColorStop(0, "rgba(255,255,255,0)"); r.addColorStop(0.55, "rgba(255,255,255,.9)"); r.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = r; g.fillRect(0, 0, 128, 128); });
+    const mAdd = (map) => new THREE.MeshBasicMaterial({ map, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    const M = { fire: mAdd(soft), spark: mAdd(soft), ring: mAdd(ring), smoke: new THREE.MeshBasicMaterial({ map: puff, transparent: true, depthWrite: false, color: 0xffffff }) };
+    const V4 = (r, g, b, a) => new THREE.Vector4(r, g, b, a), curve = (a, b, c, d) => new Q.PiecewiseBezier([[new Q.Bezier(a, b, c, d), 0]]);
+    const ringGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+    const live = [];
+    function sys(p) { const ps = new Q.ParticleSystem(Object.assign({ duration: 0.3, looping: false, autoDestroy: true, worldSpace: true, emissionOverTime: new Q.ConstantValue(0) }, p)); br.addSystem(ps); scene.add(ps.emitter); return ps; }
+    function boom(x, y, z, k = 1) { // k: 크기 (차 폭발 1, 미사일 0.6)
+      const list = [
+        sys({ shape: new Q.SphereEmitter({ radius: 1.6 * k }), startLife: new Q.IntervalValue(0.45, 0.95), startSpeed: new Q.IntervalValue(5 * k, 15 * k), startSize: new Q.IntervalValue(4 * k, 8.5 * k), startColor: new Q.ConstantColor(V4(1, 0.95, 0.75, 1)),
+          emissionBursts: [{ time: 0, count: Math.round(34 * k), cycle: 1, interval: 0.01, probability: 1 }], material: M.fire, renderMode: Q.RenderMode.BillBoard, startRotation: new Q.IntervalValue(0, 6.28),
+          behaviors: [new Q.ColorOverLife(new Q.Gradient([[new Q.ColorRange(V4(1, 0.9, 0.6, 0.8), V4(1, 0.5, 0.12, 0.7)), 0], [new Q.ColorRange(V4(1, 0.5, 0.12, 0.7), V4(0.4, 0.06, 0.02, 0)), 0.4]])), new Q.SizeOverLife(curve(0.6, 1.2, 1.35, 1.1)), new Q.SpeedOverLife(curve(1, 0.35, 0.1, 0))] }), // 불덩이
+        sys({ shape: new Q.SphereEmitter({ radius: 2 * k }), startLife: new Q.IntervalValue(2.2, 4), startSpeed: new Q.IntervalValue(2 * k, 7 * k), startSize: new Q.IntervalValue(6 * k, 11 * k), startColor: new Q.ConstantColor(V4(0.16, 0.14, 0.13, 0.8)),
+          emissionBursts: [{ time: 0.05, count: Math.round(30 * k), cycle: 1, interval: 0.01, probability: 1 }], material: M.smoke, renderMode: Q.RenderMode.BillBoard, startRotation: new Q.IntervalValue(0, 6.28),
+          behaviors: [new Q.ColorOverLife(new Q.Gradient([[new Q.ColorRange(V4(0.2, 0.17, 0.15, 0.75), V4(0.32, 0.3, 0.28, 0.55)), 0], [new Q.ColorRange(V4(0.32, 0.3, 0.28, 0.55), V4(0.45, 0.43, 0.41, 0)), 0.5]])), new Q.SizeOverLife(curve(0.5, 1.3, 1.8, 2.2)), new Q.ApplyForce(new THREE.Vector3(0, 1, 0), new Q.ConstantValue(3.5)), new Q.SpeedOverLife(curve(1, 0.4, 0.2, 0.1)), new Q.RotationOverLife(new Q.IntervalValue(-0.6, 0.6), false)] }), // 검은 연기
+        sys({ shape: new Q.SphereEmitter({ radius: 0.8 * k }), startLife: new Q.IntervalValue(0.5, 1.3), startSpeed: new Q.IntervalValue(18 * k, 42 * k), startSize: new Q.IntervalValue(0.35, 0.7), startColor: new Q.ConstantColor(V4(1, 0.75, 0.3, 1)),
+          emissionBursts: [{ time: 0, count: Math.round(70 * k), cycle: 1, interval: 0.01, probability: 1 }], material: M.spark, renderMode: Q.RenderMode.StretchedBillBoard, speedFactor: 0.05,
+          behaviors: [new Q.ApplyForce(new THREE.Vector3(0, -1, 0), new Q.ConstantValue(24)), new Q.ColorOverLife(new Q.ColorRange(V4(1, 0.85, 0.4, 1), V4(1, 0.3, 0.05, 0)))] }), // 튀는 불똥
+        sys({ shape: new Q.PointEmitter ? new Q.PointEmitter() : new Q.SphereEmitter({ radius: 0.01 }), startLife: new Q.ConstantValue(0.45), startSpeed: new Q.ConstantValue(0), startSize: new Q.ConstantValue(1), startColor: new Q.ConstantColor(V4(1, 0.8, 0.55, 0.9)),
+          emissionBursts: [{ time: 0, count: 1, cycle: 1, interval: 0.01, probability: 1 }], material: M.ring, renderMode: Q.RenderMode.Mesh, instancingGeometry: ringGeo,
+          behaviors: [new Q.SizeOverLife(curve(2, 14 * k, 24 * k, 30 * k)), new Q.ColorOverLife(new Q.ColorRange(V4(1, 0.8, 0.55, 0.9), V4(1, 0.4, 0.1, 0)))] }), // 바닥을 퍼져나가는 충격파 링
+      ];
+      list[0].emitter.position.set(x, y + 1, z); list[1].emitter.position.set(x, y + 1.5, z); list[2].emitter.position.set(x, y + 1, z); list[3].emitter.position.set(x, y + 0.25, z);
+      for (const ps of list) { ps.emitter.updateMatrixWorld(true); live.push({ ps, t: 0, life: 5 }); }
+    }
+    function update(dt) { br.update(dt); for (let i = live.length - 1; i >= 0; i--) { const L_ = live[i]; L_.t += dt; if (L_.t > L_.life) { try { br.deleteSystem(L_.ps); scene.remove(L_.ps.emitter); } catch (e) {} live.splice(i, 1); } } }
+    return { boom, update };
+  } catch (e) { console.warn("quarks 초기화 실패", e); return null; }
+})();
 function blast(x, y, z, owner, direct) { // 미사일 폭발: 직격은 크게, 주변은 조금
   for (const o of [player, ...ais]) { if (o.dead) continue; const d = Math.hypot(o.x - x, o.z - z, (o.y + 0.8) - y); if (d > 11) continue;
     if (o !== direct && d > 1 && raySolid(x, z, (o.x - x) / d, (o.z - z) / d, d, y) !== null) continue;
@@ -2578,7 +2617,7 @@ function blast(x, y, z, owner, direct) { // 미사일 폭발: 직격은 크게, 
     if (o === player) shake = Math.max(shake, 1.1 * k + 0.2); }
   for (const pr of propsNear(x, z, 10)) { const d = Math.hypot(pr.x - x, pr.z - z); if (d < 9) { const k = 1 - d / 9; breakProp(pr, (pr.x - x) / (d || 1) * 18 * k, 6 + 8 * k, (pr.z - z) / (d || 1) * 18 * k); } }
   const near = Math.hypot(x - player.x, z - player.z);
-  if (near < 400) { for (let k = 0; k < 70; k++) emit(boostFire, x, y, z, (Math.random() - 0.5) * 22, Math.random() * 12, (Math.random() - 0.5) * 22, 0.6); for (let k = 0; k < 25; k++) emit(smokeD, x, y + 0.5, z, (Math.random() - 0.5) * 6, 2 + Math.random() * 4, (Math.random() - 0.5) * 6, 1.8); sndImpact(26, x, z); shot((ctx, t) => tone(ctx, t, 0.9, "sine", 110, 30, 0.8 * distVol(x, z)), 1); }
+  if (near < 400) { if (QFX) QFX.boom(x, y - 0.8, z, 0.6); else { for (let k = 0; k < 70; k++) emit(boostFire, x, y, z, (Math.random() - 0.5) * 22, Math.random() * 12, (Math.random() - 0.5) * 22, 0.6); for (let k = 0; k < 25; k++) emit(smokeD, x, y + 0.5, z, (Math.random() - 0.5) * 6, 2 + Math.random() * 4, (Math.random() - 0.5) * 6, 1.8); } sndImpact(26, x, z); shot((ctx, t) => tone(ctx, t, 0.9, "sine", 110, 30, 0.8 * distVol(x, z)), 1); }
 }
 function fireRail(c) {
   const m = muzzle(c); let dx = Math.sin(c.h), dz = Math.cos(c.h); // 조준 보정 없이 정면으로
@@ -3069,6 +3108,7 @@ function frame(now) {
       document.getElementById("center").textContent = countdown > 0.2 ? (n > 0 ? n : "") : "GO!";
       if (countdown <= 0) { state = "race"; raceT = 0; player.lapStart = 0; sndBeep(true); setTimeout(() => { if (state === "race") document.getElementById("center").textContent = ""; }, 700); }
     }
+    if (QFX) QFX.update(dt);
     if (REPLAY.on) repTick(realDt);
     else if (state === "race" || state === "end") { raceT += dt; /* 결승 뒤에도 시계는 계속 (라이벌 기록 재려고) */ stepPlayer(dt); stepAI(dt); stepWeapons(dt); lapLogic(); }
     else if (state === "count" || state === "menu") { stepPlayer(dt); stepAI(dt); }
