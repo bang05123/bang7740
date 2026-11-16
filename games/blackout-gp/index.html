@@ -2948,17 +2948,28 @@ function drawFx(dt) {
   const w = fx.width, h = fx.height; fctx.clearRect(0, 0, w, h); drawReticle();
   const boost = player.boostT > 0, ratio = Math.max(0, (Math.abs(player.vf) / P.top - 0.22) / 0.78) + (boost ? 0.8 : 0);
   const cx = w / 2, cy = h * 0.47, R = Math.hypot(w, h) / 2;
-  if (boost) { const g = fctx.createRadialGradient(cx, cy, R * 0.35, cx, cy, R); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.7, "rgba(255,90,30,0.18)"); g.addColorStop(1, "rgba(60,220,255,0.45)"); fctx.fillStyle = g; fctx.fillRect(0, 0, w, h); }
+  if (boost) { const g = fctx.createRadialGradient(cx, cy, R * 0.35, cx, cy, R); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.7, "rgba(255,90,30,0.08)"); g.addColorStop(1, "rgba(60,220,255,0.22)"); fctx.fillStyle = g; fctx.fillRect(0, 0, w, h); }
   else if (ratio > 0.3) { const g = fctx.createRadialGradient(cx, cy, R * 0.5, cx, cy, R); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, `rgba(0,0,0,${Math.min(0.42, ratio * 0.32)})`); fctx.fillStyle = g; fctx.fillRect(0, 0, w, h); }
-  if (ratio <= 0.01) return;
-  fctx.lineWidth = boost ? 3.5 : 2;
-  for (const l of lines) {
-    l.r += l.sp * dt * (1.4 + ratio * 3); if (l.r > 1) { l.r = 0.22 + Math.random() * 0.2; l.a = Math.random() * Math.PI * 2; }
-    if (Math.random() > Math.min(1, ratio)) continue;
-    fctx.strokeStyle = boost ? (Math.random() < 0.5 ? "rgba(140,235,255,0.9)" : "rgba(255,170,90,0.85)") : "rgba(255,255,255,0.6)";
-    const r0 = R * l.r, r1 = r0 + R * (boost ? 0.22 : 0.12) * ratio;
-    fctx.beginPath(); fctx.moveTo(cx + Math.cos(l.a) * r0, cy + Math.sin(l.a) * r0 * 0.75); fctx.lineTo(cx + Math.cos(l.a) * r1, cy + Math.sin(l.a) * r1 * 0.75); fctx.stroke();
-  }
+  // 부스트: 레드라인식 만화 집중선 (굵고 끝이 뾰족한 잉크 붓 터치, 화면 가장자리에서 중심으로)
+  FOCUS.amt += ((boost ? 1 : 0) - FOCUS.amt) * Math.min(1, (boost ? 10 : 4) * dt); if (boost && !FOCUS.was) FOCUS.kick = 1; FOCUS.was = boost; FOCUS.kick = Math.max(0, FOCUS.kick - dt * 2.2);
+  const fa = FOCUS.amt; if (fa < 0.02 || SPEC.on || REPLAY.on) return;
+  if ((FOCUS.t += dt) > 0.05 || !FOCUS.list.length) { FOCUS.t = 0; FOCUS.list = []; const n = 64; for (let i = 0; i < n; i++) FOCUS.list.push({ a: (i + Math.random() * 0.8) / n * Math.PI * 2, r0: 0.5 + Math.random() * 0.32 - FOCUS.kick * 0.18, wd: 3 + Math.random() * 13, white: Math.random() < 0.18 }); } // 0.05초마다 새로 그려 지글지글
+  for (const f of FOCUS.list) { const ca = Math.cos(f.a), sa = Math.sin(f.a), x0 = cx + ca * R * f.r0, y0 = cy + sa * R * f.r0 * 0.8, x1 = cx + ca * R * 1.15, y1 = cy + sa * R * 1.15 * 0.8, wd = f.wd * (0.6 + fa * 0.6) * (w / 900);
+    fctx.fillStyle = f.white ? `rgba(255,255,255,${0.55 * fa})` : `rgba(10,8,8,${0.78 * fa})`; fctx.beginPath(); fctx.moveTo(x0, y0); fctx.lineTo(x1 - sa * wd, y1 + ca * wd); fctx.lineTo(x1 + sa * wd, y1 - ca * wd); fctx.closePath(); fctx.fill(); }
+}
+const FOCUS = { amt: 0, t: 0, list: [], was: false, kick: 0 };
+// 고속 주행: 3D 바람 줄기 (실제 공간에 떠 있어서 차가 스쳐 지나감, 가까운 건 빠르게 먼 건 느리게)
+const WIND = (() => { const n = isTouch ? 26 : 56, mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: true });
+  const im = new THREE.InstancedMesh(new THREE.BoxGeometry(0.07, 0.07, 1), mat, n); im.frustumCulled = false; im.layers.set(1); scene.add(im);
+  return { im, mat, n, p: Array.from({ length: n }, () => new THREE.Vector3()), live: false }; })();
+function windTick(dt) {
+  const p = player, show = state === "race" && !SPEC.on && !REPLAY.on && !DEMO.on && !p.dead, sr = Math.abs(p.vf) / P.top, boost = p.boostT > 0;
+  const op = show ? clamp((sr - 0.4) * 1.3, 0, 0.55) + (boost ? 0.2 : 0) : 0; WIND.mat.opacity += (op - WIND.mat.opacity) * Math.min(1, 6 * dt); WIND.im.visible = WIND.mat.opacity > 0.01; if (!WIND.im.visible) { WIND.live = false; return; }
+  const sp = Math.hypot(p.vx, p.vz) || 1, fx_ = p.vx / sp, fz_ = p.vz / sp, rx = fz_, rz = -fx_, M = WIND._m || (WIND._m = new THREE.Matrix4()), Q = WIND._q || (WIND._q = new THREE.Quaternion()), S = WIND._s || (WIND._s = new THREE.Vector3()), up = WIND._u || (WIND._u = new THREE.Vector3(0, 0, 1)), d = WIND._d || (WIND._d = new THREE.Vector3());
+  const spawn = (v, far) => { const side = Math.random() < 0.5 ? -1 : 1, lat = side * (1.8 + Math.random() * 8), fwd = far ? 20 + Math.random() * 55 : -10 + Math.random() * 70; v.set(p.x + fx_ * fwd + rx * lat, p.y + 0.3 + Math.random() * 4.2, p.z + fz_ * fwd + rz * lat); };
+  const len = 1 + sp * 0.07 + (boost ? 3 : 0); d.set(fx_, 0, fz_); Q.setFromUnitVectors(up, d); S.set(1, 1, len);
+  for (let i = 0; i < WIND.n; i++) { const v = WIND.p[i]; if (!WIND.live) spawn(v, false); const rel = (v.x - p.x) * fx_ + (v.z - p.z) * fz_; if (rel < -14 || Math.abs((v.x - p.x) * rx + (v.z - p.z) * rz) > 18) spawn(v, true); M.compose(v, Q, S); WIND.im.setMatrixAt(i, M); }
+  WIND.live = true; WIND.im.instanceMatrix.needsUpdate = true;
 }
 
 // ================= 카메라와 그리기 =================
@@ -3237,7 +3248,7 @@ function renderMain(dt) {
   if (FEST.time) FEST.time.value += dt; for (const h of FEST.turbines) h.rotation.z += dt * 0.9; for (const f of FEST.anims) f(dt);
   sky.position.copy(camera.position); ground.position.x = camera.position.x; ground.position.z = camera.position.z;
   const sr = clamp(Math.abs(player.vf) / P.top, 0, 1.6), boost = player.boostT > 0 ? 1 : 0, active = state === "race" || state === "end";
-  const tBlur = active ? Math.max(0, sr - 0.35) * 0.06 + boost * 0.06 + (slowT > 0 ? 0.04 : 0) : 0;
+  const tBlur = active ? Math.max(0, sr - 0.35) * 0.085 + boost * 0.07 + (slowT > 0 ? 0.04 : 0) : 0;
   const tWarp = active ? Math.max(0, sr - 0.3) * 0.13 + boost * 0.13 : 0;
   const tCa = active ? Math.max(0, sr - 0.6) * 0.4 + boost * 0.6 + Math.min(1, shake) * 0.3 : 0;
   const k = 1 - Math.exp(-5 * dt); POST.blur += (tBlur - POST.blur) * k; POST.warp += (tWarp - POST.warp) * k; POST.ca += (tCa - POST.ca) * k;
@@ -3336,7 +3347,7 @@ function frame(now) {
       document.getElementById("center").textContent = countdown > 0.2 ? (n > 0 ? n : "") : "GO!";
       if (countdown <= 0) { state = "race"; raceT = 0; player.lapStart = 0; sndBeep(true); setTimeout(() => { if (state === "race") document.getElementById("center").textContent = ""; }, 700); }
     }
-    if (QFX) QFX.update(dt); dynRes(realDt);
+    if (QFX) QFX.update(dt); dynRes(realDt); windTick(dt);
     if (REPLAY.on) repTick(realDt);
     else if (state === "race" || state === "end") { raceT += dt; /* 결승 뒤에도 시계는 계속 (라이벌 기록 재려고) */ stepPlayer(dt); stepAI(dt); stepWeapons(dt); lapLogic(); }
     else if (state === "count" || state === "menu") { stepPlayer(dt); stepAI(dt); }
