@@ -1107,14 +1107,44 @@ function carLod() { // 멀리 있는 차는 외곽선을 끔 (어차피 안 보�
     const far = c.mesh.position.distanceTo(p) > (SET.gfx === "low" ? 90 : 160); if (u.olFar !== far) { u.olFar = far; for (const o of u.ols) o.visible = !far; } }
 }
 function distCull() { // 그래픽 낮음 1.5km, 높음 4.5km 밖의 소품 묶음(나무·관중·풍선 등)은 안 그림
-  const lim = SET.gfx === "low" ? 1500 : 4500, p = camera.position;
-  for (const o of DCULL) { const sp = o.geometry.boundingSphere; o.visible = sp.center.distanceTo(p) - sp.radius < lim; }
+  const lim = SET.gfx === "low" ? 1100 : 4500, p = camera.position;
+  const limOl = SET.gfx === "low" ? 380 : 900; // 소품 외곽선 묶음은 더 가까이서만
+  for (const o of DCULL) { const sp = o.geometry.boundingSphere; o.visible = sp.center.distanceTo(p) - sp.radius < (o.material === outlineMat ? limOl : lim); }
   const ol = SET.gfx === "low" ? 130 : 320, ol2 = ol * ol; for (const [o, q] of WOL) o.visible = q.distanceToSquared(p) < ol2;
+}
+function mergeStatic() { // 안 움직이는 배경 메시(건물·관중석·간판 등)를 재질·구역별로 하나로 합쳐 그리기 횟수를 줄임
+  const skip = new Set(); for (const pr of PROPS) if (pr.obj) pr.obj.traverse(o => skip.add(o)); // 부서지는 오브젝트는 그대로
+  const snap = new Map(); world.traverse(o => snap.set(o, [o.position.clone(), o.quaternion.clone(), o.scale.clone()]));
+  for (const f of FEST.anims) { try { f(0.05); } catch (e) {} } for (const h of FEST.turbines) h.rotation.z += 0.01; // 움직이는 건 한 번 돌려 보고 찾아냄
+  world.traverse(o => { const q = snap.get(o); if (q && (!q[0].equals(o.position) || !q[1].equals(o.quaternion) || !q[2].equals(o.scale))) o.userData.anim = true; });
+  world.updateMatrixWorld(true); const groups = new Map(), P = new THREE.Vector3();
+  world.traverse(o => { if (!o.isMesh || o.isInstancedMesh || skip.has(o) || !o.visible || o.onBeforeRender !== THREE.Object3D.prototype.onBeforeRender) return;
+    for (let p = o; p && p !== world; p = p.parent) if (p.userData.anim || !p.visible) return;
+    const m = o.material, g = o.geometry; if (!m || Array.isArray(m) || m.transparent || !g.attributes.position || (g.morphAttributes && g.morphAttributes.position)) return;
+    const sig = Object.keys(g.attributes).sort().map(k => k + g.attributes[k].itemSize).join(",") + (g.index ? "I" : "N"); P.setFromMatrixPosition(o.matrixWorld);
+    const mk = [m.type, m.color ? m.color.getHex() : "", m.map ? m.map.uuid : "", m.emissive ? m.emissive.getHex() : "", m.side, m.vertexColors ? 1 : 0, m.opacity, m.gradientMap ? m.gradientMap.uuid : "", m.fog, m.flatShading ? 1 : 0, m.envMap ? m.envMap.uuid : "", m.metalness ?? "", m.roughness ?? "", m.onBeforeCompile && m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile ? m.uuid : ""].join(","); // 색·질감이 같은 재질끼리
+    const key = mk + "|" + sig + "|" + Math.floor(P.x / 420) + "," + Math.floor(P.z / 420) + "|" + (o.castShadow ? 1 : 0) + (o.receiveShadow ? 1 : 0) + "|" + o.renderOrder;
+    let a = groups.get(key); if (!a) groups.set(key, a = []); a.push(o); });
+  const nm = new THREE.Matrix3(), v = new THREE.Vector3(); let merged = 0;
+  for (const list of groups.values()) { if (list.length < 3) continue; const g0 = list[0].geometry, keys = Object.keys(g0.attributes), idxd = !!g0.index;
+    let nv = 0, ni = 0; for (const o of list) { nv += o.geometry.attributes.position.count; if (idxd) ni += o.geometry.index.count; } if (nv > 400000) continue;
+    const out = new THREE.BufferGeometry(), arrs = {}; for (const k of keys) arrs[k] = new Float32Array(nv * g0.attributes[k].itemSize); const idx = idxd ? (nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni)) : null;
+    let vo = 0, io = 0;
+    for (const o of list) { const g = o.geometry, cnt = g.attributes.position.count; nm.getNormalMatrix(o.matrixWorld);
+      for (const k of keys) { const at = g.attributes[k], is = at.itemSize, dst = arrs[k];
+        for (let i = 0; i < cnt; i++) { if (k === "position") { v.fromBufferAttribute(at, i).applyMatrix4(o.matrixWorld); dst[(vo + i) * 3] = v.x; dst[(vo + i) * 3 + 1] = v.y; dst[(vo + i) * 3 + 2] = v.z; }
+          else if (k === "normal") { v.fromBufferAttribute(at, i).applyMatrix3(nm).normalize(); dst[(vo + i) * 3] = v.x; dst[(vo + i) * 3 + 1] = v.y; dst[(vo + i) * 3 + 2] = v.z; }
+          else for (let c = 0; c < is; c++) dst[(vo + i) * is + c] = at.array[i * is + c] ?? at.getComponent?.(i, c) ?? 0; } }
+      if (idxd) { const ix = g.index; for (let i = 0; i < ix.count; i++) idx[io + i] = ix.getX(i) + vo; io += ix.count; } vo += cnt; }
+    for (const k of keys) out.setAttribute(k, new THREE.BufferAttribute(arrs[k], g0.attributes[k].itemSize, g0.attributes[k].normalized)); if (idx) out.setIndex(new THREE.BufferAttribute(idx, 1));
+    out.computeBoundingSphere(); const mm = new THREE.Mesh(out, list[0].material); mm.castShadow = list[0].castShadow; mm.receiveShadow = list[0].receiveShadow; mm.renderOrder = list[0].renderOrder; mm.userData.merged = true; world.add(mm);
+    for (const o of list) o.parent.remove(o); merged += list.length; }
+  return merged;
 }
 function splitInstanced() {
   const pairOf = new Map(); for (const pr of PROPS) if (pr.inst && pr.inst.om) pairOf.set(pr.inst.im, pr.inst.om);
   const outlines = new Set(pairOf.values()), list = []; world.traverse(o => { if (o.isInstancedMesh && o.count > 120 && !outlines.has(o)) list.push(o); });
-  const remap = new Map(), M = new THREE.Matrix4(), P = new THREE.Vector3(), Cc = new THREE.Color(), CELL = 700;
+  const remap = new Map(), M = new THREE.Matrix4(), P = new THREE.Vector3(), Cc = new THREE.Color(), CELL = 800;
   for (const im of list) { const om = pairOf.get(im) || null, groups = new Map(); im.geometry.computeBoundingSphere(); const gr = im.geometry.boundingSphere.radius;
     for (let i = 0; i < im.count; i++) { im.getMatrixAt(i, M); P.setFromMatrixPosition(M); const key = Math.floor(P.x / CELL) + "," + Math.floor(P.z / CELL); let a = groups.get(key); if (!a) groups.set(key, a = []); a.push(i); }
     if (groups.size <= 1) continue; const map = new Array(im.count);
@@ -1143,7 +1173,8 @@ function buildCourse(id) {
   if (id === "dam" && lapsTotal > 3 && typeof setLaps === "function") setLaps(2);
   if (typeof clearSkid === "function") clearSkid();
   splitInstanced(); // 화면 밖 오브젝트는 안 그리게
-  DCULL.length = 0; WOL.length = 0; world.updateMatrixWorld(true); world.traverse(o => { if (o.isInstancedMesh && o.geometry.boundingSphere && o.geometry.boundingSphere.radius < 2000) DCULL.push(o); else if (o.isMesh && !o.isInstancedMesh && o.material === outlineMat) WOL.push([o, new THREE.Vector3().setFromMatrixPosition(o.matrixWorld)]); }); // 멀리 있는 소품 묶음은 거리로 끔
+  mergeStatic(); // 안 움직이는 배경은 합쳐서 그리기 횟수 줄임
+  DCULL.length = 0; WOL.length = 0; world.updateMatrixWorld(true); world.traverse(o => { if (o.isInstancedMesh && o.geometry.boundingSphere && o.geometry.boundingSphere.radius < 2000) DCULL.push(o); else if (o.isMesh && !o.isInstancedMesh && o.material === outlineMat && !o.userData.merged) WOL.push([o, new THREE.Vector3().setFromMatrixPosition(o.matrixWorld)]); }); // 멀리 있는 소품 묶음은 거리로 끔
   makeEnv();
   document.querySelectorAll(".csel").forEach(b => b.classList.toggle("on", b.dataset.c === id));
 }
