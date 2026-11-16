@@ -2924,9 +2924,9 @@ const POST = { on: true, blur: 0, warp: 0, ca: 0 };
 POST.rt = new THREE.WebGLRenderTarget(4, 4, { samples: isTouch ? 2 : 4 }); // 멀티샘플이어야 깊이 정밀도가 24비트 (폰에서 땅이 도로를 덮는 문제 방지)
 POST.scene = new THREE.Scene(); POST.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 POST.mat = new THREE.ShaderMaterial({
-  uniforms: { tD: { value: POST.rt.texture }, blur: { value: 0 }, warp: { value: 0 }, ca: { value: 0 }, ctr: { value: new THREE.Vector2(0.5, 0.47) }, aspect: { value: 1 }, px: { value: new THREE.Vector2(1 / 1280, 1 / 720) }, hatch: { value: 1 } },
+  uniforms: { tD: { value: POST.rt.texture }, tB: { value: null }, bloom: { value: 0 }, vig: { value: 0 }, blur: { value: 0 }, warp: { value: 0 }, ca: { value: 0 }, ctr: { value: new THREE.Vector2(0.5, 0.47) }, aspect: { value: 1 }, px: { value: new THREE.Vector2(1 / 1280, 1 / 720) }, hatch: { value: 1 } },
   vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
-  fragmentShader: `uniform sampler2D tD; uniform float blur, warp, ca, aspect; uniform vec2 ctr, px; uniform float hatch; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tD, tB; uniform float bloom, vig; uniform float blur, warp, ca, aspect; uniform vec2 ctr, px; uniform float hatch; varying vec2 vUv;
     float lum(vec2 p){ vec3 c = texture2D(tD, p).rgb; return dot(c, vec3(0.299, 0.587, 0.114)); }
     void main(){
       vec2 d = vUv - ctr; vec2 da = d; da.x *= aspect; float r2 = dot(da, da);
@@ -2946,12 +2946,28 @@ POST.mat = new THREE.ShaderMaterial({
       float h1 = step(0.55, fract((gl_FragCoord.x + gl_FragCoord.y) / sc)), h2 = step(0.55, fract((gl_FragCoord.x - gl_FragCoord.y) / sc));
       float dark = smoothstep(0.30, 0.12, L), vdark = smoothstep(0.14, 0.05, L);
       col *= 1.0 - (h1 * vdark) * 0.12 * hatch; // 아주 어두운 곳에만 옅게
+      if (bloom > 0.0) { vec3 b = texture2D(tB, uv).rgb; col += b * bloom; col = col / (1.0 + max(vec3(0.0), col - 1.0) * 0.6); } // 빛 번짐: 밝은 곳 주변이 은은하게 빛남
+      col *= 1.0 - vig * smoothstep(0.25, 0.85, length(da)); // 부스트 때 가장자리 어둡게
       gl_FragColor = vec4(col, 1.0);
     }`,
   depthTest: false, depthWrite: false
 });
+// 블룸: 화면을 1/4 크기로 줄여 아주 밝은 곳만 골라 흐리게 번지게 한 뒤 위에 더함
+const BLOOM = { a: new THREE.WebGLRenderTarget(4, 4), b: new THREE.WebGLRenderTarget(4, 4), scene: new THREE.Scene(), px: new THREE.Vector2() };
+BLOOM.bright = new THREE.ShaderMaterial({ uniforms: { tD: { value: POST.rt.texture }, th: { value: 0.93 } }, vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+  fragmentShader: "uniform sampler2D tD; uniform float th; varying vec2 vUv; void main(){ vec3 c = texture2D(tD, vUv).rgb; float m = max(c.r, max(c.g, c.b)); float k = smoothstep(th, 1.0, m); float sat = m - min(c.r, min(c.g, c.b)); gl_FragColor = vec4(c * k * (0.08 + sat * 1.6), 1.0); }", depthTest: false, depthWrite: false }); // 채도 높은 빛(불꽃·네온·부스트)일수록 많이 번짐
+BLOOM.blur = new THREE.ShaderMaterial({ uniforms: { tD: { value: null }, dir: { value: new THREE.Vector2() } }, vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+  fragmentShader: "uniform sampler2D tD; uniform vec2 dir; varying vec2 vUv; void main(){ vec3 c = texture2D(tD, vUv).rgb * 0.227; c += (texture2D(tD, vUv + dir * 1.385).rgb + texture2D(tD, vUv - dir * 1.385).rgb) * 0.316; c += (texture2D(tD, vUv + dir * 3.231).rgb + texture2D(tD, vUv - dir * 3.231).rgb) * 0.070; gl_FragColor = vec4(c, 1.0); }", depthTest: false, depthWrite: false });
+BLOOM.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), BLOOM.bright); BLOOM.scene.add(BLOOM.quad); POST.mat.uniforms.tB.value = BLOOM.a.texture;
+function bloomResize(w, h) { const bw = Math.max(4, Math.floor(w / 4)), bh = Math.max(4, Math.floor(h / 4)); BLOOM.a.setSize(bw, bh); BLOOM.b.setSize(bw, bh); BLOOM.px.set(1 / bw, 1 / bh); }
+function bloomRender() {
+  BLOOM.quad.material = BLOOM.bright; renderer.setRenderTarget(BLOOM.a); renderer.render(BLOOM.scene, POST.cam);
+  BLOOM.quad.material = BLOOM.blur; for (const r of [1, 2.2]) { // 가로·세로 두 번씩 (두 번째는 더 넓게)
+    BLOOM.blur.uniforms.tD.value = BLOOM.a.texture; BLOOM.blur.uniforms.dir.value.set(BLOOM.px.x * r, 0); renderer.setRenderTarget(BLOOM.b); renderer.render(BLOOM.scene, POST.cam);
+    BLOOM.blur.uniforms.tD.value = BLOOM.b.texture; BLOOM.blur.uniforms.dir.value.set(0, BLOOM.px.y * r); renderer.setRenderTarget(BLOOM.a); renderer.render(BLOOM.scene, POST.cam); }
+}
 POST.scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), POST.mat)); POST.mat.uniforms.hatch.value = courseId === "circuit" ? 0.15 : 1;
-function postResize() { const v = new THREE.Vector2(); renderer.getDrawingBufferSize(v); POST.rt.setSize(Math.max(4, v.x), Math.max(4, v.y)); POST.mat.uniforms.aspect.value = v.x / Math.max(1, v.y); POST.mat.uniforms.px.value.set(1 / Math.max(1, v.x), 1 / Math.max(1, v.y)); }
+function postResize() { const v = new THREE.Vector2(); renderer.getDrawingBufferSize(v); POST.rt.setSize(Math.max(4, v.x), Math.max(4, v.y)); bloomResize(v.x, v.y); POST.mat.uniforms.aspect.value = v.x / Math.max(1, v.y); POST.mat.uniforms.px.value.set(1 / Math.max(1, v.x), 1 / Math.max(1, v.y)); }
 postResize(); addEventListener("resize", postResize); try { new ResizeObserver(postResize).observe(document.documentElement); } catch (e) {}
 function renderMain(dt) {
   if (FEST.time) FEST.time.value += dt; for (const h of FEST.turbines) h.rotation.z += dt * 0.9; for (const f of FEST.anims) f(dt);
@@ -2962,9 +2978,11 @@ function renderMain(dt) {
   const tCa = active ? Math.max(0, sr - 0.6) * 0.4 + boost * 0.6 + Math.min(1, shake) * 0.3 : 0;
   const k = 1 - Math.exp(-5 * dt); POST.blur += (tBlur - POST.blur) * k; POST.warp += (tWarp - POST.warp) * k; POST.ca += (tCa - POST.ca) * k;
   const u = POST.mat.uniforms; u.blur.value = POST.blur; u.warp.value = POST.warp; u.ca.value = POST.ca;
+  const bloomOn = SET.gfx !== "low"; u.bloom.value = bloomOn ? (courseId === "circuit" ? 1.3 : 0.7) + boost * 0.3 : 0; // 밤 서킷은 더 세게, 폰(그래픽 낮음)은 끔
+  POST.vig = (POST.vig || 0) + ((active ? boost * 0.45 + Math.max(0, sr - 0.7) * 0.25 : 0) - (POST.vig || 0)) * k; u.vig.value = POST.vig;
   sun.target.position.set(player.x, player.y, player.z); sun.position.set(player.x + SUN_DIR.x * 120, player.y + SUN_DIR.y * 120, player.z + SUN_DIR.z * 120); // 그림자 범위가 플레이어를 따라감
   if (POST.on) {
-    renderer.setRenderTarget(POST.rt); renderer.render(scene, camera); renderer.setRenderTarget(null); renderer.render(POST.scene, POST.cam);
+    renderer.setRenderTarget(POST.rt); renderer.render(scene, camera); if (POST.mat.uniforms.bloom.value > 0) bloomRender(); renderer.setRenderTarget(null); renderer.render(POST.scene, POST.cam);
   } else renderer.render(scene, camera);
 }
 
