@@ -2290,6 +2290,7 @@ function tireStep(dt, env) {
 }
 function stepPlayer(dt) { stepCar(player, player.dead ? DEAD_INP : input, dt); }
 function stepCar(p, inp, dt) {
+  if (window.__yawlog && p === player && !p.tumble) { const d = (p.ry || 0) - (p._ry || 0); if (Math.abs(d) > (window.__yawTh || 0.5)) window.__yawlog.push({ t: +raceT.toFixed(2), d: +d.toFixed(2), src: raceT - (p.kSrcT ?? -9) < 0.1 ? p.kSrc : "?", s: Math.round(p.s), lat: +p.lat.toFixed(1), v: Math.round(p.vf), air: +(p.air || 0).toFixed(2), st: inp.steer }); } p._ry = p.ry;
   CUR = p; INP = inp; const isP = p === player, canGo = (state === "race" || (state === "end" && !isP)) && !p.done && !p.dead; // 내가 들어온 뒤에도 라이벌은 끝까지 달림
   let slip = false;
   for (const a of [player, ...ais]) { if (a === p) continue; const d = a.prog - p.prog; if (d > 3 && d < 32 && p.vf > 15 && Math.abs(a.lat - p.lat) < 3.6) slip = true; }
@@ -2596,8 +2597,9 @@ function stepAI(dt) {
     let tx = rvx - vn * nxh, tz = rvz - vn * nzh; const tl = Math.hypot(tx, tz); let jt = 0;
     if (tl > 0.01) { tx /= tl; tz /= tl; const kAt = kx(rA, tx, tz), kBt = kx(rB, tx, tz); jt = clamp(-tl / (wA + wB + kAt * kAt / IA + kBt * kBt / IB), -0.35 * jn, 0.35 * jn); }
     const Jx = nxh * jn + tx * jt, Jz = nzh * jn + tz * jt;
-    A.vx += Jx * wA; A.vz += Jz * wA; A.ry = clamp(A.ry + kx(rA, Jx, Jz) / IA, -4, 4);
-    B.vx -= Jx * wB; B.vz -= Jz * wB; B.ry = clamp(B.ry - kx(rB, Jx, Jz) / IB, -4, 4);
+    const yk = clamp(-vn / 14, 0.2, 1) * 0.6, ycap = -vn > 10 ? 2.5 : 1.0; /* 살짝 스친 걸로 차가 훅 돌지 않게: 약하게 닿으면 회전은 조금만, 세게 박아야 크게 돎 */
+    A.kSrc = B.kSrc = "car"; A.kSrcT = B.kSrcT = raceT; A.vx += Jx * wA; A.vz += Jz * wA; A.ry = clamp(A.ry + clamp(kx(rA, Jx, Jz) / IA * yk, -ycap, ycap), -4, 4);
+    B.vx -= Jx * wB; B.vz -= Jz * wB; B.ry = clamp(B.ry - clamp(kx(rB, Jx, Jz) / IB * yk, -ycap, ycap), -4, 4);
     fromWorld(A); fromWorld(B);
     const hard = -vn; if (hard > 3) { A.hitT = B.hitT = 0.8; A.kickT = B.kickT = 1.2; }
     for (const [Q, sg, w_] of [[A, 1, wA], [B, -1, wB]]) { // 옆구리를 세게 맞으면 바퀴가 걸려 넘어감
@@ -2784,7 +2786,7 @@ function stepWreck(dt) {
       const sp = Math.hypot(c.vx, c.vz); if (sp < 4) continue;
       const k = 0.9 + Math.random() * 0.5; w.vx = c.vx * k + (Math.random() - 0.5) * 8; w.vz = c.vz * k + (Math.random() - 0.5) * 8; w.vy = 4 + Math.random() * 6 + Math.min(8, sp * 0.05); w.wx = (Math.random() - 0.5) * 25; w.wy = (Math.random() - 0.5) * 25; w.wz = (Math.random() - 0.5) * 25; w.rest = false; w.hitT = 0.5;
       const big = Math.min(1.6, w.r), spf = Math.min(1, sp / 60); c.kickT = 1.2;
-      c.vy = (c.vy || 0) + big * 3.5 * spf; c.ry += (Math.random() - 0.5) * big * 0.9 * spf;
+      c.vy = (c.vy || 0) + big * 3.5 * spf; c.ry += (Math.random() - 0.5) * big * 0.4 * spf; c.kSrc = "debris"; c.kSrcT = raceT;
       if (!c.tumble && big > 1.1 && sp > 60 && Math.random() < 0.12) (window.__tlog && window.__tlog.push("debris")), enterTumble(c, (Math.random() - 0.5) * big * 3, (Math.random() - 0.5) * big * 3, big * 4); c.vf *= 1 - Math.min(0.06, big * 0.03); toWorld(c);
       applyDamage(c, big * 0.8 * spf, hitLocal(c, fx, fz), null, 'debris');
       if (c === player) shake = Math.max(shake, 0.25 + big * 0.3); sndClank(0.6 + big * 0.4, w.x, w.z); sndImpact(6 + big * 6, w.x, w.z, 0.5);
@@ -2859,7 +2861,7 @@ function stepProps() { // 차가 들이받으면 부숴짐
       if (Math.abs(lz) > hl + pr.r * 0.6 || Math.abs(lx) > hw + pr.r * 0.6) continue; if (c.y > pr.y + pr.h + 0.5 || c.y < pr.y - 3) continue;
       const K = PROP_KIND[pr.kind]; breakProp(pr, c.vx * (1.05 + Math.random() * 0.3) + (Math.random() - 0.5) * 6, 3 + Math.random() * 5 + sp * 0.04, c.vz * (1.05 + Math.random() * 0.3) + (Math.random() - 0.5) * 6);
       if (c.tumble) { c.tv.multiplyScalar(K.slow); continue; }
-      c.vf *= K.slow; c.vl *= K.slow; toWorld(c); if (K.dmg) { applyDamage(c, K.dmg * Math.min(1, sp / 50), hitLocal(c, fx, fz), null, "prop"); c.ry += (Math.random() - 0.5) * 0.4 * (1 - K.slow) * 10; c.kickT = 1; }
+      c.vf *= K.slow; c.vl *= K.slow; toWorld(c); c.kSrc = "prop:" + pr.kind; c.kSrcT = raceT; if (K.dmg) { applyDamage(c, K.dmg * Math.min(1, sp / 50), hitLocal(c, fx, fz), null, "prop"); c.ry += (Math.random() - 0.5) * 0.4 * (1 - K.slow) * 10; c.kickT = 1; }
       if (c === player) shake = Math.max(shake, (1 - K.slow) * 4 + 0.08);
     }
   }
@@ -2903,7 +2905,7 @@ function collideSolids(p, tumble) { // 차 앞·가운데·뒤 세 원으로 검
     const [nx_, nz_, pen] = hit;
     if (tumble) { p.tc.x += nx_ * pen; p.tc.z += nz_ * pen; const vn = p.tv.x * nx_ + p.tv.z * nz_; if (vn < 0) { p.tv.x -= nx_ * vn * 1.3; p.tv.z -= nz_ * vn * 1.3; if (-vn > 8) applyDamage(p, dmgWall(-vn) * SMASH, hitLocal(p, -nx_, -nz_), null, "solid"); if (-vn > 4) sndImpact(-vn, p.x, p.z); } p.x = p.tc.x; p.z = p.tc.z; continue; }
     p.x += nx_ * pen; p.z += nz_ * pen; const vn = p.vx * nx_ + p.vz * nz_;
-    if (vn < 0) { p.vx -= nx_ * vn * 1.25; p.vz -= nz_ * vn * 1.25; p.vx *= 0.9; p.vz *= 0.9; fromWorld(p); p.ry *= 0.5; p.ry += (o > 0 ? 1 : o < 0 ? -1 : 0) * Math.min(2, -vn * 0.04) * (Math.random() < 0.5 ? 1 : -1); // 모서리를 박으면 휙 돎
+    if (vn < 0) { p.kSrc = "wall"; p.kSrcT = raceT; p.vx -= nx_ * vn * 1.25; p.vz -= nz_ * vn * 1.25; p.vx *= 0.9; p.vz *= 0.9; fromWorld(p); p.ry *= 0.5; p.ry += (o > 0 ? 1 : o < 0 ? -1 : 0) * Math.min(2, -vn * 0.04) * (Math.random() < 0.5 ? 1 : -1); // 모서리를 박으면 휙 돎
       if (-vn > 8) applyDamage(p, dmgWall(-vn) * SMASH, hitLocal(p, -nx_, -nz_), null, "solid");
       if (-vn > 26 && !p.dead) { const rr = vn * 0.12; enterTumble(p, -nz_ * rr, nx_ * rr, -vn * 0.2); }
       if (-vn > 4) sndImpact(-vn * 1.1, p.x, p.z); if (isP) shake = Math.max(shake, Math.min(1.2, -vn / 18));
@@ -3765,7 +3767,7 @@ function simulate(secs, driver) {
   for (let t = 0; t < secs; t += dt) { if (state !== "race" && state !== "end") break; const d = driver(player); Object.assign(input, d); raceT += dt; stepPlayer(dt); stepAI(dt); stepWeapons(dt); stepProps(); stepWreck(dt); lapLogic(); syncMeshes(dt); recFrame(); }
 }
 window.__cam = () => { updateCamera(1 / 30); return camera.position.distanceTo(new THREE.Vector3(player.x, player.y, player.z)); };
-window.__SND = SND; window.__upd = updateSound; window.__inp = input; window.__bgp = { get SFX() { return SFX; }, get renderer() { return renderer; }, get scene() { return scene; }, get camera() { return camera; }, get REC() { return REC; }, detachPart, ensureDmg, raySolid, get SOLIDS() { return SOLIDS; }, useSpecial, fireGun, PROJ, TETHERS, setSpecial, enterTumble, applyDamage, explode, hitLocal, repairAll, get REPLAY() { return REPLAY; }, WRECK, get GAP() { return GAP; }, player, ais, get state() { return state; }, get L() { return L; }, get HALF() { return HALF; }, P, startRace, simulate, get TRK() { return TRK; }, idxAtS, posAt, surfH, setCourse(id) { buildCourse(id); loadBest(); placeGrid(); }, skipCount() { if (state === "intro") introEnd(); countdown = 0.01; } };
+window.__SND = SND; window.__upd = updateSound; window.__inp = input; window.__bgp = { get SFX() { return SFX; }, get renderer() { return renderer; }, get scene() { return scene; }, get camera() { return camera; }, get REC() { return REC; }, detachPart, ensureDmg, raySolid, get SOLIDS() { return SOLIDS; }, useSpecial, fireGun, PROJ, TETHERS, setSpecial, enterTumble, applyDamage, explode, hitLocal, repairAll, demoDrive, get REPLAY() { return REPLAY; }, WRECK, get GAP() { return GAP; }, player, ais, get state() { return state; }, get L() { return L; }, get HALF() { return HALF; }, P, startRace, simulate, get TRK() { return TRK; }, idxAtS, posAt, surfH, setCourse(id) { buildCourse(id); loadBest(); placeGrid(); }, skipCount() { if (state === "intro") introEnd(); countdown = 0.01; } };
 })();
 </script>
 </body>
