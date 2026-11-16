@@ -262,6 +262,7 @@
   <div class="card">
     <h1>설정</h1>
     <div class="setrow">전체 음량 <input type="range" id="sVol" min="0" max="100" step="5"></div>
+    <div class="setrow">속도 흐림 <span><button class="lsel" data-blr="1">보통</button><button class="lsel" data-blr="0.5">약하게</button><button class="lsel" data-blr="0">끔</button></span></div>
     <div class="setrow">화면 흔들림 <span><button class="lsel" data-shk="1">보통</button><button class="lsel" data-shk="0.5">약하게</button><button class="lsel" data-shk="0">끔</button></span></div>
     <div class="setrow">그래픽 <span><button class="lsel" data-gfx="high">높음</button><button class="lsel" data-gfx="low">낮음 (폰 추천)</button></span></div>
     <button class="ghost" id="bSetBack">뒤로</button>
@@ -1920,13 +1921,13 @@ document.getElementById("spChase").onclick = () => specMode("chase"); document.g
 function toMenu() { introCleanup(); repStop(); specOff(); clearTimeout(endTimer); state = "menu"; placeGrid(); gridFresh = true; showScreen("startScreen"); }
 function toTitle() { introCleanup(); repStop(); specOff(); clearTimeout(endTimer); state = "menu"; placeGrid(); gridFresh = true; showScreen("titleScreen"); }
 function isTouchDev() { return matchMedia("(pointer: coarse)").matches || "ontouchstart" in window; }
-const SET = { vol: 60, shake: 1, gfx: isTouchDev() ? "low" : "high" }; try { Object.assign(SET, JSON.parse(localStorage.getItem("bgp_set") || "{}")); } catch (e) {}
+const SET = { vol: 60, shake: 1, blur: 0.5, gfx: isTouchDev() ? "low" : "high" }; try { Object.assign(SET, JSON.parse(localStorage.getItem("bgp_set") || "{}")); } catch (e) {}
 function applySet() {
   try { localStorage.setItem("bgp_set", JSON.stringify(SET)); } catch (e) {}
   if (SND.master) SND.master.gain.value = SND.on ? SET.vol / 100 : 0;
   renderer.setPixelRatio(SET.gfx === "low" ? Math.min(window.devicePixelRatio, 1) : Math.min(window.devicePixelRatio, 1.5)); renderer.shadowMap.enabled = SET.gfx !== "low"; resize(); applyViewDist(); if (typeof DYN !== "undefined") DYN.pr = 0;
   document.getElementById("sVol").value = SET.vol;
-  document.querySelectorAll("[data-shk]").forEach(b => b.classList.toggle("on", +b.dataset.shk === SET.shake)); document.querySelectorAll("[data-gfx]").forEach(b => b.classList.toggle("on", b.dataset.gfx === SET.gfx));
+  document.querySelectorAll("[data-shk]").forEach(b => b.classList.toggle("on", +b.dataset.shk === SET.shake)); document.querySelectorAll("[data-blr]").forEach(b => b.classList.toggle("on", +b.dataset.blr === SET.blur)); document.querySelectorAll("[data-gfx]").forEach(b => b.classList.toggle("on", b.dataset.gfx === SET.gfx));
 }
 function togglePause() {
   if (DEMO.on) return;
@@ -1966,6 +1967,7 @@ titleBtn("tmRace", () => showScreen("startScreen")); titleBtn("tmHelp", () => sh
 document.getElementById("bHelpBack").onclick = document.getElementById("bSetBack").onclick = document.getElementById("bSetupBack").onclick = () => showScreen("titleScreen");
 document.getElementById("sVol").oninput = e => { SET.vol = +e.target.value; applySet(); };
 document.querySelectorAll("[data-shk]").forEach(b => b.onclick = () => { SET.shake = +b.dataset.shk; applySet(); });
+document.querySelectorAll("[data-blr]").forEach(b => b.onclick = () => { SET.blur = +b.dataset.blr; applySet(); });
 document.querySelectorAll("[data-gfx]").forEach(b => b.onclick = () => { SET.gfx = b.dataset.gfx; applySet(); });
 setTimeout(applySet, 0);
 document.getElementById("bMenu").onclick = toMenu;
@@ -3311,7 +3313,7 @@ function dynRes(realDt) {
   if (!isTouch || state !== "race") return; DYN.sum += realDt; DYN.n++; DYN.t += realDt; if (DYN.t < 2) return;
   const avg = DYN.sum / DYN.n * 1000, base = SET.gfx === "low" ? Math.min(window.devicePixelRatio, 1) : Math.min(window.devicePixelRatio, 1.5); DYN.t = 0; DYN.n = 0; DYN.sum = 0;
   if (!DYN.pr) DYN.pr = renderer.getPixelRatio();
-  let pr = DYN.pr; if (avg > 24) pr = Math.max(0.55, pr - 0.1); else if (avg < 17) pr = Math.min(base, pr + 0.05);
+  let pr = DYN.pr; const floor = Math.max(0.7, base * 0.75); if (avg > 30) pr = Math.max(floor, pr - 0.05); else if (avg < 22) pr = Math.min(base, pr + 0.1); // 너무 흐려지지 않게 최소 75%까지만 낮춤
   if (Math.abs(pr - DYN.pr) > 0.001) { DYN.pr = pr; renderer.setPixelRatio(pr); resize(); postResize(); }
 }
 function renderMain(dt) {
@@ -3320,13 +3322,13 @@ function renderMain(dt) {
   if (FEST.time) FEST.time.value += dt; for (const h of FEST.turbines) h.rotation.z += dt * 0.9; for (const f of FEST.anims) f(dt);
   sky.position.copy(camera.position); ground.position.x = camera.position.x; ground.position.z = camera.position.z;
   const sr = clamp(Math.abs(player.vf) / P.top, 0, 1.6), boost = player.boostT > 0 ? 1 : 0, active = state === "race" || state === "end";
-  const tBlur = active ? Math.max(0, sr - 0.35) * 0.085 + boost * 0.07 + (slowT > 0 ? 0.04 : 0) : 0;
+  const tBlur = active ? (Math.max(0, sr - 0.45) * 0.07 + boost * 0.06) * SET.blur + (slowT > 0 ? 0.03 : 0) : 0; // 설정의 '속도 흐림'으로 조절 (기본 약하게)
   const tWarp = active ? Math.max(0, sr - 0.3) * 0.13 + boost * 0.13 : 0;
   const tCa = active ? Math.max(0, sr - 0.6) * 0.4 + boost * 0.6 + Math.min(1, shake) * 0.3 : 0;
   const k = 1 - Math.exp(-5 * dt); POST.blur += (tBlur - POST.blur) * k; POST.warp += (tWarp - POST.warp) * k; POST.ca += (tCa - POST.ca) * k;
   stretchTick(dt); const stx = STRETCH.x * STRETCH.sc;
-  const u = POST.mat.uniforms; u.blur.value = POST.blur + Math.max(0, stx) * 0.06; u.warp.value = POST.warp + stx * 0.42; u.ca.value = POST.ca + Math.abs(stx) * 0.5; // 가장자리만 늘어나고 가운데는 선명 (줄어들 땐 반대로 오므라듦)
-  const bloomOn = SET.gfx !== "low"; u.lite.value = SET.gfx === "low" ? 1 : 0; u.aoK.value = SET.gfx === "low" ? 0 : 0.8; u.bloom.value = bloomOn ? (courseId === "circuit" ? 1.3 : 0.7) + boost * 0.3 : 0; // 밤 서킷은 더 세게, 폰(그래픽 낮음)은 끔
+  const u = POST.mat.uniforms; u.blur.value = POST.blur + Math.max(0, stx) * 0.04 * SET.blur; u.warp.value = POST.warp + stx * 0.42; u.ca.value = POST.ca + Math.abs(stx) * 0.5; // 가장자리만 늘어나고 가운데는 선명 (줄어들 땐 반대로 오므라듦)
+  const bloomOn = SET.gfx !== "low"; u.lite.value = SET.gfx === "low" ? 1 : 0; u.aoK.value = SET.gfx === "low" ? 0 : 0.8; u.bloom.value = bloomOn ? (courseId === "circuit" ? 1.2 : 0.38) + boost * 0.25 : 0; BLOOM.bright.uniforms.th.value = courseId === "circuit" ? 0.93 : 0.965; // 낮 코스는 하늘·모래가 뿌옇게 번지지 않게 약하게 // 밤 서킷은 더 세게, 폰(그래픽 낮음)은 끔
   POST.vig = (POST.vig || 0) + ((active ? boost * 0.45 + Math.max(0, sr - 0.7) * 0.25 : 0) - (POST.vig || 0)) * k; u.vig.value = POST.vig;
   { const f = SUN_DIR, r = _shR.set(0, 1, 0).cross(f); if (r.lengthSq() < 1e-6) r.set(1, 0, 0); r.normalize(); const up = _shU.copy(f).cross(r), tex = 90 / sun.shadow.mapSize.x, P0 = _shP.set(player.x, player.y, player.z); // 그림자 픽셀 격자에 맞춰 스냅
     const a = Math.round(P0.dot(r) / tex) * tex, b = Math.round(P0.dot(up) / tex) * tex, c = P0.dot(f); P0.copy(r).multiplyScalar(a).addScaledVector(up, b).addScaledVector(f, c);
