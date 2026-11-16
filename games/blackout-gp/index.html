@@ -77,6 +77,10 @@
   #touch .tb.on { background: rgba(216,90,48,.7); }
   /* 모바일: 왼쪽 핸들, 오른쪽 버튼 3개 (엄지 부채꼴) */
   #touch #tLeft, #touch #tRight { display: none; }
+  #touch #tRet { right: calc(14px + env(safe-area-inset-right)); top: calc(112px + env(safe-area-inset-top)); bottom: auto; width: min(13vh, 56px); height: min(13vh, 56px); font-size: 11px; line-height: 1.15; text-align: center; opacity: .75; flex-direction: column; }
+  #touch #tRet.need { opacity: 1; background: #d85a30 !important; border-color: #fff !important; animation: rpulse .8s ease-in-out infinite alternate; }
+  @keyframes rpulse { from { transform: scale(1); } to { transform: scale(1.12); } }
+  body.touch #bReset { display: none; } #bReset.need { background: #d85a30; }
   #touch .tb { border-width: 2px; border-color: rgba(255,255,255,.55); background: rgba(0,0,0,.25); font-size: 14px; user-select: none; -webkit-user-select: none; touch-action: none; }
   #touch #tBrake { right: 18px !important; bottom: 22px !important; left: auto !important; width: min(23vh, 104px); height: min(23vh, 104px); }
   #touch #tNitro { right: calc(18px + min(25vh, 114px)) !important; bottom: 26px !important; width: min(19vh, 86px); height: min(19vh, 86px); }
@@ -190,6 +194,7 @@
   <div class="tb" id="tNitro" style="right:104px;bottom:128px;">부스트</div>
   <div class="tb" id="tDrift" style="right:190px;bottom:118px;width:64px;height:64px;font-size:13px;">드리프트</div>
   <div class="tb" id="tGun" style="right:18px;bottom:226px;width:72px;height:72px;font-size:13px;">기관포</div>
+  <div class="tb" id="tRet">↺<br>복귀</div>
   <div class="tb" id="tSp" style="right:104px;bottom:226px;width:72px;height:72px;font-size:13px;">특수</div>
 </div>
 
@@ -199,6 +204,7 @@
   <button id="bCam">시점 전환 (C)</button>
   <button id="bSnd">소리 켬 (M)</button>
   <button id="bFull">⛶ 전체화면</button>
+  <button id="bReset">↺ 복귀 (R)</button>
 </div>
 
 <div id="tune">
@@ -1415,6 +1421,9 @@ for (const [id, k] of [["tLeft", "left"], ["tRight", "right"], ["tGas", "gas"], 
   const off = e => { e.preventDefault(); touch[k] = false; el.classList.remove("on"); };
   el.addEventListener("pointerdown", on); el.addEventListener("pointerup", off); el.addEventListener("pointercancel", off); el.addEventListener("pointerleave", off);
 }
+{ const doReset = e => { if (e) e.preventDefault(); if (state === "race" && !player.dead && !player.done) resetToTrack(); }; // 복귀 버튼 (PC는 R키와 같음)
+  document.getElementById("tRet").addEventListener("pointerdown", e => { doReset(e); e.currentTarget.classList.add("on"); }); document.getElementById("tRet").addEventListener("pointerup", e => e.currentTarget.classList.remove("on"));
+  document.getElementById("bReset").onclick = () => doReset(); }
 let padInfo = "게임패드: 연결 안 됨", yHeld = false, steerTarget = 0;
 // ---- 모바일 옵션: 자동 가속
 const MOB = { gas: true, steer: "wheel" }; try { const o = JSON.parse(localStorage.getItem("bgp_mob") || "{}"); Object.assign(MOB, o); } catch (e) {} MOB.steer = "wheel"; delete MOB.gun; // 조향은 핸들만, 자동 사격은 없앰
@@ -2715,6 +2724,9 @@ function syncMeshes(dt) {
   }
 }
 function updateHud() {
+  { const p = player, t = TRK[p.idx], off = t && Math.abs(p.lat) > t.hw + 3, flip = p.tumble || Math.abs(p.roll || 0) > 1.2, slow = Math.abs(p.vf) < 3; // 걸리거나 뒤집히면 복귀 버튼이 깜빡임
+    const bad = state === "race" && !p.dead && !p.done && (off || flip || slow) && raceT > 3; if (!bad) p.needSince = 0; else if (!p.needSince) p.needSince = performance.now(); const need = bad && performance.now() - p.needSince > 1200;
+    if (need !== p.needShown) { p.needShown = need; document.getElementById("tRet").classList.toggle("need", need); document.getElementById("bReset").classList.toggle("need", need); } }
   const st = standings(), pos = st.findIndex(r => r.me) + 1, lap = Math.min(lapsTotal, Math.max(1, player.laps.length + 1));
   const hp = Math.max(0, player.hp ?? 100), hc = hp > 70 ? "#7cff8a" : hp > 40 ? "#ffd23a" : hp > 15 ? "#ff8a2a" : (performance.now() % 400 < 200 ? "#ff2a2a" : "#5a1010");
   document.getElementById("hudTL").innerHTML = `<b>${pos}</b> / ${TOTAL} 위<br>랩 ${lap} / ${lapsTotal}<br><span style="display:inline-block;width:96px;height:9px;background:rgba(0,0,0,.5);border:1px solid #fff4;vertical-align:middle"><i style="display:block;width:${hp}%;height:100%;background:${hc}"></i></span> <small>내구도</small><br>${player.slip ? '<span style="color:#39d4ff">슬립스트림</span>' : ""}`;
