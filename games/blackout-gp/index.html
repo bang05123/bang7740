@@ -1317,7 +1317,7 @@ function carKit(color, accent) {
 
 // 주인공 0번: 긴 보닛, 패스트백, 트렁크에 붙은 낮은 스포일러의 아메리칸 쿠페
 // o: { len, color, accent, wing, scoop, num, rim, rust, pipes }
-function carDetail0(K, o, W, zz, P) { /* 주인공 0번 세밀 부품: 패널 틈, 리벳, 손잡이, 사이드 파이프, 보닛 핀·루버, 블로워 리브, 창틀, 뒷유리 루버, 미러, 안테나, 주유구, 범퍼, 번호판 */
+function carDetail0(K, o, W, zz, P) { /* 주인공 0번 세밀 부품: 패널 틈, 손잡이, 사이드 파이프, 보닛 핀·루버, 블로워 리브, 창틀, 뒷유리 루버, 미러, 안테나, 주유구, 범퍼, 번호판 */
   const B = (w, h, d) => new THREE.BoxGeometry(w, h, d), Cyl = (r, h, sg = 8) => new THREE.CylinderGeometry(r, r, h, sg), PI = Math.PI;
   const _q = new THREE.Quaternion(), _e = new THREE.Euler(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), Z = new THREE.Vector3(0, 0, 1);
   const rod = (a, b, w, h) => { _a.set(...a); _b.set(...b); const d = _b.clone().sub(_a), len = d.length(); _q.setFromUnitVectors(Z, d.normalize()); _e.setFromQuaternion(_q); return [B(w, h, len), (_a.x + _b.x) / 2, (_a.y + _b.y) / 2, (_a.z + _b.z) / 2, _e.x, _e.y, _e.z]; };
@@ -1335,27 +1335,24 @@ function carDetail0(K, o, W, zz, P) { /* 주인공 0번 세밀 부품: 패널 �
     for (const z of [1.32, -0.92]) seams.push([B(0.03, 0.46, 0.03), X, 0.9, zz(z)]); // 문 틈
     seams.push([B(0.03, 0.025, zz(2.24)), X, 0.69, zz(0.2)]);
     seams.push([B(0.03, 0.08, 0.28), X, 1.04, zz(-0.55)]); chrome.push([B(0.05, 0.035, 0.22), X + sd * 0.012, 1.05, zz(-0.55)]); // 손잡이
-    for (let z = -0.8; z <= 1.21; z += 0.2) rivs.push([rivS, X + sd * 0.008, 1.115, zz(z)]); // 허리선 리벳
     acc.push([B(0.02, 0.035, zz(2.2)), X + sd * 0.004, 0.96, zz(0.2)]); // 핀스트라이프
     chrome.push([B(0.42, 0.05, 0.16), sd * 0.79, 0.975, zz(3.15), -0.3]); // 헤드라이트 눈썹 (차체색 아래 크롬 테)
   }
   // 보닛 핀·루버
   for (const sx of [-0.72, 0.72]) { const z = zz(2.85), y = top(z); chrome.push([Cyl(0.035, 0.06, 8), sx, y + 0.02, z]); chrome.push([new THREE.TorusGeometry(0.055, 0.011, 5, 12).rotateX(PI / 2), sx, y + 0.012, z]); }
   for (const sx of [-0.62, 0.62]) for (let k = 0; k < 5; k++) { const z = zz(2.15 + k * 0.13); seams.push([B(0.3, 0.03, 0.045), sx, top(z) + 0.014, z, slope(top, z)]); }
-  // 블로워 밑 볼트
-  for (let k = 0; k <= 5; k++) { const z = zz(0.85 + k * 0.2); for (const sx of [-0.48, 0.48]) rivs.push([rivU, sx, top(z) + 0.008, z]); }
   // 뒤: 후미등 틀, 번호판
   seams.push([B(W * 0.9, 0.22, 0.04), 0, 0.96, zz(-3.315)]);
   seams.push([B(0.56, 0.24, 0.015), 0, 0.66, zz(-3.303)]);
   on(body, DARK, seams); on(body, CHROME, chrome); on(body, RIV, rivs); on(body, o.accent ?? 0x111111, acc); on(body, 0xe8e2c8, [[B(0.5, 0.19, 0.02), 0, 0.66, zz(-3.312)]]);
   on(body, 0xfff2b0, [[Cyl(0.07, 0.04, 12).rotateX(PI / 2), -0.86, 0.6, zz(3.31)], [Cyl(0.07, 0.04, 12).rotateX(PI / 2), 0.86, 0.6, zz(3.31)]], true); // 안개등
   // 펜더 리벳 + 아가미
-  (P.ff || []).forEach(pt => { const sd = Math.sign(pt.position.x), r = []; along(zp([[1.45, 0.6], [1.7, 1.14], [2.55, 1.1], [2.9, 0.62]]), 10, 0.1, 0.9, (z, y) => r.push([rivS, sd * 1.337, y - 0.07, z])); on(pt, RIV, r);
+  (P.ff || []).forEach(pt => { const sd = Math.sign(pt.position.x), r = [];
     on(pt, DARK, [0, 1, 2].map(k => [B(0.025, 0.15, 0.035), sd * 1.335, 0.95, zz(1.95 + k * 0.12), 0.35])); });
-  (P.rf || []).forEach(pt => { const sd = Math.sign(pt.position.x), r = []; along(zp([[-2.85, 0.62], [-2.55, 1.22], [-1.45, 1.26], [-1.05, 0.62]]), 11, 0.1, 0.9, (z, y) => r.push([rivS, sd * 1.407, y - 0.08, z])); on(pt, RIV, r);
+  (P.rf || []).forEach(pt => { const sd = Math.sign(pt.position.x), r = [];
     if (sd > 0) { const z = zz(-1.85), y = 1.28; on(pt, CHROME, [[Cyl(0.1, 0.04, 16), sd * 1.23, y + 0.02, z], ...[0, 1, 2, 3, 4, 5].map(k => [rivU, sd * 1.23 + Math.cos(k * PI / 3) * 0.13, y + 0.01, z + Math.sin(k * PI / 3) * 0.13])]); } }); // 주유구
   // 하부 장갑판
-  if (P.under) { const it = [], rv = []; for (const sd of [-1, 1]) { it.push([B(0.03, 0.2, zz(1.9)), sd * 1.19, 0.53, zz(0.2)]); for (let z = -0.7; z <= 1.11; z += 0.3) rv.push([rivS, sd * 1.208, 0.6, zz(z)]); } for (let k = -2; k <= 2; k++) it.push([B(0.03, 0.16, 0.45), k * 0.2, 0.38, zz(-3.1)]); on(P.under, ARM, it); on(P.under, RIV, rv); }
+  if (P.under) { const it = [], rv = []; for (const sd of [-1, 1]) { it.push([B(0.03, 0.2, zz(1.9)), sd * 1.19, 0.53, zz(0.2)]); } for (let k = -2; k <= 2; k++) it.push([B(0.03, 0.16, 0.45), k * 0.2, 0.38, zz(-3.1)]); on(P.under, ARM, it); }
   // 블로워 리브·풀리, 흡기구 그릴
   if (P.blower) { const it = []; for (const sx of [-0.43, 0.43]) for (let k = 0; k < 7; k++) it.push([B(0.025, 0.34, 0.03), sx, 1.33, zz(0.92) + k * zz(0.14)]); on(P.blower, GREY, it); on(P.blower, DARK, [[Cyl(0.13, 0.05, 14).rotateX(PI / 2), 0.2, 1.24, zz(1.35) + 0.53], [Cyl(0.05, 0.07, 8).rotateX(PI / 2), 0.2, 1.24, zz(1.35) + 0.55]]); }
   if (P.intake) { const it = []; for (let k = 0; k < 4; k++) { const y = 1.56 + k * 0.065, z = zz(0.88) + 0.85 + (1.8 - y) / 0.3 * 0.1 + 0.02; it.push([B(0.6, 0.025, 0.03), 0, y, z]); } on(P.intake, CHROME, it); }
@@ -1368,7 +1365,7 @@ function carDetail0(K, o, W, zz, P) { /* 주인공 0번 세밀 부품: 패널 �
     for (let k = 0; k < 8; k++) { const z = zz(-2.15 + k * 0.17), y = cab(z); lv.push([B(hw(y) * 1.6, 0.03, 0.09), 0, y + 0.06, z, slope(cab, z)]); }
     lv.push(rod([0, cab(zz(-2.2)) + 0.085, zz(-2.2)], [0, cab(zz(-0.95)) + 0.085, zz(-0.95)], 0.06, 0.04));
     on(P.cabin, 0x9a9a9a, tr); on(P.cabin, DARK, dk); on(P.cabin, o.color, lv); }
-  if (P.roof) { const r = [], rp = zp([[-1.0, 1.53], [-0.4, 1.64], [0.2, 1.63]]); for (const sx of [-0.6, 0.6]) for (let k = 0; k < 6; k++) { const z = zz(-0.85 + k * 0.2); r.push([rivU, sx, lerpY(rp, z) + 0.025, z]); } on(P.roof, RIV, r);
+  if (P.roof) {
     on(P.roof, DARK, [rod([0.38, 1.63, zz(-0.55)], [0.38, 2.12, zz(-0.85)], 0.018, 0.018)]); } // 안테나
   // 떨어지는 부품: 사이드 파이프·열판, 미러, 범퍼, 스포일러 날개판
   for (const sd of [-1, 1]) {
