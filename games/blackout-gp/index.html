@@ -506,6 +506,62 @@ let SUN_DIR = new THREE.Vector3(0, 1, 0);
 const amb = new THREE.AmbientLight(0xffffff, 0.1); scene.add(amb);
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(24000, 24000), toon(0xd9a066)); ground.rotation.x = -Math.PI / 2; ground.position.y = -4; scene.add(ground);
 const outlineMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide });
+function partGraph(body, parts, flames, tol) { // 부품끼리 실제로 맞닿았는지(면 가까이 있거나 박혀 있는지) 그래프로
+  tol = tol || 0.06;
+  const pset = new Set(parts), fl = new Set(flames || []);
+  const nodes = [...parts, ...body.children.filter(o => !pset.has(o) && !fl.has(o) && o.visible !== false && (o.isMesh || o.children.some(ch => ch.isMesh)))];
+  const u = { parts };
+  body.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(body.matrixWorld).invert();
+  const geo = nodes.map(n => { const V = [], T = [], box = new THREE.Box3(); n.updateMatrixWorld(true);
+    n.traverse(o => { if (!o.isMesh || o.material && o.material.side === THREE.BackSide) return; const M = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), pos = o.geometry.attributes.position, idx = o.geometry.index; const base = V.length;
+      for (let i = 0; i < pos.count; i++) { const v = new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(M); V.push(v); box.expandByPoint(v); }
+      const n3 = idx ? idx.count : pos.count; for (let i = 0; i < n3; i += 3) { const a = idx ? idx.getX(i) : i, b = idx ? idx.getX(i + 1) : i + 1, cc = idx ? idx.getX(i + 2) : i + 2; T.push(new THREE.Triangle(V[base + a], V[base + b], V[base + cc])); } });
+    // 정점이 너무 많으면 솎아냄
+    const Vs = V.length > 400 ? V.filter((_, i) => i % Math.ceil(V.length / 400) === 0) : V;
+    return { V: Vs, T, box }; });
+  const ray = new THREE.Ray(), hit = new THREE.Vector3(), dir = new THREE.Vector3();
+  const near = (A, B) => { const tp = new THREE.Vector3(); const bb = B.box.clone().expandByScalar(tol);
+    for (const v of A.V) { if (!bb.containsPoint(v)) continue; for (const t of B.T) { t.closestPointToPoint(v, tp); if (tp.distanceToSquared(v) < tol * tol) return true; } }
+    for (const ta of A.T) { const es = [[ta.a, ta.b], [ta.b, ta.c], [ta.c, ta.a]]; // 모서리가 상대 면을 뚫고 지나가면(박혀 있으면) 붙은 것
+      for (const [p, q] of es) { if (!bb.containsPoint(p) && !bb.containsPoint(q)) continue; dir.subVectors(q, p); const len = dir.length(); if (len < 1e-6) continue; dir.divideScalar(len); ray.set(p, dir);
+        for (const t of B.T) { if (ray.intersectTriangle(t.a, t.b, t.c, false, hit) && hit.distanceTo(p) <= len) return true; } } }
+    return false; };
+  const adj = nodes.map(() => []);
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+    if (!geo[i].box.clone().expandByScalar(tol).intersectsBox(geo[j].box)) continue;
+    if (near(geo[i], geo[j]) || near(geo[j], geo[i])) { adj[i].push(j); adj[j].push(i); } }
+  // 뿌리: 큰 부품(전체 부피 16% 이상), 없으면 제일 큰 것
+  const all = new THREE.Box3(); geo.slice(0, u.parts.length).forEach(g => all.union(g.box)); const S = all.getSize(new THREE.Vector3()), total = S.x * S.y * S.z;
+  const vol = b => { const s = b.getSize(new THREE.Vector3()); return s.x * s.y * s.z; };
+  const roots = new Set(); u.parts.forEach((p, i) => { if (vol(geo[i].box) >= total * 0.16) roots.add(i); });
+  if (!roots.size) { let bi = 0; for (let i = 0; i < u.parts.length; i++) if (vol(geo[i].box) > vol(geo[bi].box)) bi = i; roots.add(bi); }
+  return { nodes, adj, roots, nParts: u.parts.length, geo };
+}
+
+function autoBrackets(K) { // 차체에 안 붙고 떠 있는 부품 덩어리를 찾아, 가장 가까운 곳에 받침대를 세워 연결
+  K.g.updateMatrixWorld(true);
+  for (let pass = 0; pass < 4; pass++) {
+    const A = partGraph(K.body, K.parts, K.flames), P = A.nParts, vol = b => { const z = b.getSize(new THREE.Vector3()); return z.x * z.y * z.z; };
+    const comp = new Array(P).fill(-1); let nc = 0;
+    for (let i = 0; i < P; i++) { if (comp[i] >= 0) continue; const st = [i]; comp[i] = nc; while (st.length) { const a = st.pop(); for (const b of A.adj[a]) if (b < P && comp[b] < 0) { comp[b] = nc; st.push(b); } } nc++; }
+    if (nc <= 1) return;
+    const cv = new Array(nc).fill(0); for (let i = 0; i < P; i++) cv[comp[i]] += vol(A.geo[i].box); const main = cv.indexOf(Math.max(...cv));
+    const mainT = []; for (let i = 0; i < P; i++) if (comp[i] === main) mainT.push(...A.geo[i].T);
+    for (let k = 0; k < nc; k++) { if (k === main) continue;
+      const V = [], CT = [], box = new THREE.Box3(); for (let i = 0; i < P; i++) if (comp[i] === k) { V.push(...A.geo[i].V); CT.push(...A.geo[i].T); box.union(A.geo[i].box); }
+      const w = box.max.x - box.min.x, cx = (box.max.x + box.min.x) / 2, spots = w > 1.2 ? [cx - w * 0.3, cx + w * 0.3] : [null];
+      for (const xs of spots) {
+        let best = null, bd = 1e9; const tp = new THREE.Vector3();
+        let cand = V; if (xs !== null) { cand = []; const q = new THREE.Vector3(), tq = new THREE.Vector3(); // 넓은 부품(윙)은 양쪽에 하나씩: 그 위치의 아랫면 점들을 표면에 붙여서 후보로
+          for (let zi = 0; zi <= 6; zi++) { q.set(xs, box.min.y - 0.5, box.min.z + (box.max.z - box.min.z) * zi / 6); let bd2 = 1e9, bp = null; for (const t of CT) { t.closestPointToPoint(q, tq); const d2 = tq.distanceToSquared(q); if (d2 < bd2) { bd2 = d2; bp = tq.clone(); } } if (bp) cand.push(bp); } }
+        for (const v of cand) { for (const t of mainT) { t.closestPointToPoint(v, tp); const d = tp.distanceToSquared(v); if (d < bd) { bd = d; best = [v.clone(), tp.clone()]; } } }
+        if (!best) continue; const [a, b] = best, dir = b.clone().sub(a), len = dir.length(); if (len < 1e-4) continue; dir.normalize();
+        const th = clamp(0.09 + len * 0.04, 0.09, 0.16), L_ = len + 0.16, geo = new THREE.BoxGeometry(th, L_, th);
+        const m = K.part("받침대", geo, 0x3a3c42, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2, 0.03); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); m.userData.bracket = true;
+      } }
+    K.g.updateMatrixWorld(true);
+  }
+}
 function outlined(geo, color, thick = 0.06, parent) {
   const g = new THREE.Group(), m = new THREE.Mesh(geo, toon(color)), o = new THREE.Mesh(geo, outlineMat);
   geo.computeBoundingBox(); const sz = new THREE.Vector3(); geo.boundingBox.getSize(sz);
@@ -1057,6 +1113,7 @@ function carKit(color, accent) {
   K.plates = (num, x, y, z, r = 0.32) => { if (!num) return; const geo = new THREE.CircleGeometry(r, 24), mat = new THREE.MeshBasicMaterial({ map: plateTex(num) });
     for (const sd of [-1, 1]) { const pl = new THREE.Mesh(geo, mat); pl.rotation.y = sd * Math.PI / 2; pl.position.set(sd * x, y, z); body.add(pl); } };
   K.done = (radius, st = { x: 1, y: 1, z: 1, w: 1 }) => {
+    autoBrackets(K); // 떠 있는 부품 연결
     g.traverse(o => { if (o.isMesh && o.material !== outlineMat && !(o.material && o.material.isMeshBasicMaterial)) o.castShadow = true; });
     body.scale.set(st.x, st.y, st.z); // 레드라인식: 길고 두꺼운 덩어리
     K.wheels.forEach((pv, i) => { pv.position.x *= st.x; pv.position.z *= st.z; pv.scale.setScalar(st.w); pv.userData.baseY *= st.w; pv.position.y = pv.userData.baseY; pv.userData.r *= st.w; K.wheelPos[i] = [K.wheelPos[i][0] * st.x, K.wheelPos[i][1] * st.z]; });
@@ -1067,7 +1124,11 @@ function carKit(color, accent) {
       const sh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
       sh.scale.set((bb.max.x - bb.min.x) / CS * 1.05, 1, (bb.max.z - bb.min.z) / CS * 0.95); sh.position.set((bb.max.x + bb.min.x) / 2 / CS, 0.04, (bb.max.z + bb.min.z) / 2 / CS); g.add(sh); } // 차 밑 진한 접지 그림자
     const boxes = (K.boxes || [[0, 0, hl / CS, hwd / CS]]).map(b => b.map(v => v * CS)); // 충돌 상자들 [옆 위치, 앞뒤 위치, 반 길이, 반 폭]
-    g.userData = { hl, hwd, boxes, body, wheels: K.wheels, wheelPos: K.wheelPos.map(([x, z]) => [x * CS, z * CS]), flames: K.flames, parts: K.parts, radius: radius * st.z * CS, tail: K.tail }; METAL = false; return g;
+    g.userData = { hl, hwd, boxes, body, wheels: K.wheels, wheelPos: K.wheelPos.map(([x, z]) => [x * CS, z * CS]), flames: K.flames, parts: K.parts, radius: radius * st.z * CS, tail: K.tail };
+    { g.updateMatrixWorld(true); const A = partGraph(body, K.parts, K.flames); const reach = new Set(A.roots), stk = [...A.roots]; while (stk.length) { const i = stk.pop(); for (const j of A.adj[i]) if (!reach.has(j)) { reach.add(j); stk.push(j); } }
+      for (let i = 0; i < A.nodes.length; i++) if (!reach.has(i)) { let bj = -1, bd = 1e9; const ci = A.geo[i].box.getCenter(new THREE.Vector3()); for (const j of reach) { const d = A.geo[j].box.distanceToPoint(ci); if (d < bd) { bd = d; bj = j; } } if (bj >= 0) { A.adj[i].push(bj); A.adj[bj].push(i); } } // 번호판 같은 얇은 장식은 가장 가까운 부품에 붙은 걸로
+      g.userData.adj = { nodes: A.nodes, adj: A.adj, roots: A.roots, cen: A.geo.map(q => q.box.getCenter(new THREE.Vector3())) }; }
+    METAL = false; return g;
   };
   return K;
 }
@@ -2250,7 +2311,9 @@ function ensureDmg(c) {
   const C0 = new THREE.Vector3(), S = new THREE.Vector3(); bb.getCenter(C0); bb.getSize(S);
   const zoneOf = (x, z) => { const uu = (z - C0.z) / (S.z / 2), vv = (x - C0.x) / (S.x / 2); return Math.abs(uu) * 0.8 > Math.abs(vv) ? (uu > 0 ? "F" : "B") : (vv > 0 ? "P" : "N"); };
   const total = S.x * S.y * S.z, det = { F: [], B: [], P: [], N: [] };
-  for (const it of info) { it.pt.userData.orig = { p: it.pt.position.clone(), q: it.pt.quaternion.clone(), s: it.pt.scale.clone() }; if (it.vol < total * 0.16) { const z = zoneOf(it.c.x, it.c.z); it.out = z === "F" || z === "B" ? Math.abs(it.c.z - C0.z) : Math.abs(it.c.x - C0.x); det[z].push(it.pt); it.pt.userData.out = it.out; } }
+  const ADJ = u.adj, rootSet = new Set(ADJ ? [...ADJ.roots].map(i => ADJ.nodes[i]) : []);
+  if (ADJ) for (const n of ADJ.nodes) if (!n.userData.orig) n.userData.orig = { p: n.position.clone(), q: n.quaternion.clone(), s: n.scale.clone() };
+  for (const it of info) { it.pt.userData.orig = { p: it.pt.position.clone(), q: it.pt.quaternion.clone(), s: it.pt.scale.clone() }; if (it.vol < total * 0.16 && !rootSet.has(it.pt)) { const z = zoneOf(it.c.x, it.c.z); it.out = z === "F" || z === "B" ? Math.abs(it.c.z - C0.z) : Math.abs(it.c.x - C0.x); det[z].push(it.pt); it.pt.userData.out = it.out; } }
   for (const k in det) det[k].sort((a, b) => b.userData.out - a.userData.out); // 바깥쪽 부품부터 떨어짐
   u.wheels.forEach(w => w.userData.orig = { p: w.position.clone(), q: w.quaternion.clone(), s: w.scale.clone() });
   // 속 프레임 (처음엔 숨겨두고, 그쪽 부품이 떨어지면 드러남)
@@ -2329,6 +2392,13 @@ function pivotize(obj) { // 부품 모양의 한가운데를 회전 중심으로
   obj.updateMatrixWorld(true); _wbb.setFromObject(obj); const cen = _wbb.getCenter(new THREE.Vector3());
   const g = new THREE.Group(); g.userData.pivot = true; g.position.copy(cen); wreckG.add(g); obj.position.sub(cen); g.add(obj); return g;
 }
+function cascadeParts(c) { // 받쳐주던 부품이 떨어지면, 차체와 더는 이어지지 않는 부품도 같이 떨어짐 (공중에 떠 있지 않게)
+  const u = c.mesh.userData, A = u.adj, d = u.dmg; if (!A || !d || d.casc) return; d.casc = true;
+  const on = i => A.nodes[i].parent === u.body, reach = new Set(), st = []; for (const r of A.roots) if (on(r)) { reach.add(r); st.push(r); }
+  while (st.length) { const i = st.pop(); for (const j of A.adj[i]) if (!reach.has(j) && on(j)) { reach.add(j); st.push(j); } }
+  for (let i = 0; i < A.nodes.length; i++) if (on(i) && !reach.has(i)) { const n = A.nodes[i], z = d.zoneOf(A.cen[i].x, A.cen[i].z); for (const k in d.det) { const ix = d.det[k].indexOf(n); if (ix >= 0) d.det[k].splice(ix, 1); } detachPart(c, n, z, 0.5); }
+  d.casc = false;
+}
 function detachPart(c, pt, zone, power) {
   const d = ensureDmg(c), u = c.mesh.userData; c.mesh.updateMatrixWorld(true); pt.updateMatrixWorld(true);
   const P_ = new THREE.Vector3(), Q = new THREE.Quaternion(), Sc = new THREE.Vector3(); pt.matrixWorld.decompose(P_, Q, Sc);
@@ -2339,6 +2409,7 @@ function detachPart(c, pt, zone, power) {
   const pg_ = pivotize(pt);
   WRECK.push({ obj: pg_, x: pg_.position.x, y: pg_.position.y, z: pg_.position.z, vx: c.vx * 0.8 + ox / ol * kick, vy: 3 + Math.random() * 5 * power, vz: c.vz * 0.8 + oz / ol * kick, wx: (Math.random() - 0.5) * 12, wy: (Math.random() - 0.5) * 12, wz: (Math.random() - 0.5) * 12, r, idx: c.idx, rest: false, hitT: 0.6, wheel: !!pt.userData.isWheel });
   recWreck(WRECK[WRECK.length - 1], c);
+  if (!pt.userData.isWheel) cascadeParts(c);
   sndClank(1, P_.x, P_.z);
   if (Math.hypot(c.x - player.x, c.z - player.z) < 300) for (let k = 0; k < 8; k++) emit(sparks, P_.x, P_.y, P_.z, (Math.random() - 0.5) * 10 + c.vx * 0.5, Math.random() * 6, (Math.random() - 0.5) * 10 + c.vz * 0.5, 0.4);
 }
@@ -3133,7 +3204,7 @@ function simulate(secs, driver) {
   for (let t = 0; t < secs; t += dt) { if (state !== "race" && state !== "end") break; const d = driver(player); Object.assign(input, d); raceT += dt; stepPlayer(dt); stepAI(dt); stepWeapons(dt); stepProps(); stepWreck(dt); lapLogic(); syncMeshes(dt); recFrame(); }
 }
 window.__cam = () => { updateCamera(1 / 30); return camera.position.distanceTo(new THREE.Vector3(player.x, player.y, player.z)); };
-window.__SND = SND; window.__upd = updateSound; window.__inp = input; window.__bgp = { get camera() { return camera; }, get REC() { return REC; }, raySolid, get SOLIDS() { return SOLIDS; }, useSpecial, fireGun, PROJ, TETHERS, setSpecial, enterTumble, applyDamage, explode, hitLocal, WRECK, get GAP() { return GAP; }, player, ais, get state() { return state; }, get L() { return L; }, get HALF() { return HALF; }, P, startRace, simulate, get TRK() { return TRK; }, idxAtS, posAt, surfH, setCourse(id) { buildCourse(id); loadBest(); placeGrid(); }, skipCount() { countdown = 0.01; } };
+window.__SND = SND; window.__upd = updateSound; window.__inp = input; window.__bgp = { get camera() { return camera; }, get REC() { return REC; }, detachPart, ensureDmg, raySolid, get SOLIDS() { return SOLIDS; }, useSpecial, fireGun, PROJ, TETHERS, setSpecial, enterTumble, applyDamage, explode, hitLocal, WRECK, get GAP() { return GAP; }, player, ais, get state() { return state; }, get L() { return L; }, get HALF() { return HALF; }, P, startRace, simulate, get TRK() { return TRK; }, idxAtS, posAt, surfH, setCourse(id) { buildCourse(id); loadBest(); placeGrid(); }, skipCount() { countdown = 0.01; } };
 })();
 </script>
 </body>
