@@ -1986,7 +1986,7 @@ function repFx(e) { /* 리플레이에서 공격·부스트 다시 */
 }
 function repChar(c, on) { const d = ensureDmg(c), st = REPLAY.charred.get(c); if (st === on) return; REPLAY.charred.set(c, on); unmergeCar(c.mesh);
   for (const pair of d.chars) { const [mesh, orig] = pair; if (!pair[2]) pair[2] = mesh.material; mesh.material = on ? pair[2] : orig; }
-  for (const k in d.fr) d.fr[k].visible = on; }
+  for (const k in d.fr) d.fr[k].visible = on; c.mesh.userData.body.position.y = on ? -0.32 : 0; } /* 터지기 전 장면에선 차체를 원래 높이로 (터지면 차체가 0.32 꺼지는데, 다시 붙여 보여주는 부품은 원래 높이라 떠 보였음) */
 function repStart() {
   if (REC.ts.length < 20) { setMsg("기록이 너무 짧아요", 1.2); return; }
   specOff(); REPLAY.on = true; REPLAY.fxi = undefined; REPLAY.t = REC.ts[0]; REPLAY.lastT = REPLAY.t; REPLAY.paused = false; REPLAY.speed = 1; REPLAY.auto = true; REPLAY.camT = 0; REPLAY.hiEnd = 0; REPLAY.charred.clear();
@@ -2749,13 +2749,12 @@ function dentAt(c, loc, depth) { // 맞은 자리 근처 꼭짓점을 안쪽으�
   for (const it of d.info) {
     const pt = it.pt; if (pt.parent !== c.mesh.userData.body) continue;
     if (Math.abs(it.c.x - loc.x) > R + it.sz.x / 2 || Math.abs(it.c.z - loc.z) > R + it.sz.z / 2) continue;
-    const mesh = pt.children[1] || pt.children[0], ol = pt.children[1] ? pt.children[0] : null, extra = pt.children.slice(2).filter(o => o.isMesh); /* 붙어 있는 작은 부품(손잡이·줄무늬 등)도 같이 찌그러짐 */
-    if (!pt.userData.dented) { const g0 = mesh.geometry, g1 = g0.clone(); mesh.geometry = g1; if (ol) ol.geometry = g1; d.dents.push({ pt, mesh, ol, geo0: g0 }); for (const x of extra) { const e0 = x.geometry; x.geometry = e0.clone(); d.dents.push({ pt, mesh: x, ol: null, geo0: e0 }); } pt.userData.dented = true; }
+    const mesh = pt.children[1] || pt.children[0], ol = pt.children[1] ? pt.children[0] : null;
+    if (!pt.userData.dented) { const g0 = mesh.geometry, g1 = g0.clone(); mesh.geometry = g1; if (ol) ol.geometry = g1; d.dents.push({ pt, mesh, ol, geo0: g0 }); pt.userData.dented = true; }
     inv.copy(pt.matrix).invert(); pL.copy(loc).applyMatrix4(inv); dL.copy(dir).transformDirection(inv);
-    const v = new THREE.Vector3();
-    for (const m of [mesh, ...extra]) { const pos = m.geometry.attributes.position; let moved = false;
-      for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i); const dd = v.distanceTo(pL); if (dd < R) { const f = (1 - dd / R) ** 2 * depth * (0.7 + 0.6 * Math.sin(Math.round(v.x * 8) * 1.7 + Math.round(v.z * 8) * 2.3 + Math.round(v.y * 8) * 0.9) ** 2); v.addScaledVector(dL, f); pos.setXYZ(i, v.x, v.y, v.z); moved = true; /* 아래로 꺼지는 건 뺌 (옆 부품이 떠 보였음) */ } } /* 같은 자리 꼭짓점은 똑같이 움직여서 틈이 안 벌어짐 */
-      if (moved) { pos.needsUpdate = true; m.geometry.computeVertexNormals(); } }
+    const pos = mesh.geometry.attributes.position, v = new THREE.Vector3(); let moved = false;
+    for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i); const dd = v.distanceTo(pL); if (dd < R) { const f = (1 - dd / R) ** 2 * depth * (0.7 + 0.6 * Math.sin(i * 1.7) ** 2); v.addScaledVector(dL, f); v.y -= f * 0.25; pos.setXYZ(i, v.x, v.y, v.z); moved = true; } }
+    if (moved) { pos.needsUpdate = true; mesh.geometry.computeVertexNormals(); }
   }
 }
 function explode(c) {
