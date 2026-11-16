@@ -1886,7 +1886,7 @@ const introSkip = () => { if (state === "intro" && INTRO.t > 0.3) INTRO.t = Math
 addEventListener("keydown", introSkip); addEventListener("pointerdown", introSkip);
 function startRace() {
   repStop(); demoStop(); specOff(); recReset(true); audioInit(); clearTimeout(endTimer); setMsg("", 0.01); flashT = 0; slowT = 0;
-  placeGrid(!gridFresh); gridFresh = false; raceT = 0; introStart(); // 메뉴에서 보던 자리 그대로 출발 → 그리드 소개 → 신호등
+  placeGrid(!gridFresh); gridFresh = false; raceT = 0; gapReset(); introStart(); // 메뉴에서 보던 자리 그대로 출발 → 그리드 소개 → 신호등
   showScreen(null); hideBig(); kos.clear();
 }
 const SCREENS = ["titleScreen", "helpScreen", "setScreen", "startScreen", "endScreen", "pauseScreen"];
@@ -3117,7 +3117,23 @@ function sndFinalLap() { [0, 0.16, 0.32].forEach(d => shot((ctx, t) => tone(ctx,
 function fmt(t) { const m = Math.floor(t / 60), s = t - m * 60; return `${m}:${s.toFixed(2).padStart(5, "0")}`; }
 const bestKey = () => "bgp_best4_" + courseId;
 let best = null; const loadBest = () => { try { best = parseFloat(localStorage.getItem(bestKey())) || null; } catch (e) { best = null; } };
+const GAP_STEP = 20; /* 20m마다 지나간 시각을 적어둠 → 같은 지점을 지난 시각 차이 = 간격 */
+function gapRec() { if (raceT <= 0) return; for (const c of [player, ...ais]) { if (!c.ghist || raceT < (c.ghistT0 ?? 1e9)) { c.ghist = []; c.ghistT0 = raceT; } if (c.dead || c.done) continue; const b = Math.floor(c.prog / GAP_STEP); if (b < 0) continue; const h = c.ghist; if (h.length === 0) { h[b] = raceT; continue; } let last = h.length - 1; while (last < b) { last++; h[last] = raceT; } } }
+function gapReset() { for (const c of [player, ...ais]) { c.ghist = []; c.ghistT0 = 0; } }
+function gapTAt(c, prog) { const h = c.ghist; if (!h) return null; const b = Math.floor(prog / GAP_STEP), f = prog / GAP_STEP - b, a = h[b], n = h[b + 1]; if (a === undefined) return null; return n === undefined ? a : a + (n - a) * f; }
+const GAPV = { t: 0, html: "" };
+function gapHtml(st) { /* 앞차·뒤차 간격 (0.25초마다) */
+  if (performance.now() - GAPV.t < 250) return GAPV.html; GAPV.t = performance.now();
+  const i = st.findIndex(r => r.me); let out = "";
+  if (state === "race" && !player.done && !player.dead && raceT > 2) {
+    const A = i > 0 ? st[i - 1] : null, B = i < st.length - 1 ? st[i + 1] : null;
+    if (A && !A.ret) { const t0 = gapTAt(A.car, player.prog); const g = A.done ? null : t0 === null ? null : raceT - t0; out += `<span style="color:#ffb15a">▲ ${g === null ? "-" : "+" + g.toFixed(1)}</span>`; }
+    if (B && !B.ret && !B.done) { const t0 = gapTAt(player, B.car.prog); const g = t0 === null ? null : raceT - t0; out += `${out ? " &nbsp;" : ""}<span style="color:#6fd8ff">▼ ${g === null ? "-" : "−" + g.toFixed(1)}</span>`; }
+  }
+  GAPV.html = out ? `<span style="font-size:13px;font-weight:700;margin-left:8px;vertical-align:middle">${out}</span>` : ""; return GAPV.html;
+}
 function lapLogic() {
+  gapRec();
   const lapNow = Math.floor(player.prog / L);
   if (!DEMO.on && !player.done && lapNow > player.laps.length && player.prog > 0) {
     const lt = raceT - player.lapStart; player.laps.push(lt); player.lapStart = raceT;
@@ -3132,7 +3148,7 @@ function lapLogic() {
   if (state === "race" && raceT > 2) { const pos = standings().findIndex(r => r.me) + 1; if (pos < lastPos && msgT <= 0.3) setMsg(pos === 1 ? "선두 탈환!" : "OVERTAKE!", 0.9); lastPos = pos; }
 }
 function standings() {
-  const all = [{ name: player.name, prog: player.prog, done: player.done, t: player.finishT, me: true, ret: player.dead }, ...ais.map(a => ({ name: a.name, prog: a.prog, done: a.done, t: a.finishT, ret: a.dead }))];
+  const all = [{ name: player.name, prog: player.prog, done: player.done, t: player.finishT, me: true, ret: player.dead, car: player }, ...ais.map(a => ({ name: a.name, prog: a.prog, done: a.done, t: a.finishT, ret: a.dead, car: a }))];
   return all.sort((a, b) => (a.ret - b.ret) || ((a.done && b.done) ? a.t - b.t : (b.done - a.done) || (b.prog - a.prog)));
 }
 let endRefresh = 0;
@@ -3281,7 +3297,7 @@ function updateHud() {
     if (need !== p.needShown) { p.needShown = need; document.getElementById("tRet").classList.toggle("need", need); document.getElementById("bReset").classList.toggle("need", need); } }
   const st = standings(), pos = st.findIndex(r => r.me) + 1, lap = Math.min(lapsTotal, Math.max(1, player.laps.length + 1));
   const hp = Math.max(0, player.hp ?? 100), hc = hp > 70 ? "#7cff8a" : hp > 40 ? "#ffd23a" : hp > 15 ? "#ff8a2a" : (performance.now() % 400 < 200 ? "#ff2a2a" : "#5a1010");
-  setHTML("hudTL", `<b>${pos}</b> / ${TOTAL} 위<br>랩 ${lap} / ${lapsTotal}<br><span style="display:inline-block;width:96px;height:9px;background:rgba(0,0,0,.5);border:1px solid #fff4;vertical-align:middle"><i style="display:block;width:${hp}%;height:100%;background:${hc}"></i></span> <small>내구도</small><br>${player.slip ? '<span style="color:#39d4ff">슬립스트림</span>' : ""}`);
+  setHTML("hudTL", `<b>${pos}</b> / ${TOTAL} 위${gapHtml(st)}<br>랩 ${lap} / ${lapsTotal}<br><span style="display:inline-block;width:96px;height:9px;background:rgba(0,0,0,.5);border:1px solid #fff4;vertical-align:middle"><i style="display:block;width:${hp}%;height:100%;background:${hc}"></i></span> <small>내구도</small><br>${player.slip ? '<span style="color:#39d4ff">슬립스트림</span>' : ""}`);
   if (performance.now() - _hudT > 100) { _hudT = performance.now(); setHTML("hudTR", `시간 ${fmt(player.done ? player.finishT : raceT)}<br>이번 랩 ${player.done ? "-" : fmt(Math.max(0, raceT - player.lapStart))}<br>최고 랩 ${best ? fmt(best) : "-"}`); }
   const kmh = Math.round(Math.abs(player.vf) * 3.6);
   setHTML("speed", `${kmh}<small> km/h</small>`);
