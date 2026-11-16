@@ -1711,8 +1711,12 @@ function sndExplode(x, z) { // 폭발: 긴 저음 + 화염 쏴아 + 잔불 탁�
 function sndPop(v = 1) { shot((ctx, t) => { nzs(ctx, t, 0.07, "bandpass", 650 + Math.random() * 300, 300, 0.7 * v, 1.5); tone(ctx, t, 0.08, "sine", 140, 60, 0.4 * v); }, 0.15); } // 백파이어 펑
 function sndBeep(go) { shot((ctx, t) => { tone(ctx, t, go ? 0.6 : 0.22, "square", go ? 880 : 440, go ? 880 : 440, 0.12); }, 0.7); }
 function updateSound(dt) {
-  if (!SND.ctx) return; const ctx = SND.ctx, t = ctx.currentTime, p = player, v = Math.abs(p.vf), active = (state === "race" || state === "count" || state === "intro" || state === "end" || state === "menu") && !p.dead && !DEMO.on;
-  const boosting = p.boostT > 0, gas = input.gas > 0 && active;
+  if (!SND.ctx) return; const ctx = SND.ctx, t = ctx.currentTime;
+  const watch = (SPEC.on || REPLAY.on) && !DEMO.on, F = watch ? (SPEC.car || player) : player; /* 관전·리플레이: 보고 있는 차의 엔진 소리 */
+  const fv = c => REPLAY.on ? ((REPLAY.view.get(c) || {}).vf || 0) : (c.vf || 0), fb = c => REPLAY.on ? !!(REPLAY.view.get(c) || {}).boost : c.boostT > 0, fdead = c => REPLAY.on ? false : !!c.dead;
+  const camD = watch ? Math.hypot(F.mesh.position.x - camera.position.x, F.mesh.position.z - camera.position.z) : 0, camK = watch ? Math.max(0.12, 1 / (1 + Math.pow(Math.max(0, camD - 8) / (SPEC.mode === "tv" ? 55 : 22), 1.5))) : 1; /* TV 캠은 멀리서 찍으니 덜 줄임 */
+  const p = watch ? { vf: fv(F), boostT: fb(F) ? 1 : 0, hp: F.hp, air: 0, lat: 0, s: 0, vx: 0, vz: 0, scrape: 0, slipR: 0, dead: fdead(F) } : player, v = Math.abs(p.vf), active = (state === "race" || state === "count" || state === "intro" || state === "end" || state === "menu") && !p.dead && !DEMO.on;
+  const boosting = p.boostT > 0, gas = watch ? active && v > 5 : input.gas > 0 && active;
   // 기어: 회전수가 차면 변속 (툭 끊겼다가 다시 올라감)
   const GT = [0.2, 0.34, 0.5, 0.66, 0.83, 1.02, 1.3].map(k => k * P.top);
   SND.shiftT = Math.max(0, SND.shiftT - (dt || 0.016));
@@ -1721,18 +1725,18 @@ function updateSound(dt) {
   const dmgShake = (p.hp ?? 100) < 40 && Math.random() < (40 - p.hp) / 400 ? 0.4 : 1; // 망가지면 엔진이 툭툭 끊김
   const f = 34 + rpm * 108 + (boosting ? 26 : 0) + (p.air > 0.1 && gas ? 22 : 0) + (state === "count" && input.gas > 0 ? 45 : 0);
   const load = boosting ? 1 : gas ? 0.8 : 0.15;
-  SND.eng.set(f, load, active ? (0.28 + load * 0.16) * (SND.shiftT > 0 ? 0.35 : 1) * dmgShake : 0, 0, SND.shiftT > 0 ? 0.015 : 0.04);
+  SND.eng.set(f, load, active ? (0.28 + load * 0.16) * (SND.shiftT > 0 ? 0.35 : 1) * dmgShake * camK : 0, 0, SND.shiftT > 0 ? 0.015 : 0.04);
   // 라이벌: 가까운 3대, 거리·좌우·도플러
   const cx = camera.position.x, cz = camera.position.z, ch = Math.atan2(camLook.x - cx, camLook.z - cz);
-  const near = ais.filter(a => !a.dead).map(a => [a, Math.hypot(a.x - cx, a.z - cz)]).sort((q, w) => q[1] - w[1]).slice(0, 3);
+  const near = (watch ? [player, ...ais].filter(a => a !== F) : ais).filter(a => !fdead(a)).map(a => [a, Math.hypot(a.mesh.position.x - cx, a.mesh.position.z - cz)]).sort((q, w) => q[1] - w[1]).slice(0, 3);
   SND.rv.forEach((e, i) => { const it = near[i]; if (!it || !active && state !== "count") { e.set(30, 0, 0, 0); return; }
-    const [a, d] = it, ri = ais.indexOf(a), pitch = [1.08, 0.95, 1.18, 1.0, 0.9, 1.05, 0.72][ri] || 1;
-    const ux = (a.x - cx) / (d || 1), uz = (a.z - cz) / (d || 1), vRel = (a.vx - p.vx) * ux + (a.vz - p.vz) * uz, dop = clamp(260 / (260 + vRel), 0.6, 1.6);
-    const ar = clamp(Math.abs(a.vf) / (P.top * 1.02), 0, 1.3), fa = (34 + ((ar * 6) % 1) * 100 + (a.boostT > 0 ? 28 : 0)) * pitch * dop;
-    const pan = clamp(Math.sin(Math.atan2(ux, uz) - ch) * -1, -1, 1), gain = 0.3 / (1 + Math.pow(d / 22, 1.5));
-    e.set(fa, a.boostT > 0 ? 1 : 0.75, gain, pan); });
+    const [a, d] = it, ri = ais.indexOf(a), pitch = [1.08, 0.95, 1.18, 1.0, 0.9, 1.05, 0.72][ri] || 1, av = fv(a), ah = REPLAY.on ? ((REPLAY.view.get(a) || {}).h || 0) : a.h, avx = Math.sin(ah) * av, avz = Math.cos(ah) * av;
+    const ux = (a.mesh.position.x - cx) / (d || 1), uz = (a.mesh.position.z - cz) / (d || 1), vRel = watch ? (avx * ux + avz * uz) : (a.vx - p.vx) * ux + (a.vz - p.vz) * uz, dop = clamp(260 / (260 + vRel), 0.6, 1.6);
+    const ar = clamp(Math.abs(av) / (P.top * 1.02), 0, 1.3), fa = (34 + ((ar * 6) % 1) * 100 + (fb(a) ? 28 : 0)) * pitch * dop;
+    const pan = clamp(Math.sin(Math.atan2(ux, uz) - ch) * -1, -1, 1), gain = 0.3 / (1 + Math.pow(d / (watch ? 40 : 22), 1.5));
+    e.set(fa, fb(a) ? 1 : 0.75, gain, pan); });
   // 바람·노면·부스트·불
-  const r = Math.min(1.4, v / P.top), onRoad = Math.abs(p.lat) <= hwAt(p.s) + 0.5;
+  const r = Math.min(1.4, v / P.top) * (watch ? (SPEC.mode === "chase" ? 0.8 : 0.15) : 1), onRoad = watch || Math.abs(p.lat) <= hwAt(p.s) + 0.5;
   SND.wind.g.gain.setTargetAtTime(active ? 0.04 + r * 0.16 : 0, t, 0.15); SND.wind.f.frequency.setTargetAtTime(300 + r * 700, t, 0.2);
   SND.rush.g.gain.setTargetAtTime(active ? Math.max(0, r - 0.45) * 0.12 + (boosting ? 0.06 : 0) : 0, t, 0.15);
   SND.scrape.g.gain.setTargetAtTime(p.scrape > 0 ? 0.22 : 0, t, 0.03); SND.scrape2.g.gain.setTargetAtTime(p.scrape > 0 ? 0.1 : 0, t, 0.03);
@@ -1743,7 +1747,7 @@ function updateSound(dt) {
   if (L_.wind) L_.wind.g.gain.setTargetAtTime(active ? Math.max(0, r - 0.15) * 0.16 + (boosting ? 0.05 : 0) : 0, t, 0.2);
   if (L_.crowd) L_.crowd.g.gain.setTargetAtTime(courseId !== "desert" && (active || state === "menu" || state === "count") ? (state === "count" || state === "intro" ? 0.24 : 0.11) : 0, t, 0.6); // 관중석 있는 코스는 함성이 깔림
   SND.gravel.g.gain.setTargetAtTime(active && !onRoad && p.air <= 0 ? Math.min(0.35, v * 0.006) : 0, t, 0.05);
-  SND.boostRoar.g.gain.setTargetAtTime(boosting && active ? 0.42 : 0, t, boosting ? 0.05 : 0.4); SND.boostRumble.g.gain.setTargetAtTime(boosting && active ? 0.5 : 0, t, boosting ? 0.05 : 0.5);
+  SND.boostRoar.g.gain.setTargetAtTime(boosting && active ? 0.42 * camK : 0, t, boosting ? 0.05 : 0.4); SND.boostRumble.g.gain.setTargetAtTime(boosting && active ? 0.5 * camK : 0, t, boosting ? 0.05 : 0.5);
   SND.jet.o.frequency.setTargetAtTime(700 + r * 900, t, 0.1); SND.jet.g.gain.setTargetAtTime(boosting && active ? 0.035 : 0, t, 0.2);
   let fireV = 0; for (const c of [player, ...ais]) if (c.hp !== undefined && c.hp < 15) fireV = Math.max(fireV, distVol(c.x, c.z) * (c.dead && c.deadT > 40 ? 0 : 1));
   SND.fire.g.gain.setTargetAtTime(fireV * (0.15 + Math.random() * 0.25), t, 0.03);
@@ -1974,13 +1978,13 @@ function repApply(t, dt) {
     REPLAY.fxT = t; }
   if (REPLAY.speed > 0 && !REPLAY.paused) for (const e of REC.ev) if (e.t > REPLAY.lastT && e.t <= t && t - e.t < 0.5) { // 지나가는 순간 효과 다시
     if (e.type === "boom") { if (QFX) QFX.boom(e.x, e.y, e.z, 1); else for (let k = 0; k < 120; k++) emit(boostFire, e.x, e.y + 1, e.z, (Math.random() - 0.5) * 30, Math.random() * 16, (Math.random() - 0.5) * 30, 0.9); for (let k = 0; k < 40; k++) emit(smokeD, e.x, e.y + 1.5, e.z, (Math.random() - 0.5) * 8, 2 + Math.random() * 4, (Math.random() - 0.5) * 8, 2.5); sndExplode(e.x, e.z); }
-    else for (let k = 0; k < 24; k++) emit(sparks, e.x, e.y + 1, e.z, (Math.random() - 0.5) * 14, Math.random() * 7, (Math.random() - 0.5) * 14, 0.4); }
+    else { for (let k = 0; k < 24; k++) emit(sparks, e.x, e.y + 1, e.z, (Math.random() - 0.5) * 14, Math.random() * 7, (Math.random() - 0.5) * 14, 0.4); sndImpact(e.big ? 22 : 12, e.x, e.z); } }
   REPLAY.lastT = t;
 }
 function repFx(e) { /* 리플레이에서 공격·부스트 다시 */
   if (e.k === "gun") { if (viewD(e.a[0], e.a[2]) < 300) { addTracer(e.a, e.b); sndGun(distVol(e.a[0], e.a[2]) * 0.8); } }
   else if (e.k === "can") { cannonFx(e.c, e.m, e.dx, e.dz, e.len, true); sndCannon(distVol(e.m[0], e.m[2])); }
-  else if (e.k === "pile") { e.c.pbT = 0; if (e.hit) { if (QFX && viewD(e.hit[0], e.hit[2]) < 400) QFX.boom(e.hit[0], e.hit[1] - 0.3, e.hit[2], 0.38); const v = distVol(e.hit[0], e.hit[2]); if (v > 0.04) { sfx("boom2", Math.min(1.4, v * 1.2), 1.15); sndImpact(true, e.hit[0], e.hit[2]); } } }
+  else if (e.k === "pile") { e.c.pbT = 0; if (e.hit) { if (QFX && viewD(e.hit[0], e.hit[2]) < 400) QFX.boom(e.hit[0], e.hit[1] - 0.3, e.hit[2], 0.38); const v = distVol(e.hit[0], e.hit[2]); if (v > 0.04) { sfx("boom2", Math.min(1.4, v * 1.2), 1.15); sndImpact(20, e.hit[0], e.hit[2]); } } }
   else if (e.k === "blast") { if (viewD(e.x, e.z) < 400) { if (QFX) QFX.boom(e.x, e.y - 0.8, e.z, 0.6); else for (let k = 0; k < 70; k++) emit(boostFire, e.x, e.y, e.z, (Math.random() - 0.5) * 22, Math.random() * 12, (Math.random() - 0.5) * 22, 0.6); } const v = distVol(e.x, e.z); if (v > 0.04) sfx("boom2", Math.min(1.2, v * 1.3), 1 + Math.random() * 0.1); }
   else if (e.k === "bst") { if (viewD(e.c.mesh.position.x, e.c.mesh.position.z) < 600) { boostBurst(e.c); sndBoost(distVol(e.c.mesh.position.x, e.c.mesh.position.z) * 0.9); } }
 }
@@ -3097,7 +3101,7 @@ function firePile(c) {
   const hx = o.x - fx * (o.mesh.userData.hl || 3) * 0.8, hz = o.z - fz * (o.mesh.userData.hl || 3) * 0.8;
   recFx({ k: "pile", c, hit: [hx, o.y, hz] });
   if (viewD(hx, hz) < 400) { if (QFX) QFX.boom(hx, o.y - 0.3, hz, 0.38); for (let k = 0; k < 40; k++) emit(sparks, hx, o.y + 0.8, hz, (Math.random() - 0.5) * 22 + fx * 18, Math.random() * 10, (Math.random() - 0.5) * 22 + fz * 18, 0.5); }
-  if (v > 0.04 || distVol(o.x, o.z) > 0.04) { const vv = Math.max(v, distVol(o.x, o.z)); sfx("boom2", Math.min(1.4, vv * 1.2), 1.15); sfx("clank" + (1 + Math.floor(Math.random() * 4)), vv, 0.7); sndImpact(true, o.x, o.z); }
+  if (v > 0.04 || distVol(o.x, o.z) > 0.04) { const vv = Math.max(v, distVol(o.x, o.z)); sfx("boom2", Math.min(1.4, vv * 1.2), 1.15); sfx("clank" + (1 + Math.floor(Math.random() * 4)), vv, 0.7); sndImpact(20, o.x, o.z); }
   if (c === player) { shake = Math.max(shake, 1.2); flashT = Math.max(flashT, 0.3); setMsg("쾅!", 0.6); } if (o === player) { shake = Math.max(shake, 1.4); setMsg("파일벙커에 맞음!", 1); }
 }
 function fireRail(c) {
@@ -3106,7 +3110,7 @@ function fireRail(c) {
   for (const o of [player, ...ais]) { if (o === c || o.dead) continue; const rx = o.x - m[0], rz = o.z - m[2], al = rx * dx + rz * dz; if (al < 0 || al > len) continue; const perp = Math.abs(rx * dz - rz * dx); if (perp > o.mesh.userData.hwd + 0.8 || Math.abs(o.y - c.y) > 5) continue;
     applyDamage(o, 24, hitLocal(o, -dx, -dz), c, "rail"); o.kickT = 1.2; const side = Math.sign(rx * dz - rz * dx) || 1;
     if (o.tumble) { o.tv.x += dx * 12; o.tv.z += dz * 12; } else { o.vx += dx * 12 + dz * side * 6; o.vz += dz * 12 - dx * side * 6; fromWorld(o); o.ry += side * 1.6; if (Math.random() < 0.2) (window.__tlog && window.__tlog.push("rail")), enterTumble(o, dx * 4 * side, dz * 4 * side, 5); }
-    if (viewD(o.x, o.z) < 400) { if (QFX) QFX.boom(o.x, o.y - 0.4, o.z, 0.4); sndImpact(true, o.x, o.z); } if (viewD(o.x, o.z) < 400) for (let k = 0; k < 30; k++) emit(sparks, o.x, o.y + 1, o.z, (Math.random() - 0.5) * 20 + dx * 15, Math.random() * 10, (Math.random() - 0.5) * 20 + dz * 15, 0.5);
+    if (viewD(o.x, o.z) < 400) { if (QFX) QFX.boom(o.x, o.y - 0.4, o.z, 0.4); sndImpact(20, o.x, o.z); } if (viewD(o.x, o.z) < 400) for (let k = 0; k < 30; k++) emit(sparks, o.x, o.y + 1, o.z, (Math.random() - 0.5) * 20 + dx * 15, Math.random() * 10, (Math.random() - 0.5) * 20 + dz * 15, 0.5);
     if (o === player) shake = Math.max(shake, 1); }
   { let o = 0; while (o < len) { const ph = rayProp(m[0] + dx * o, m[2] + dz * o, dx, dz, len - o, m[1]); if (!ph) break; breakProp(ph[0], dx * 30, 6, dz * 30); o += ph[1] + 0.5; } } // 레일건은 오브젝트도 관통하며 다 부숨
   cannonFx(c, m, dx, dz, len);
