@@ -108,6 +108,14 @@
   #touch #tSp { right: 26px !important; bottom: calc(26px + min(25vh, 114px)) !important; width: min(19vh, 86px); height: min(19vh, 86px); }
   #touch #tGun { right: calc(22px + min(23vh, 106px)) !important; bottom: calc(22px + min(23vh, 106px)) !important; width: min(14vh, 62px); height: min(14vh, 62px); font-size: 12px; }
   #touch #tDrift { right: calc(22px + min(25vh, 114px) + min(21vh, 96px)) !important; bottom: 30px !important; left: auto !important; width: min(15vh, 68px); height: min(15vh, 68px); font-size: 12px; }
+  #touch .tb .bi { display: flex; gap: 3px; justify-content: center; margin-top: 4px; pointer-events: none; }
+  #touch .tb { flex-direction: column; }
+  #touch .tb .bi i { width: 9px; height: 9px; transform: rotate(45deg); border: 1.5px solid #fff; display: block; }
+  #touch .tb .bi i.full { background: #ff5a1f; box-shadow: 0 0 6px #ff5a1f; } #touch .tb .bi i.lock { border-color: #555; }
+  #touch .tb .hb { width: 70%; height: 5px; margin-top: 4px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.4); pointer-events: none; } #touch .tb .hb i { display: block; height: 100%; }
+  #touch .tb .am { font-size: 10px; margin-top: 2px; letter-spacing: 1px; pointer-events: none; }
+  body.touch #hudBR .barlabel, body.touch #hudBR #charges, body.touch #hudBR #wpnHud { display: none !important; } /* 폰: 부스트·무기 표시는 버튼 안으로 */
+  body.touch #hudBR { bottom: calc(4px + env(safe-area-inset-bottom)) !important; }
   #touch #tGas { display: none; right: calc(26px + min(25vh, 114px) + min(21vh, 96px) + min(17vh, 78px)) !important; bottom: 22px !important; }
   body.manualgas #touch #tGas { display: flex; }
   #sTrack { position: absolute; width: 0; height: 0; pointer-events: none; display: none; }
@@ -217,11 +225,11 @@
   <div class="tb" id="tRight" style="left:104px;bottom:30px;">▶</div>
   <div class="tb" id="tBrake" style="right:190px;bottom:30px;">브레이크</div>
   <div class="tb" id="tGas" style="right:18px;bottom:30px;width:90px;height:90px;">가속</div>
-  <div class="tb" id="tNitro" style="right:104px;bottom:128px;">부스트</div>
+  <div class="tb" id="tNitro" style="right:104px;bottom:128px;">부스트<span class="bi" id="tNitroI"></span></div>
   <div class="tb" id="tDrift" style="right:190px;bottom:118px;width:64px;height:64px;font-size:13px;">드리프트</div>
-  <div class="tb" id="tGun" style="right:18px;bottom:226px;width:72px;height:72px;font-size:13px;">기관포</div>
+  <div class="tb" id="tGun" style="right:18px;bottom:226px;width:72px;height:72px;font-size:13px;">기관포<span class="bi" id="tGunI"></span></div>
   <div class="tb" id="tRet">↺<br>복귀</div>
-  <div class="tb" id="tSp" style="right:104px;bottom:226px;width:72px;height:72px;font-size:13px;">특수</div>
+  <div class="tb" id="tSp" style="right:104px;bottom:226px;width:72px;height:72px;font-size:13px;">특수<span class="bi" id="tSpI"></span></div>
 </div>
 
 <div id="mirror"></div>
@@ -3279,6 +3287,9 @@ function updateHud() {
   setHTML("speed", `${kmh}<small> km/h</small>`);
   const maxC = Math.round(P.charges); let ch = ""; for (let i = 0; i < 3; i++) ch += `<i class="${i >= maxC ? "lock" : (i < player.charges ? "full" : "used")}"></i>`;
   const ce = document.getElementById("charges"); if (ce.innerHTML !== ch) ce.innerHTML = ch;
+  if (isTouch) { setHTML("tNitroI", ch); /* 폰: 버튼 안에 남은 부스트 */
+    if (player.wpn) { const w = player.wpn; setHTML("tGunI", `<span class="hb" style="display:block;width:${Math.round(40)}px"><i style="width:${Math.round(w.heat * 100)}%;background:${w.over ? "#ff3b3b" : "#ffd23a"}"></i></span>`);
+      setHTML("tSpI", `<span class="am">${"●".repeat(w.ammo)}${"○".repeat(Math.max(0, WEAPONS[w.sp].ammo - w.ammo))}${w.sp === "rail" && w.charge > 0 ? ` <b style="color:#8ff4ff">${w.charge >= 1 ? "!" : Math.round(w.charge * 100) + "%"}</b>` : ""}</span>`); } }
   if (player.wpn) { const w = player.wpn, hc2 = w.over ? "#ff3b3b" : "#ffd23a"; const wh = `기관포 <span style="display:inline-block;width:60px;height:7px;background:rgba(0,0,0,.5);vertical-align:middle"><i style="display:block;height:100%;width:${Math.round(w.heat * 100)}%;background:${hc2}"></i></span><br>${WEAPONS[w.sp].name} ${"●".repeat(w.ammo)}${"○".repeat(Math.max(0, WEAPONS[w.sp].ammo - w.ammo))}${w.sp === "rail" && w.charge > 0 ? ` <b style="color:#8ff4ff">${w.charge >= 1 ? "발사!" : Math.round(w.charge * 100) + "%"}</b>` : ""}`; const we = document.getElementById("wpnHud"); if (we.innerHTML !== wh) we.innerHTML = wh; }
   flashT = Math.max(0, flashT - 0.05); const fe = document.getElementById("flash"); fe.style.opacity = flashT * 0.85; fe.style.background = flashT > 0.5 ? "#fff" : "#ff9a3a";
   if (camMode === "cockpit") {
