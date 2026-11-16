@@ -509,18 +509,20 @@ const WEAR_TEX = (() => { const S = 512, c = document.createElement("canvas"); c
   for (let k = 0; k < 18; k++) { const x = R() * S, y = R() * S * 0.6; g.strokeStyle = "rgba(40,180,0,0.18)"; g.lineWidth = 2 + R() * 4; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (R() - 0.5) * 8, y + 20 + R() * 70); g.stroke(); } // 흘러내린 기름 자국
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t; })();
 function applyWear(body, dirtCol) { // 부품 재질에 때·상처를 입힘
-  const dc = new THREE.Color(dirtCol || 0x6a5238);
-  body.traverse(o => { if (!o.isMesh || !o.material || !o.material.isMeshStandardMaterial || o.material.transparent || o.material.userData.wear) return; const m = o.material; m.userData.wear = true;
-    m.onBeforeCompile = sh => { sh.uniforms.wearMap = { value: WEAR_TEX }; sh.uniforms.dirtCol = { value: dc };
+  body.traverse(o => { if (!o.isMesh || !o.material || !o.material.isMeshStandardMaterial || o.material.transparent || o.material.userData.wear) return; const m = o.material; m.userData.wear = true; m.userData.dirt = dirtCol || 0x6a5238;
+    m.onBeforeCompile = wearCompile(m.userData.dirt, "#include <map_fragment>");
+    m.customProgramCacheKey = () => "wear"; m.needsUpdate = true; });
+}
+function wearCompile(dirtCol, anchor) { const dc = new THREE.Color(dirtCol);
+  return sh => { sh.uniforms.wearMap = { value: WEAR_TEX }; sh.uniforms.dirtCol = { value: dc };
       sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vOP; varying vec3 vON;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvOP = position; vON = normal;");
-      sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform sampler2D wearMap; uniform vec3 dirtCol; varying vec3 vOP; varying vec3 vON;").replace("#include <map_fragment>", `#include <map_fragment>
+      sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform sampler2D wearMap; uniform vec3 dirtCol; varying vec3 vOP; varying vec3 vON;").replace(anchor, anchor + `
         { vec3 bw = pow(abs(normalize(vON)), vec3(4.0)); bw /= (bw.x + bw.y + bw.z + 1e-4); vec3 p = vOP * 0.36;
           vec3 w = texture2D(wearMap, p.zy).rgb * bw.x + texture2D(wearMap, p.xz).rgb * bw.y + texture2D(wearMap, p.xy).rgb * bw.z;
           float dirt = smoothstep(1.05, 0.2, vOP.y) * 0.55 + w.g * 0.35;
           diffuseColor.rgb *= mix(0.2, 1.0, w.r);
           diffuseColor.rgb = mix(diffuseColor.rgb, dirtCol * 0.6, clamp(dirt, 0.0, 0.7));
           diffuseColor.rgb += w.b * 0.26; }`); };
-    m.customProgramCacheKey = () => "wear"; m.needsUpdate = true; });
 }
 // 차 만들 때만 금속 재질 (어두운 색은 타이어·고무처럼 덜 반짝이게)
 const toon = (c, extra) => {
@@ -545,6 +547,7 @@ let SUN_DIR = new THREE.Vector3(0, 1, 0);
 const amb = new THREE.AmbientLight(0xffffff, 0.1); scene.add(amb);
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(24000, 24000), toon(0xd9a066)); ground.rotation.x = -Math.PI / 2; ground.position.y = -4; scene.add(ground);
 const outlineMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide });
+const carOlMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide }); /* 차 외곽선 전용 (폰에서 배경 외곽선만 끌 수 있게) */
 function partGraph(body, parts, flames, tol) { // 부품끼리 실제로 맞닿았는지(면 가까이 있거나 박혀 있는지) 그래프로
   tol = tol || 0.06;
   const pset = new Set(parts), fl = new Set(flames || []);
@@ -1101,9 +1104,55 @@ function computeRacingLine() { // 레이싱 라인: 바깥-안쪽(에이펙스)-
     t.rl = o[j] + (o[j2] - o[j]) * f; t.krl = Math.min(t.k, Math.max(kr[(j - 1 + M) % M], kr[j], kr[j2]) * 1.1 + 0.00005); } // 라인 곡률 (원래 코스 곡률보다 크게는 안 봄)
 }
 const DCULL = [], WOL = []; // WOL: 길가 소품들의 외곽선 (멀면 끔)
+const VC_MATS = new Map(); /* 색을 꼭짓점에 굽고 공유하는 재질 */
+function vcMat(m0, key) { let m = VC_MATS.get(key); if (m) return m;
+  m = m0.clone(); m.vertexColors = true; if (m.color) m.color.setHex(0xffffff);
+  if (m0.userData.wear) { m.onBeforeCompile = wearCompile(m0.userData.dirt || 0x6a5238, "#include <color_fragment>"); m.customProgramCacheKey = () => "wearVC"; }
+  if (m.isMeshStandardMaterial) metalMats.push(m); VC_MATS.set(key, m); return m; }
+function matKey(m, vc) { return m === carOlMat ? "OL" : [m.type, vc ? "" : (m.color ? m.color.getHex() : ""), m.map ? m.map.uuid : "", m.emissive ? m.emissive.getHex() : "", m.side, m.gradientMap ? m.gradientMap.uuid : "", m.metalness ?? "", m.roughness ?? "", m.polygonOffset ? m.polygonOffsetFactor : "", m.userData.wear ? "W" + (m.userData.dirt || 0) : (m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile ? m.uuid : "")].join(","); }
+function buildMerged(list, rel, key) { /* 여러 메시를 하나로 (색은 꼭짓점 색으로) */
+  const m0 = list[0].material, ol = m0 === carOlMat, uv = !!m0.map, nm = new THREE.Matrix3(), v = new THREE.Vector3(), C = new THREE.Color();
+  let nv = 0, ni = 0; for (const o of list) { const gg = o.geometry; nv += gg.attributes.position.count; ni += gg.index ? gg.index.count : gg.attributes.position.count; }
+  const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), col = ol ? null : new Float32Array(nv * 3), tuv = uv ? new Float32Array(nv * 2) : null, idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let vo = 0, io = 0;
+  for (const o of list) { const gg = o.geometry, P = gg.attributes.position, N = gg.attributes.normal, T = gg.attributes.uv, M = rel.get(o), cnt = P.count; nm.getNormalMatrix(M); if (col) C.copy(o.material.color || C.setHex(0xffffff));
+    for (let i = 0; i < cnt; i++) { const k = (vo + i) * 3; v.fromBufferAttribute(P, i).applyMatrix4(M); pos[k] = v.x; pos[k + 1] = v.y; pos[k + 2] = v.z;
+      v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); nor[k] = v.x; nor[k + 1] = v.y; nor[k + 2] = v.z;
+      if (col) { col[k] = C.r; col[k + 1] = C.g; col[k + 2] = C.b; } if (uv) { tuv[(vo + i) * 2] = T ? T.getX(i) : 0; tuv[(vo + i) * 2 + 1] = T ? T.getY(i) : 0; } }
+    if (gg.index) { const ix = gg.index; for (let i = 0; i < ix.count; i++) idx[io + i] = ix.getX(i) + vo; io += ix.count; } else { for (let i = 0; i < cnt; i++) idx[io + i] = vo + i; io += cnt; }
+    vo += cnt; }
+  const out = new THREE.BufferGeometry(); out.setAttribute("position", new THREE.BufferAttribute(pos, 3)); out.setAttribute("normal", new THREE.BufferAttribute(nor, 3)); if (col) out.setAttribute("color", new THREE.BufferAttribute(col, 3)); if (uv) out.setAttribute("uv", new THREE.BufferAttribute(tuv, 2)); out.setIndex(new THREE.BufferAttribute(idx, 1)); out.computeBoundingSphere();
+  const mm = new THREE.Mesh(out, ol ? carOlMat : vcMat(m0, key)); mm.castShadow = list[0].castShadow; mm.receiveShadow = list[0].receiveShadow; mm.renderOrder = list[0].renderOrder; mm.layers.mask = list[0].layers.mask; mm.userData.carMerged = true; return mm;
+}
+function collectMerge(root, skip, okVis) { /* root 아래 메시를 재질 종류별로 묶음 (root 기준 좌표) */
+  root.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), groups = new Map(), rel = new Map();
+  root.traverse(o => { if (!o.isMesh || skip.has(o) || o.userData.carMerged) return;
+    for (let p = o.parent; p && p !== root; p = p.parent) if (!p.visible) return;
+    if (!o.visible && !okVis(o)) return;
+    const m = o.material, gg = o.geometry; if (!m || Array.isArray(m) || m.transparent || !gg.attributes.position || !gg.attributes.normal) return;
+    const key = matKey(m, true) + "|" + (o.castShadow ? 1 : 0); let a = groups.get(key); if (!a) groups.set(key, a = []); a.push(o); rel.set(o, new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld)); });
+  return { groups, rel };
+}
+function mergeWheels(g) { /* 바퀴 안쪽(타이어·림·스포크·허브)은 영구히 합침 — 바퀴째 떨어지니 다시 나눌 일 없음 */
+  for (const pv of g.userData.wheels || []) { const sp = pv.userData.spin; if (!sp || sp.userData.merged) continue; sp.userData.merged = true;
+    const { groups, rel } = collectMerge(sp, new Set(), () => false);
+    for (const [key, list] of groups) { if (list.length < 2) continue; const mm = buildMerged(list, rel, key); sp.add(mm); for (const o of list) o.parent.remove(o); } }
+}
+function mergeCar(g) { /* 차가 멀쩡할 땐 부품 100여 개를 재질 종류별 몇 덩어리로 합쳐 그림 (처음 부서질 때 원래 부품으로 돌아감) */
+  const u = g.userData, body = u.body; if (!body || u.mrg) return;
+  const skip = new Set(u.flames || []); if (u.tail) skip.add(u.tail);
+  const { groups, rel } = collectMerge(body, skip, o => o.material === carOlMat);
+  const meshes = [], hid = new Set();
+  for (const [key, list] of groups) { if (list.length < 2) continue; const mm = buildMerged(list, rel, key); body.add(mm); meshes.push(mm); for (const o of list) { o.visible = false; hid.add(o); } }
+  u.mrg = { meshes, hid }; u.ols = null; u.olFar = undefined;
+}
+function unmergeCar(g) { /* 부서지기 시작하면 원래 부품들로 */
+  const u = g.userData, M = u.mrg; if (!M) return;
+  for (const o of M.hid) o.visible = true; for (const mm of M.meshes) { u.body.remove(mm); mm.geometry.dispose(); }
+  u.mrg = null; u.ols = null; u.olFar = undefined;
+}
 function carLod() { // 멀리 있는 차는 외곽선을 끔 (어차피 안 보이고 그리기 횟수만 두 배)
   const p = camera.position;
-  for (const c of [player, ...ais]) { const u = c.mesh.userData; if (!u.ols) { u.ols = []; c.mesh.traverse(o => { if (o.isMesh && o.material === outlineMat) u.ols.push(o); }); }
+  for (const c of [player, ...ais]) { const u = c.mesh.userData; if (!u.ols) { u.ols = []; c.mesh.traverse(o => { if (o.isMesh && o.material === carOlMat && (!u.mrg || o.userData.carMerged || !u.mrg.hid.has(o))) u.ols.push(o); }); }
     const far = c.mesh.position.distanceTo(p) > (SET.gfx === "low" ? 90 : 160); if (u.olFar !== far) { u.olFar = far; for (const o of u.ols) o.visible = !far; } }
 }
 function distCull() { // 그래픽 낮음 1.5km, 높음 4.5km 밖의 소품 묶음(나무·관중·풍선 등)은 안 그림
@@ -1248,6 +1297,8 @@ function carKit(color, accent) {
     { g.updateMatrixWorld(true); const A = partGraph(body, K.parts, K.flames); const reach = new Set(A.roots), stk = [...A.roots]; while (stk.length) { const i = stk.pop(); for (const j of A.adj[i]) if (!reach.has(j)) { reach.add(j); stk.push(j); } }
       for (let i = 0; i < A.nodes.length; i++) if (!reach.has(i)) { let bj = -1, bd = 1e9; const ci = A.geo[i].box.getCenter(new THREE.Vector3()); for (const j of reach) { const d = A.geo[j].box.distanceToPoint(ci); if (d < bd) { bd = d; bj = j; } } if (bj >= 0) { A.adj[i].push(bj); A.adj[bj].push(i); } } // 번호판 같은 얇은 장식은 가장 가까운 부품에 붙은 걸로
       g.userData.adj = { nodes: A.nodes, adj: A.adj, roots: A.roots, cen: A.geo.map(q => q.box.getCenter(new THREE.Vector3())) }; }
+    g.traverse(o => { if (o.isMesh && o.material === outlineMat) o.material = carOlMat; });
+    mergeWheels(g); mergeCar(g); /* 멀쩡할 땐 한 덩어리로 그림 */
     METAL = false; return g;
   };
   return K;
@@ -1826,7 +1877,7 @@ function repApply(t, dt) {
     else for (let k = 0; k < 24; k++) emit(sparks, e.x, e.y + 1, e.z, (Math.random() - 0.5) * 14, Math.random() * 7, (Math.random() - 0.5) * 14, 0.4); }
   REPLAY.lastT = t;
 }
-function repChar(c, on) { const d = ensureDmg(c), st = REPLAY.charred.get(c); if (st === on) return; REPLAY.charred.set(c, on);
+function repChar(c, on) { const d = ensureDmg(c), st = REPLAY.charred.get(c); if (st === on) return; REPLAY.charred.set(c, on); unmergeCar(c.mesh);
   for (const pair of d.chars) { const [mesh, orig] = pair; if (!pair[2]) pair[2] = mesh.material; mesh.material = on ? pair[2] : orig; }
   for (const k in d.fr) d.fr[k].visible = on; }
 function repStart() {
@@ -1956,7 +2007,7 @@ const SET = { vol: 60, shake: 1, blur: 0.5, gfx: isTouchDev() ? "low" : "high" }
 function applySet() {
   try { localStorage.setItem("bgp_set", JSON.stringify(SET)); } catch (e) {}
   if (SND.master) SND.master.gain.value = SND.on ? SET.vol / 100 : 0;
-  renderer.setPixelRatio(SET.gfx === "low" ? Math.min(window.devicePixelRatio, 1) : Math.min(window.devicePixelRatio, 1.5)); renderer.shadowMap.enabled = SET.gfx !== "low"; resize(); applyViewDist(); if (typeof DYN !== "undefined") DYN.pr = 0;
+  renderer.setPixelRatio(SET.gfx === "low" ? Math.min(window.devicePixelRatio, 1) : Math.min(window.devicePixelRatio, 1.5)); renderer.shadowMap.enabled = SET.gfx !== "low"; outlineMat.visible = SET.gfx !== "low"; /* 폰: 배경 외곽선은 화면 잉크선으로 대신 (차 외곽선은 유지) */ resize(); applyViewDist(); if (typeof DYN !== "undefined") DYN.pr = 0;
   document.getElementById("sVol").value = SET.vol;
   document.querySelectorAll("[data-shk]").forEach(b => b.classList.toggle("on", +b.dataset.shk === SET.shake)); document.querySelectorAll("[data-blr]").forEach(b => b.classList.toggle("on", +b.dataset.blr === SET.blur)); document.querySelectorAll("[data-gfx]").forEach(b => b.classList.toggle("on", b.dataset.gfx === SET.gfx));
 }
@@ -2530,6 +2581,7 @@ function repairCar(c) {
   for (const [mesh, mat] of d.chars) mesh.material = mat; d.chars = [];
   for (const k in d.fr) d.fr[k].visible = false; u.body.position.y = 0;
   d.det = { F: [], B: [], P: [], N: [] }; for (const it of d.info) if (it.out !== undefined) d.det[d.zoneOf(it.c.x, it.c.z)].push(it.pt); for (const k in d.det) d.det[k].sort((a, b) => b.userData.out - a.userData.out);
+  mergeCar(c.mesh); /* 다 고쳤으면 다시 한 덩어리 */
   Object.assign(c, { tumble: false, rolls: 0, hp: 100, hpMul: 1, zoneD: { F: 0, B: 0, P: 0, N: 0 }, dead: false, deadT: 0, camRetT: 0, lastHit: null, dmgFxT: 0 });
 }
 function repairAll() { for (const w of WRECK) if (!w.obj.userData.orig) wreckG.remove(w.obj); WRECK.length = 0; resetProps(); for (const c of [player, ...ais]) repairCar(c); }
@@ -2570,7 +2622,7 @@ function cascadeParts(c) { // 받쳐주던 부품이 떨어지면, 차체와 더
   d.casc = false;
 }
 function detachPart(c, pt, zone, power) {
-  const d = ensureDmg(c), u = c.mesh.userData; c.mesh.updateMatrixWorld(true); pt.updateMatrixWorld(true);
+  unmergeCar(c.mesh); const d = ensureDmg(c), u = c.mesh.userData; c.mesh.updateMatrixWorld(true); pt.updateMatrixWorld(true);
   const P_ = new THREE.Vector3(), Q = new THREE.Quaternion(), Sc = new THREE.Vector3(); pt.matrixWorld.decompose(P_, Q, Sc);
   pt.parent.remove(pt); wreckG.add(pt); pt.position.copy(P_); pt.quaternion.copy(Q); pt.scale.copy(Sc); pt.userData.zone = zone; d.gone.push(pt);
   if (zone && d.fr[zone]) d.fr[zone].visible = true;
@@ -2584,7 +2636,7 @@ function detachPart(c, pt, zone, power) {
   if (Math.hypot(c.x - player.x, c.z - player.z) < 300) for (let k = 0; k < 8; k++) emit(sparks, P_.x, P_.y, P_.z, (Math.random() - 0.5) * 10 + c.vx * 0.5, Math.random() * 6, (Math.random() - 0.5) * 10 + c.vz * 0.5, 0.4);
 }
 function dentAt(c, loc, depth) { // 맞은 자리 근처 꼭짓점을 안쪽으로 밀어 찌그러뜨림
-  const d = ensureDmg(c), R = Math.max(0.9, d.S.x * 0.55), dir = new THREE.Vector3(d.C0.x - loc.x, 0, d.C0.z - loc.z).normalize(), inv = new THREE.Matrix4(), pL = new THREE.Vector3(), dL = new THREE.Vector3();
+  unmergeCar(c.mesh); const d = ensureDmg(c), R = Math.max(0.9, d.S.x * 0.55), dir = new THREE.Vector3(d.C0.x - loc.x, 0, d.C0.z - loc.z).normalize(), inv = new THREE.Matrix4(), pL = new THREE.Vector3(), dL = new THREE.Vector3();
   for (const it of d.info) {
     const pt = it.pt; if (pt.parent !== c.mesh.userData.body) continue;
     if (Math.abs(it.c.x - loc.x) > R + it.sz.x / 2 || Math.abs(it.c.z - loc.z) > R + it.sz.z / 2) continue;
@@ -2597,7 +2649,7 @@ function dentAt(c, loc, depth) { // 맞은 자리 근처 꼭짓점을 안쪽으�
   }
 }
 function explode(c) {
-  recEvent("boom", c, true);
+  recEvent("boom", c, true); unmergeCar(c.mesh);
   const d = ensureDmg(c), u = c.mesh.userData; c.dead = true; c.hp = 0; c.deadT = 0; c.boostT = 0;
   for (const z of ["F", "B", "P", "N"]) while (d.det[z].length) detachPart(c, d.det[z].shift(), z, 2.2);
   for (const w of u.wheels) { w.userData.isWheel = true; detachPart(c, w, null, 1.6); }
@@ -3477,7 +3529,7 @@ function simulate(secs, driver) {
   for (let t = 0; t < secs; t += dt) { if (state !== "race" && state !== "end") break; const d = driver(player); Object.assign(input, d); raceT += dt; stepPlayer(dt); stepAI(dt); stepWeapons(dt); stepProps(); stepWreck(dt); lapLogic(); syncMeshes(dt); recFrame(); }
 }
 window.__cam = () => { updateCamera(1 / 30); return camera.position.distanceTo(new THREE.Vector3(player.x, player.y, player.z)); };
-window.__SND = SND; window.__upd = updateSound; window.__inp = input; window.__bgp = { get SFX() { return SFX; }, get renderer() { return renderer; }, get scene() { return scene; }, get camera() { return camera; }, get REC() { return REC; }, detachPart, ensureDmg, raySolid, get SOLIDS() { return SOLIDS; }, useSpecial, fireGun, PROJ, TETHERS, setSpecial, enterTumble, applyDamage, explode, hitLocal, WRECK, get GAP() { return GAP; }, player, ais, get state() { return state; }, get L() { return L; }, get HALF() { return HALF; }, P, startRace, simulate, get TRK() { return TRK; }, idxAtS, posAt, surfH, setCourse(id) { buildCourse(id); loadBest(); placeGrid(); }, skipCount() { if (state === "intro") introEnd(); countdown = 0.01; } };
+window.__SND = SND; window.__upd = updateSound; window.__inp = input; window.__bgp = { get SFX() { return SFX; }, get renderer() { return renderer; }, get scene() { return scene; }, get camera() { return camera; }, get REC() { return REC; }, detachPart, ensureDmg, raySolid, get SOLIDS() { return SOLIDS; }, useSpecial, fireGun, PROJ, TETHERS, setSpecial, enterTumble, applyDamage, explode, hitLocal, repairAll, WRECK, get GAP() { return GAP; }, player, ais, get state() { return state; }, get L() { return L; }, get HALF() { return HALF; }, P, startRace, simulate, get TRK() { return TRK; }, idxAtS, posAt, surfH, setCourse(id) { buildCourse(id); loadBest(); placeGrid(); }, skipCount() { if (state === "intro") introEnd(); countdown = 0.01; } };
 })();
 </script>
 </body>
