@@ -1,0 +1,15 @@
+{
+  "name": "버스 플랜B",
+  "short_name": "버스 플랜B",
+  "description": "내 주변 버스정류장 도착 시간, 탈 수 있는지 판정, 놓치면 다음에 탈 버스 알려주기",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6fb",
+  "theme_color": "#1f4fbf",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

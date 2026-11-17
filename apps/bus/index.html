@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1f4fbf">
+<title>버스 플랜B</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { font-family: -apple-system, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: #f4f6fb; color: #1b1f2a; display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+  button { font: inherit; border: none; cursor: pointer; }
+  header { background: #1f4fbf; color: #fff; padding: calc(10px + env(safe-area-inset-top)) 14px 10px; display: flex; align-items: center; gap: 10px; flex: none; }
+  header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.3px; }
+  header h1 b { color: #f2c21a; }
+  #destChip { margin-left: auto; background: rgba(255,255,255,.16); color: #fff; padding: 6px 10px; border-radius: 16px; font-size: 13px; max-width: 58%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #destChip.on { background: #f2c21a; color: #1b1f2a; font-weight: 700; }
+  #map { flex: 0 0 38%; position: relative; z-index: 1; }
+  #map .locbtn { position: absolute; right: 10px; bottom: 10px; z-index: 500; background: #fff; border-radius: 22px; padding: 9px 13px; box-shadow: 0 2px 8px rgba(0,0,0,.25); font-size: 13px; font-weight: 700; color: #1f4fbf; }
+  #map .here { position: absolute; left: 10px; bottom: 10px; z-index: 500; background: #fff; border-radius: 22px; padding: 9px 13px; box-shadow: 0 2px 8px rgba(0,0,0,.25); font-size: 13px; font-weight: 700; color: #333; }
+  #panel { flex: 1; display: flex; flex-direction: column; min-height: 0; background: #fff; border-radius: 16px 16px 0 0; margin-top: -14px; position: relative; z-index: 2; box-shadow: 0 -3px 12px rgba(0,0,0,.12); }
+  #tabs { display: flex; padding: 6px 8px 0; gap: 4px; flex: none; }
+  #tabs button { flex: 1; padding: 10px 0; background: none; font-weight: 700; color: #889; border-bottom: 3px solid transparent; }
+  #tabs button.on { color: #1f4fbf; border-color: #1f4fbf; }
+  #view { flex: 1; overflow-y: auto; padding: 10px 12px calc(14px + env(safe-area-inset-bottom)); }
+  .msg { color: #667; text-align: center; padding: 24px 10px; font-size: 14px; line-height: 1.6; }
+  .msg .err { color: #c0392b; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 12px 6px; border-bottom: 1px solid #eef0f5; cursor: pointer; }
+  .row:active { background: #f4f6fb; }
+  .row .nm { font-weight: 700; font-size: 15px; }
+  .row .sub { font-size: 12px; color: #889; margin-top: 2px; }
+  .row .right { margin-left: auto; text-align: right; font-size: 13px; color: #556; white-space: nowrap; }
+  .search { display: flex; gap: 6px; margin-bottom: 8px; }
+  .search input, .search select { padding: 11px; border: 1px solid #ccd3e2; border-radius: 10px; font-size: 15px; min-width: 0; }
+  .search input { flex: 1; }
+  .search select { max-width: 34%; }
+  .search button, .btn { background: #1f4fbf; color: #fff; border-radius: 10px; padding: 11px 14px; font-weight: 700; }
+  .btn.y { background: #f2c21a; color: #1b1f2a; }
+  .btn.g { background: #eef0f5; color: #334; }
+  .stopHead { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+  .stopHead .back { background: #eef0f5; border-radius: 8px; padding: 6px 10px; font-weight: 700; }
+  .stopHead h2 { font-size: 18px; }
+  .stopHead .meta { font-size: 12px; color: #778; margin-top: 2px; }
+  .star { margin-left: auto; font-size: 24px; background: none; color: #ccc; }
+  .star.on { color: #f2b01a; }
+  .acts { display: flex; gap: 6px; margin: 6px 0 10px; flex-wrap: wrap; }
+  .acts .btn { padding: 8px 11px; font-size: 13px; }
+  .bus { display: flex; align-items: center; gap: 10px; padding: 11px 4px; border-bottom: 1px solid #eef0f5; }
+  .no { min-width: 54px; text-align: center; font-weight: 800; font-size: 16px; padding: 6px 4px; border-radius: 8px; color: #fff; background: #3a7bd5; }
+  .no.t농어촌, .no.t마을 { background: #2e9e5b; }
+  .no.t좌석, .no.t직행, .no.t광역, .no.t급행 { background: #d0392b; }
+  .no.t간선 { background: #2f5fd0; }
+  .no.t지선 { background: #3aa64c; }
+  .bus .info { flex: 1; min-width: 0; }
+  .bus .t { font-weight: 800; font-size: 17px; }
+  .bus .s { font-size: 12px; color: #778; margin-top: 2px; }
+  .bus .godest { font-size: 11px; color: #b07a00; font-weight: 700; }
+  .chip { font-size: 12px; font-weight: 800; padding: 5px 9px; border-radius: 12px; white-space: nowrap; }
+  .chip.ok { background: #dff5e6; color: #1e8a46; }
+  .chip.run { background: #fff2c6; color: #a36b00; }
+  .chip.miss { background: #fde2df; color: #c0392b; }
+  .note { font-size: 11px; color: #99a; margin-top: 10px; line-height: 1.5; }
+  .plan { border: 1px solid #e3e7f0; border-radius: 12px; padding: 11px; margin-bottom: 8px; display: flex; gap: 10px; align-items: center; cursor: pointer; }
+  .plan.best { border-color: #f2c21a; background: #fffbea; }
+  .plan.miss { opacity: .55; }
+  .plan .eta { margin-left: auto; text-align: right; }
+  .plan .eta b { font-size: 18px; display: block; }
+  .plan .eta span { font-size: 11px; color: #889; }
+  .plan .how { font-size: 13px; line-height: 1.5; }
+  .plan .how small { color: #889; }
+  .prog { height: 4px; background: #eef0f5; border-radius: 2px; overflow: hidden; margin: 8px 0; }
+  .prog i { display: block; height: 100%; background: #1f4fbf; width: 0; transition: width .2s; }
+  .walkOnly { background: #eef6ff; border-radius: 12px; padding: 11px; margin-bottom: 8px; font-size: 13px; }
+  #toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #222b; color: #fff; padding: 10px 16px; border-radius: 20px; font-size: 13px; z-index: 9999; display: none; }
+  .leaflet-popup-content { font-family: inherit; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🚌 버스 <b>플랜B</b></h1>
+  <button id="destChip">🏁 목적지 정하기</button>
+</header>
+<div id="map"><button class="here" id="hereBtn">🗺 이 근처 찾기</button><button class="locbtn" id="locBtn">📍 내 위치</button></div>
+<div id="panel">
+  <div id="tabs"><button data-t="near" class="on">주변</button><button data-t="search">검색</button><button data-t="fav">즐겨찾기</button><button data-t="plan">플랜B</button></div>
+  <div id="view"></div>
+</div>
+<div id="toast"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+/* ===== 설정 ===== */
+const KEY = "5def63645b8740e01306b54b2606abd08f3582bac6e98a14cf38f78c16e0aeb5"; // 공공데이터포털 인증키 (TAGO 정류소·도착·노선)
+const API = "https://apis.data.go.kr/1613000";
+const WALK = 70, RUN = 160, DETOUR = 1.25; // 걷기 70m/분, 뛰기 160m/분, 직선거리 → 실제 길 보정
+const BUS_MPM = 330; // 버스 평균 속도 약 20km/h (정차 포함)
+
+/* ===== 저장 ===== */
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+let favs = store.get("favs", []);   // [{citycode,nodeid,nodenm,nodeno,lat,lng}]
+let dest = store.get("dest", null);  // 목적지 정류장
+let myPos = null;                    // {lat,lng}
+let curStop = null, refreshT = null, tickT = null, lastArr = null, lastFetch = 0;
+
+/* ===== 공공 API 부르기 ===== */
+async function call(svc, op, params) {
+  const u = new URL(`${API}/${svc}/${op}`);
+  u.searchParams.set("serviceKey", KEY); u.searchParams.set("_type", "json"); u.searchParams.set("pageNo", "1");
+  for (const k in params) u.searchParams.set(k, params[k]);
+  let j;
+  try { const r = await fetch(u); j = await r.json(); } catch (e) { throw new Error("인터넷 연결을 확인해 주세요"); }
+  const h = j && j.response && j.response.header;
+  if (!h) throw new Error("버스 정보 서버 응답이 이상해요");
+  if (String(h.resultCode) !== "00") throw new Error(String(h.resultMsg).includes("세션") ? "버스 정보 서버가 바빠요. 잠시 후 다시 눌러 주세요" : h.resultMsg || "버스 정보를 못 받았어요");
+  const it = j.response.body && j.response.body.items && j.response.body.items.item;
+  if (!it) return [];
+  return Array.isArray(it) ? it : [it];
+}
+const nearStops = (lat, lng) => call("BusSttnInfoInqireService", "getCrdntPrxmtSttnList", { gpsLati: lat, gpsLong: lng, numOfRows: 30 });
+const searchStops = (city, name) => call("BusSttnInfoInqireService", "getSttnNoList", { cityCode: city, nodeNm: name, numOfRows: 40 });
+const arrivals = (city, node) => call("ArvlInfoInqireService", "getSttnAcctoArvlPrearngeInfoList", { cityCode: city, nodeId: node, numOfRows: 60 });
+async function cities() { let c = store.get("cities", null); if (c && c.length) return c; c = (await call("BusSttnInfoInqireService", "getCtyCodeList", { numOfRows: 300 })).map(x => [x.citycode, x.cityname]); store.set("cities", c); return c; }
+async function routeStops(city, rid) { // 노선이 지나는 정류장 순서 (한 번 받으면 폰에 저장)
+  const k = "rt:" + city + ":" + rid; let s = store.get(k, null); if (s) return s;
+  const it = await call("BusRouteInfoInqireService", "getRouteAcctoThrghSttnList", { cityCode: city, routeId: rid, numOfRows: 400 });
+  s = it.sort((a, b) => a.nodeord - b.nodeord).map(x => [x.nodeid, +x.gpslati, +x.gpslong, x.nodenm]); store.set(k, s); return s;
+}
+
+/* ===== 도구 ===== */
+const $ = s => document.querySelector(s), view = $("#view");
+function toast(t) { const e = $("#toast"); e.textContent = t; e.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => e.style.display = "none", 2200); }
+function dist(a, b) { const R = 6371000, r = Math.PI / 180, dl = (b.lat - a.lat) * r, dg = (b.lng - a.lng) * r, x = Math.sin(dl / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dg / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); }
+const walkMin = m => m * DETOUR / WALK, runMin = m => m * DETOUR / RUN;
+const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmtMin = m => m < 1 ? "1분 안" : Math.round(m) + "분";
+function fmtSec(s) { s = Math.max(0, Math.round(s)); if (s < 60) return s <= 20 ? "곧 도착" : s + "초"; const m = Math.floor(s / 60), r = s % 60; return m + "분" + (m < 10 && r ? " " + r + "초" : ""); }
+const clock = d => d.toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
+const typeCls = t => "t" + String(t || "").replace(/[()\s]/g, "").replace(/버스|\(일반\)/g, "").slice(0, 3);
+const stopObj = x => ({ citycode: x.citycode, nodeid: x.nodeid, nodenm: x.nodenm, nodeno: x.nodeno, lat: +x.gpslati, lng: +x.gpslong });
+function status(arrSec, meters) { // 탈 수 있을까?
+  if (meters == null) return null; const a = arrSec / 60;
+  if (walkMin(meters) <= a - 0.5) return ["ok", "여유"];
+  if (runMin(meters) <= a - 0.2) return ["run", "뛰어!"];
+  return ["miss", "놓침"];
+}
+
+/* ===== 지도 ===== */
+const map = L.map("map", { zoomControl: false, attributionControl: true }).setView([36.81, 126.77], 14);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+const stopLayer = L.layerGroup().addTo(map), routeLayer = L.layerGroup().addTo(map);
+let meMarker = null, destMarker = null;
+function drawDest() { if (destMarker) map.removeLayer(destMarker); destMarker = null; if (dest) destMarker = L.marker([dest.lat, dest.lng], { icon: L.divIcon({ html: "🏁", className: "", iconSize: [26, 26], iconAnchor: [6, 24] }) }).addTo(map).bindTooltip("목적지: " + dest.nodenm); }
+function drawStops(list, sel) {
+  stopLayer.clearLayers();
+  for (const s of list) L.circleMarker([s.lat, s.lng], { radius: sel && sel.nodeid === s.nodeid ? 10 : 7, color: "#fff", weight: 2, fillColor: sel && sel.nodeid === s.nodeid ? "#f2a64b" : "#1f4fbf", fillOpacity: 1 })
+    .addTo(stopLayer).on("click", () => openStop(s)).bindTooltip(s.nodenm);
+}
+function setMe(p) { myPos = p; if (meMarker) meMarker.setLatLng([p.lat, p.lng]); else meMarker = L.circleMarker([p.lat, p.lng], { radius: 8, color: "#fff", weight: 3, fillColor: "#e0453a", fillOpacity: 1 }).addTo(map).bindTooltip("내 위치"); }
+function locate(then) {
+  if (!navigator.geolocation) { toast("이 기기는 위치를 못 써요. 지도를 움직여 '이 근처 찾기'를 눌러 주세요"); return; }
+  navigator.geolocation.getCurrentPosition(p => { setMe({ lat: p.coords.latitude, lng: p.coords.longitude }); map.setView([myPos.lat, myPos.lng], 16); then && then(); },
+    () => { toast("위치 권한이 없어요. 지도를 움직여 '이 근처 찾기'를 눌러 주세요"); then && then(true); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
+}
+
+/* ===== 화면: 주변 ===== */
+let tab = "near", nearList = [], nav = 0; // nav: 화면이 바뀌면 늦게 온 응답은 버림
+async function showNear(center) {
+  stopTimers(); tab = "near"; setTab(); const my = ++nav;
+  const c = center || myPos || { lat: map.getCenter().lat, lng: map.getCenter().lng };
+  view.innerHTML = `<div class="msg">주변 정류장 찾는 중…</div>`;
+  try {
+    const it = await nearStops(c.lat, c.lng); if (my !== nav) return;
+    nearList = it.map(stopObj).map(s => ({ ...s, d: dist(c, s) })).sort((a, b) => a.d - b.d);
+    drawStops(nearList); routeLayer.clearLayers();
+    if (!nearList.length) { view.innerHTML = `<div class="msg">근처 500m 안에 정류장이 없어요.<br>지도를 움직이고 <b>🗺 이 근처 찾기</b>를 눌러 보세요.</div>`; return; }
+    if (nearList[0].citycode) store.set("city", nearList[0].citycode);
+    view.innerHTML = nearList.map((s, i) => `<div class="row" data-i="${i}"><div><div class="nm">${esc(s.nodenm)}</div><div class="sub">정류장 번호 ${esc(s.nodeno ?? "-")}</div></div><div class="right">${Math.round(s.d)}m<br><small>걸어서 ${fmtMin(walkMin(s.d))}</small></div></div>`).join("");
+    view.querySelectorAll(".row").forEach(r => r.onclick = () => openStop(nearList[+r.dataset.i]));
+  } catch (e) { if (my !== nav) return; view.innerHTML = `<div class="msg"><span class="err">${esc(e.message)}</span><br><br><button class="btn" id="rt">다시 시도</button></div>`; $("#rt").onclick = () => showNear(c); }
+}
+
+/* ===== 화면: 검색 ===== */
+async function showSearch() {
+  stopTimers(); tab = "search"; setTab(); ++nav;
+  view.innerHTML = `<div class="search"><select id="city"><option>지역 불러오는 중</option></select><input id="q" placeholder="정류장 이름 (예: 터미널)" enterkeyhint="search"><button id="go">검색</button></div><div id="res" class="msg">정류장 이름 일부만 써도 돼요.</div>`;
+  const sel = $("#city");
+  const myN = nav; try { const cs = await cities(); if (myN !== nav) return; const cur = store.get("city", 34390); sel.innerHTML = cs.sort((a, b) => a[1].localeCompare(b[1], "ko")).map(([c, n]) => `<option value="${c}" ${+c === +cur ? "selected" : ""}>${esc(n)}</option>`).join(""); }
+  catch (e) { sel.innerHTML = `<option value="34390">당진시</option>`; }
+  const go = async () => {
+    const q = $("#q").value.trim(); if (!q) return; const my = nav; const city = sel.value; store.set("city", +city); const res = $("#res"); res.className = "msg"; res.textContent = "찾는 중…";
+    try {
+      const it = (await searchStops(city, q)).map(x => ({ ...stopObj(x), citycode: +city })); if (my !== nav) return;
+      if (!it.length) { res.textContent = "그런 이름의 정류장이 없어요."; return; }
+      const ref = myPos || null; it.forEach(s => s.d = ref ? dist(ref, s) : null); if (ref) it.sort((a, b) => a.d - b.d);
+      res.className = ""; res.innerHTML = it.map((s, i) => `<div class="row" data-i="${i}"><div><div class="nm">${esc(s.nodenm)}</div><div class="sub">정류장 번호 ${esc(s.nodeno ?? "-")}</div></div><div class="right">${s.d != null ? (s.d > 1500 ? (s.d / 1000).toFixed(1) + "km" : Math.round(s.d) + "m") : ""}</div></div>`).join("");
+      res.querySelectorAll(".row").forEach(r => r.onclick = () => openStop(it[+r.dataset.i]));
+      drawStops(it); if (it.length) map.fitBounds(L.latLngBounds(it.map(s => [s.lat, s.lng])).pad(0.2), { maxZoom: 16 });
+    } catch (e) { res.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  };
+  $("#go").onclick = go; $("#q").onkeydown = e => { if (e.key === "Enter") go(); };
+}
+
+/* ===== 화면: 즐겨찾기 ===== */
+function showFav() {
+  stopTimers(); tab = "fav"; setTab(); ++nav;
+  if (!favs.length) { view.innerHTML = `<div class="msg">아직 즐겨찾기한 정류장이 없어요.<br>정류장을 열고 ☆를 누르면 여기 모여요.</div>`; return; }
+  view.innerHTML = favs.map((s, i) => `<div class="row" data-i="${i}"><div><div class="nm">⭐ ${esc(s.nodenm)}</div><div class="sub">정류장 번호 ${esc(s.nodeno ?? "-")}</div></div><div class="right">${myPos ? Math.round(dist(myPos, s)) + "m" : ""}</div></div>`).join("");
+  view.querySelectorAll(".row").forEach(r => r.onclick = () => openStop(favs[+r.dataset.i]));
+  drawStops(favs);
+}
+
+/* ===== 정류장 열기: 도착 정보 + 탈 수 있을까 ===== */
+async function openStop(s) {
+  stopTimers(); curStop = s; ++nav; drawStops(tab === "near" ? nearList : [s], s); map.setView([s.lat, s.lng], Math.max(map.getZoom(), 16));
+  const isFav = favs.some(f => f.nodeid === s.nodeid);
+  view.innerHTML = `<div class="stopHead"><button class="back" id="back">←</button><div><h2>${esc(s.nodenm)}</h2><div class="meta">정류장 번호 ${esc(s.nodeno ?? "-")}${myPos ? ` · ${Math.round(dist(myPos, s))}m · 걸어서 ${fmtMin(walkMin(dist(myPos, s)))}` : ""}</div></div><button class="star ${isFav ? "on" : ""}" id="star">${isFav ? "★" : "☆"}</button></div>
+    <div class="acts"><button class="btn y" id="setDest">🏁 여기를 목적지로</button>${dest ? `<button class="btn" id="goPlan">플랜B: ${esc(dest.nodenm)}까지</button>` : ""}<button class="btn g" id="ref">↻ 새로고침</button></div>
+    <div id="arr" class="msg">도착 정보 받는 중…</div>`;
+  $("#back").onclick = () => tab === "search" ? showSearch() : tab === "fav" ? showFav() : showNear();
+  $("#star").onclick = () => { const i = favs.findIndex(f => f.nodeid === s.nodeid); if (i >= 0) favs.splice(i, 1); else favs.push({ citycode: s.citycode, nodeid: s.nodeid, nodenm: s.nodenm, nodeno: s.nodeno, lat: s.lat, lng: s.lng }); store.set("favs", favs); const on = i < 0; $("#star").className = "star" + (on ? " on" : ""); $("#star").textContent = on ? "★" : "☆"; toast(on ? "즐겨찾기에 추가했어요" : "즐겨찾기에서 뺐어요"); };
+  $("#setDest").onclick = () => { setDest(s); openStop(s); };
+  if ($("#goPlan")) $("#goPlan").onclick = () => showPlan(s);
+  $("#ref").onclick = () => loadArr(true);
+  await loadArr(true);
+  refreshT = setInterval(() => { if (!document.hidden) loadArr(false); }, 30000); // 30초마다 새로
+  tickT = setInterval(renderArr, 1000); // 1초마다 남은 시간 줄이기
+}
+async function loadArr(show) {
+  const s = curStop; if (!s) return; const box = $("#arr"); if (!box) return;
+  try { const it = await arrivals(s.citycode, s.nodeid); if (curStop !== s) return; lastArr = it; lastFetch = Date.now(); renderArr(); markDestRoutes(s, it); }
+  catch (e) { if (show || !lastArr) box.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+let destRoutes = {}; // routeid → 목적지까지 정류장 수 (못 가면 -1)
+async function markDestRoutes(s, it) { // 이 정류장 버스 중 목적지 가는 것 표시
+  if (!dest || dest.nodeid === s.nodeid) return;
+  for (const a of it) { const k = s.nodeid + ">" + a.routeid; if (destRoutes[k] !== undefined) continue; destRoutes[k] = null;
+    try { const seq = await routeStops(s.citycode, a.routeid); destRoutes[k] = stopsBetween(seq, s.nodeid, dest.nodeid); } catch (e) { delete destRoutes[k]; } }
+  renderArr();
+}
+function stopsBetween(seq, from, to) { for (let i = 0; i < seq.length; i++) if (seq[i][0] === from) for (let j = i + 1; j < seq.length; j++) if (seq[j][0] === to) return j - i; return -1; }
+function renderArr() {
+  const box = $("#arr"); if (!box || !lastArr || !curStop) return; const s = curStop;
+  if (!lastArr.length) { box.className = "msg"; box.innerHTML = "지금은 도착 예정인 버스가 없어요.<br><small>막차가 끝났거나, 이 지역 버스 정보가 잠시 안 들어오는 중일 수 있어요.</small>"; return; }
+  const el = (Date.now() - lastFetch) / 1000, m = myPos ? dist(myPos, s) : null;
+  const list = lastArr.map(a => ({ ...a, left: Math.max(0, a.arrtime - el) })).sort((a, b) => a.left - b.left);
+  box.className = ""; box.innerHTML = list.map(a => { const st = status(a.left, m), k = s.nodeid + ">" + a.routeid, dn = destRoutes[k];
+    return `<div class="bus"><div class="no ${typeCls(a.routetp)}">${esc(a.routeno)}</div><div class="info"><div class="t">${fmtSec(a.left)}</div><div class="s">${a.arrprevstationcnt != null ? a.arrprevstationcnt + "정류장 전" : ""} · ${esc(a.routetp || "")}${a.vehicletp ? " · " + esc(a.vehicletp) : ""}</div>${dn > 0 ? `<div class="godest">🏁 ${esc(dest.nodenm)}까지 ${dn}정류장</div>` : ""}</div>${st ? `<span class="chip ${st[0]}">${st[1]}</span>` : ""}</div>`; }).join("")
+    + `<div class="note">${m != null ? "여유·뛰어!·놓침은 내 위치에서 정류장까지 직선거리로 계산한 대략값이에요. " : "📍 내 위치를 켜면 탈 수 있는지 알려줘요. "}도착 시간은 버스정보시스템 값이라 1~2분 차이 날 수 있어요.${list.some(a => status(a.left, m)?.[0] === "miss") && dest ? " 놓친 버스가 있으면 위의 <b>플랜B</b>를 눌러 보세요." : ""}</div>`;
+}
+
+/* ===== 목적지 ===== */
+function setDest(s) { dest = { citycode: s.citycode, nodeid: s.nodeid, nodenm: s.nodenm, nodeno: s.nodeno, lat: s.lat, lng: s.lng }; store.set("dest", dest); destRoutes = {}; drawDest(); setDestChip(); toast("목적지: " + s.nodenm); }
+function setDestChip() { const c = $("#destChip"); c.className = dest ? "on" : ""; c.textContent = dest ? "🏁 " + dest.nodenm : "🏁 목적지 정하기"; }
+$("#destChip").onclick = () => { if (dest) { if (confirm(`목적지 '${dest.nodenm}'을(를) 지울까요?`)) { dest = null; store.set("dest", null); destRoutes = {}; drawDest(); setDestChip(); if (tab === "plan") showPlan(); } } else { showSearch(); toast("목적지로 할 정류장을 찾아서 '여기를 목적지로'를 눌러 주세요"); } };
+
+/* ===== 플랜B: 목적지까지 지금 제일 빨리 가는 방법 ===== */
+async function showPlan(fromStop) {
+  stopTimers(); tab = "plan"; setTab(); routeLayer.clearLayers(); const my = ++nav;
+  if (!dest) { view.innerHTML = `<div class="msg">먼저 <b>목적지</b>를 정해 주세요.<br>자주 가는 정류장(학교 앞, 터미널 등)을 찾아서 <b>🏁 여기를 목적지로</b>를 누르면 돼요.<br><br><button class="btn" id="toS">정류장 찾기</button></div>`; $("#toS").onclick = showSearch; return; }
+  const origin = myPos || (fromStop ? { lat: fromStop.lat, lng: fromStop.lng } : { lat: map.getCenter().lat, lng: map.getCenter().lng });
+  view.innerHTML = `<div class="msg" style="padding:8px">🏁 <b>${esc(dest.nodenm)}</b>까지 지금 갈 수 있는 방법을 찾는 중…<div class="prog"><i id="pg"></i></div><small id="pgt"></small></div>`;
+  const pg = (f, t) => { const e = $("#pg"); if (e) e.style.width = Math.round(f * 100) + "%"; const tt = $("#pgt"); if (tt) tt.textContent = t || ""; };
+  try {
+    const dWalk = dist(origin, dest);
+    let stops = (await nearStops(origin.lat, origin.lng)).map(stopObj).map(s => ({ ...s, d: dist(origin, s) })).sort((a, b) => a.d - b.d);
+    if (fromStop && !stops.some(s => s.nodeid === fromStop.nodeid)) stops.unshift({ ...fromStop, d: dist(origin, fromStop) });
+    stops = stops.filter(s => s.nodeid !== dest.nodeid).slice(0, 8);
+    if (!stops.length) throw new Error("근처 500m 안에 정류장이 없어요");
+    pg(0.1, "주변 정류장 " + stops.length + "곳 도착 정보 확인 중");
+    const arrs = []; let done = 0;
+    await Promise.all(stops.map(async s => { try { const it = await arrivals(s.citycode, s.nodeid); for (const a of it) arrs.push({ s, a }); } catch (e) {} pg(0.1 + 0.4 * (++done / stops.length)); }));
+    const rids = [...new Set(arrs.map(x => x.s.citycode + "|" + x.a.routeid))]; done = 0;
+    pg(0.5, "노선 " + rids.length + "개가 목적지에 가는지 확인 중 (처음 한 번만 오래 걸려요)");
+    const seqs = {};
+    for (let i = 0; i < rids.length; i += 4) await Promise.all(rids.slice(i, i + 4).map(async k => { const [c, r] = k.split("|"); try { seqs[k] = await routeStops(c, r); } catch (e) { seqs[k] = null; } pg(0.5 + 0.48 * (++done / rids.length)); }));
+    const now = Date.now(), res = [];
+    for (const { s, a } of arrs) {
+      const seq = seqs[s.citycode + "|" + a.routeid]; if (!seq) continue;
+      let oi = -1, di = -1; for (let i = 0; i < seq.length && di < 0; i++) if (seq[i][0] === s.nodeid) for (let j = i + 1; j < seq.length; j++) if (seq[j][0] === dest.nodeid) { oi = i; di = j; break; }
+      if (di < 0) continue;
+      let ride = 0; for (let i = oi; i < di; i++) ride += dist({ lat: seq[i][1], lng: seq[i][2] }, { lat: seq[i + 1][1], lng: seq[i + 1][2] });
+      const rideMin = ride / BUS_MPM + (di - oi) * 0.25, arrMin = a.arrtime / 60, st = status(a.arrtime, s.d);
+      res.push({ s, a, n: di - oi, rideMin, arrMin, st, eta: new Date(now + (arrMin + rideMin) * 60000), path: seq.slice(oi, di + 1) });
+    }
+    if (my !== nav) return;
+    const ok = res.filter(r => r.st[0] !== "miss").sort((a, b) => a.eta - b.eta), miss = res.filter(r => r.st[0] === "miss").sort((a, b) => a.eta - b.eta);
+    pg(1);
+    let html = `<div style="font-size:13px;color:#556;margin-bottom:8px">🏁 <b>${esc(dest.nodenm)}</b>까지 · ${myPos ? "내 위치" : fromStop ? esc(fromStop.nodenm) : "지도 가운데"} 기준</div>`;
+    if (dWalk < 2500) html += `<div class="walkOnly">🚶 그냥 걸어가면 약 <b>${fmtMin(walkMin(dWalk))}</b> (${(dWalk / 1000).toFixed(1)}km) · 도착 ${clock(new Date(now + walkMin(dWalk) * 60000))}</div>`;
+    if (!ok.length && !miss.length) html += `<div class="msg">지금 근처에서 목적지로 가는 버스 도착 정보가 없어요.<br><small>근처 정류장 8곳까지 확인했어요. 다른 정류장 쪽으로 지도를 옮기고 다시 해보거나, 버스 시간표를 확인해 보세요.</small></div>`;
+    const card = (r, i, best) => `<div class="plan ${best ? "best" : ""} ${r.st[0] === "miss" ? "miss" : ""}" data-k="${i}"><div class="no ${typeCls(r.a.routetp)}">${esc(r.a.routeno)}</div><div class="how">${best ? "<b>👍 제일 빨라요</b><br>" : ""}<b>${esc(r.s.nodenm)}</b>에서 탑승 <small>(${r.s.d < 30 ? "바로 앞" : "걸어서 " + fmtMin(walkMin(r.s.d))})</small><br>${fmtSec(r.a.arrtime)} 뒤 도착 · ${r.n}정류장 · 약 ${fmtMin(r.rideMin)} <span class="chip ${r.st[0]}">${r.st[1]}</span></div><div class="eta"><b>${clock(r.eta)}</b><span>도착 예상</span></div></div>`;
+    const all = [...ok, ...miss];
+    html += ok.map((r, i) => card(r, i, i === 0)).join("");
+    if (miss.length) html += `<div style="font-size:12px;color:#99a;margin:10px 0 6px">지금 가면 못 타는 버스 (다음 차는 배차 간격만큼 뒤에 와요)</div>` + miss.map((r, i) => card(r, ok.length + i, false)).join("");
+    html += `<div class="note">도착 예상은 버스 도착 시간 + 정류장 사이 거리로 계산한 대략값이에요. 버스 정보는 정류장마다 다음 차 한 대만 나와요. 노선 정보는 한 번 받으면 폰에 저장해서 다음부터 빨라요.</div><div class="acts" style="margin-top:10px"><button class="btn g" id="again">↻ 다시 찾기</button></div>`;
+    view.innerHTML = html; $("#again").onclick = () => showPlan(fromStop);
+    view.querySelectorAll(".plan").forEach(e => e.onclick = () => { const r = all[+e.dataset.k]; routeLayer.clearLayers(); L.polyline(r.path.map(p => [p[1], p[2]]), { color: "#f2a64b", weight: 6, opacity: .9 }).addTo(routeLayer); L.polyline([[origin.lat, origin.lng], [r.s.lat, r.s.lng]], { color: "#e0453a", weight: 3, dashArray: "6 6" }).addTo(routeLayer); map.fitBounds(L.latLngBounds([[origin.lat, origin.lng], ...r.path.map(p => [p[1], p[2]])]).pad(0.15)); toast(`${r.a.routeno}번: ${r.s.nodenm} → ${dest.nodenm}`); });
+    drawStops(stops);
+    if (ok[0]) view.querySelector(".plan").click();
+  } catch (e) { if (my !== nav) return; view.innerHTML = `<div class="msg"><span class="err">${esc(e.message)}</span><br><br><button class="btn" id="rt">다시 시도</button></div>`; $("#rt").onclick = () => showPlan(fromStop); }
+}
+
+/* ===== 탭·버튼 ===== */
+function stopTimers() { clearInterval(refreshT); clearInterval(tickT); refreshT = tickT = null; curStop = null; lastArr = null; }
+function setTab() { document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === tab)); }
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => { const t = b.dataset.t; if (t === "near") showNear(); else if (t === "search") showSearch(); else if (t === "fav") showFav(); else showPlan(curStop); });
+$("#locBtn").onclick = () => locate(() => showNear());
+$("#hereBtn").onclick = () => { const c = map.getCenter(); showNear({ lat: c.lat, lng: c.lng }); };
+
+/* ===== 시작 ===== */
+setDestChip(); drawDest();
+locate(failed => showNear(failed ? { lat: map.getCenter().lat, lng: map.getCenter().lng } : null));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
