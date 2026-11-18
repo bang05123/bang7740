@@ -172,3 +172,17 @@
   #rotate p { font-size: 18px; font-weight: 800; margin-bottom: 18px; }
   #rotate button { font: inherit; font-size: 13px; padding: 6px 14px; background: transparent; color: #aaa; border: 1px solid #666; }
   body.touch.portrait:not(.allowPortrait) #rotate { display: flex; }
+
+  /* ---- 멀티플레이 ---- */
+  #mpPanel { display: none; margin-bottom: 8px; padding: 8px 10px; border: 2px dashed #555; }
+  body.mp #mpPanel { display: block; }
+  .mpcode { font-size: 14px; color: #bbb; } .mpcode b { font-size: 30px; letter-spacing: 6px; color: #ffd23a; margin-left: 8px; user-select: all; }
+  #mpList { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  #mpList span { font-size: 12px; padding: 2px 8px; background: #1a1a1a; border: 1px solid #444; }
+  #mpList span.me { border-color: #d85a30; } #mpList span.bot { color: #777; border-style: dashed; }
+  .mpst { color: #ffd23a !important; min-height: 1em; }
+  #mpScreen input { font: inherit; font-size: 18px; padding: 4px 8px; width: 150px; background: #1a1a1a; color: #fff; border: 2px solid #fff; text-transform: none; }
+  #mpCode { text-transform: uppercase !important; letter-spacing: 4px; width: 110px !important; }
+  body.mpclient #startScreen .courses, body.mpclient #lapRow, body.mpclient #bStart { display: none !important; }
+  body.mpclient #bAgain, body.mpclient #bMenu { display: none !important; }
+  body.mp #introSkip { display: none !important; }

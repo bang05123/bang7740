@@ -80,7 +80,7 @@
   <div>
     <div class="logo">BLACKOUT<br><span>GP</span></div>
     <div class="sub">NO RULES · NO BRAKES · FIRST LINE WINS</div>
-    <div class="menu"><button id="tmRace">레이스</button><button id="tmHelp">조작법</button><button id="tmSet">설정</button></div>
+    <div class="menu"><button id="tmRace">레이스</button><button id="tmMulti">멀티플레이</button><button id="tmHelp">조작법</button><button id="tmSet">설정</button></div>
   </div>
 </div>
 <div class="screen" id="helpScreen" style="display:none">
@@ -106,13 +106,26 @@
   </div>
 </div>
 <div id="bigMsg"></div>
+<div class="screen" id="mpScreen" style="display:none">
+  <div class="card">
+    <h1>멀티 <span>플레이</span></h1>
+    <p>친구랑 최대 8명 · 빈자리는 라이벌 봇이 채움</p>
+    <div class="setrow">내 이름 <input id="mpName" maxlength="10" placeholder="이름"></div>
+    <button id="mpCreate">방 만들기</button>
+    <div class="setrow" style="margin-top:14px">방 코드 <input id="mpCode" maxlength="4" placeholder="ABCD" autocapitalize="characters" autocomplete="off"></div>
+    <button id="mpJoin">참가</button>
+    <p id="mpStatus" class="mpst"></p>
+    <button class="ghost" id="mpBack">뒤로</button>
+  </div>
+</div>
 <div class="screen" id="startScreen" style="display:none">
   <div class="card">
+    <div id="mpPanel"><div class="mpcode">방 코드 <b id="mpCodeShow">----</b></div><div id="mpList"></div><p id="mpWait" class="mpst"></p></div>
     <h1>BLACKOUT <span>GP</span></h1>
     <p>레이스 준비 · 라이벌 7대</p>
     <div class="courses"><button class="csel" data-c="desert">더스트 하이웨이<small>아무도 안 쓰는 황야 고속도로</small></button><button class="csel" data-c="circuit">메가 서킷<small>거대 구조물 사이 야간 서킷</small></button><button class="csel" data-c="dam">레드워터 댐<small>미래 마을을 통째로 막고 달리는 축제</small></button></div>
     <div class="laps">특수무기 <button class="wsel lsel" data-w="missile">미사일</button><button class="wsel lsel" data-w="harpoon">작살</button><button class="wsel lsel" data-w="rail">대구경 포</button><button class="wsel lsel" data-w="pile">파일벙커</button></div>
-    <div class="laps">바퀴 수 <button class="lsel" data-l="1">1</button><button class="lsel" data-l="2">2</button><button class="lsel" data-l="3">3</button><button class="lsel" data-l="5">5</button><button class="lsel" data-l="7">7</button><button class="lsel" data-l="10">10</button></div>
+    <div class="laps" id="lapRow">바퀴 수 <button class="lsel" data-l="1">1</button><button class="lsel" data-l="2">2</button><button class="lsel" data-l="3">3</button><button class="lsel" data-l="5">5</button><button class="lsel" data-l="7">7</button><button class="lsel" data-l="10">10</button></div>
     <div class="laps tonly-flex">모바일 <button class="lsel" id="oGas">자동 가속</button></div>
     <button id="bStart">출발</button><button class="ghost" id="bSetupBack">뒤로</button>
   </div>
@@ -143,11 +156,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three.quarks@0.10.0/dist/three.quarks.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 /* 게임 코드는 js·cars·courses 폴더에 기능별로 나뉘어 있음. 순서대로 이어 붙여 한 번에 실행 (원래 한 파일일 때와 똑같이 동작) */
 (() => {
-  const VER = "1185";
-  const FILES = ["js/core.js", "js/render.js", "courses/common.js", "courses/desert.js", "courses/dam.js", "courses/circuit.js", "js/optimize.js", "courses/build.js", "cars/kit.js", "cars/rook.js", "cars/rivals.js", "js/participants.js", "js/sound.js", "js/input.js", "js/state.js", "js/replay.js", "js/spectate.js", "js/physics.js", "js/rivals_ai.js", "js/damage.js", "js/props.js", "js/weapons.js", "js/race.js", "js/camera.js", "js/post.js", "js/hud_loop.js"];
+  const VER = "1186";
+  const FILES = ["js/core.js", "js/render.js", "courses/common.js", "courses/desert.js", "courses/dam.js", "courses/circuit.js", "js/optimize.js", "courses/build.js", "cars/kit.js", "cars/rook.js", "cars/rivals.js", "js/participants.js", "js/sound.js", "js/input.js", "js/state.js", "js/replay.js", "js/spectate.js", "js/physics.js", "js/rivals_ai.js", "js/damage.js", "js/props.js", "js/weapons.js", "js/race.js", "js/camera.js", "js/post.js", "js/net.js", "js/hud_loop.js"];
   Promise.all(FILES.map(f => fetch(f + "?v=" + VER).then(r => { if (!r.ok) throw new Error(f + " (" + r.status + ")"); return r.text(); })))
     .then(parts => { const s = document.createElement("script"); s.textContent = parts.join("") + "\n//# sourceURL=blackout-gp.js"; document.body.appendChild(s); })
     .catch(e => { const d = document.createElement("div"); d.style.cssText = "position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;color:#fff;font:16px sans-serif;z-index:99;text-align:center;padding:20px"; d.textContent = "게임 파일을 못 불러왔어요: " + e.message + " — 새로고침 해보세요"; document.body.appendChild(d); });

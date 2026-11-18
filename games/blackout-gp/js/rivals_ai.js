@@ -7,6 +7,7 @@ function aiCornerV(k, mu) { const den = k - mu * DOWN / MASS; return den <= 1e-5
 const DEAD_INP = { steer: 0, gas: 0, brake: 0, drift: false, boostPress: false };
 function stepAI(dt) {
   for (const a of ais) {
+    if (a.net) { netStep(a, dt); continue; } // 멀티: 다른 사람(또는 호스트)이 모는 차는 받은 위치로
     if (a.dead) { stepCar(a, DEAD_INP, dt); a.v = a.vf; a.lane = a.lat; continue; }
     const canGo = (state === "race" || state === "end") && !a.done, gap = a.prog - player.prog;
     a.v = a.vf; a.lane = a.lat;

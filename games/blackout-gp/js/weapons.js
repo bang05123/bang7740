@@ -245,7 +245,7 @@ function stepWeapons(dt) {
   }
   // 라이벌 사격
   if (racing && !window.__bgpGhost && raceT > 9) for (const a of ais) {
-    const w = a.wpn; if (!w || a.dead || a.done || a.tumble) continue;
+    const w = a.wpn; if (!w || a.net || a.dead || a.done || a.tumble) continue;
     const tg = findTarget(a, 140, 0.13); if (tg && !w.over && w.heat < 0.8 && (w.gunBurst > 0 || Math.random() < dt * 1.1)) { if (w.gunBurst <= 0) w.gunBurst = 0.5 + Math.random() * 0.8; fireGun(a); } w.gunBurst -= dt;
     if (w.cd > 0 || w.ammo <= 0 || a.prog < (w.nextOK || 0) || raceT < 16) continue; // 특수무기는 레이스 전체에 나눠서 씀
     const lastLap = a.prog >= (lapsTotal - 1) * L, keep = !lastLap && w.ammo <= 1 && Math.random() < 0.97; // 마지막 한 발은 마지막 바퀴용으로 아끼는 편

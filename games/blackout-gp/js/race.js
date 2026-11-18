@@ -35,7 +35,7 @@ function lapLogic() {
       endTimer = setTimeout(showEnd, 3200); }
     else if (player.laps.length === lapsTotal - 1) { setMsg("", 0.01); showBig("FINAL LAP", 1.4); sndFinalLap(); flashT = Math.max(flashT, 0.5); }
   }
-  for (const a of ais) if (!a.done && a.prog >= lapsTotal * L) { a.done = true; a.finishT = raceT; }
+  for (const a of ais) if (!a.net && !a.done && a.prog >= lapsTotal * L) { a.done = true; a.finishT = raceT; }
   if (state === "race" && raceT > 2) { const pos = standings().findIndex(r => r.me) + 1; if (pos < lastPos && msgT <= 0.3) setMsg(pos === 1 ? "선두 탈환!" : "OVERTAKE!", 0.9); lastPos = pos; }
 }
 function standings() {

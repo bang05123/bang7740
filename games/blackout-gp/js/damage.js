@@ -73,7 +73,7 @@ function hitLocal(c, dx, dz) { // 월드 방향(차 중심→맞은 곳)을 차�
 }
 function applyDamage(c, amt, loc, by, src) {
   if (!(amt > 0.15) || c.dead || state !== "race" || c.done) return;
-  if (c !== player && by !== player) amt *= 0.6; // 라이벌끼리·혼자 입는 피해는 줄여서 판이 너무 일찍 비지 않게 (나와 엮인 피해는 그대로)
+  if (!window.__netNoScale && c !== player && by !== player) amt *= 0.6; // 라이벌끼리·혼자 입는 피해는 줄여서 판이 너무 일찍 비지 않게 (나와 엮인 피해는 그대로)
   if (window.__dlog) window.__dlog.push([c.name.split(' ')[0], Math.round(amt), src, Math.round(c.prog)]);
   if (by === player && c !== player) { const big = src !== "gun"; HITFX.mark = 0.18; if (big) HITFX.big = 0.4; if (HITFX.tickCd <= 0 || big) { sndTick(big); HITFX.tickCd = 0.06; } }
   if (c === player && amt >= 0.2) { const src2 = by && by !== player ? by : null, ang = src2 ? Math.atan2(src2.x - player.x, src2.z - player.z) : (loc ? Math.atan2(loc.x - (ensureDmg(c).C0.x), loc.z - ensureDmg(c).C0.z) + player.h : null);
