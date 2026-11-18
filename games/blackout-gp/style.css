@@ -179,7 +179,8 @@
   .mpcode { font-size: 14px; color: #bbb; } .mpcode b { font-size: 30px; letter-spacing: 6px; color: #ffd23a; margin-left: 8px; user-select: all; }
   #mpList { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
   #mpList span { font-size: 12px; padding: 2px 8px; background: #1a1a1a; border: 1px solid #444; }
-  #mpList span.me { border-color: #d85a30; } #mpList span.bot { color: #777; border-style: dashed; }
+  #mpList span.me { border-color: #d85a30; } #mpList span.bot { color: #9aa; border-style: dashed; cursor: pointer; } #mpList span.bot.off { color: #555; text-decoration: line-through; }
+  body.mpclient #mpList span.bot { cursor: default; } #mpBots { display: flex; gap: 6px; margin-top: 6px; } #mpBots .lsel { font-size: 12px; padding: 3px 10px; }
   .mpst { color: #ffd23a !important; min-height: 1em; }
   #mpScreen input { font: inherit; font-size: 18px; padding: 4px 8px; width: 150px; background: #1a1a1a; color: #fff; border: 2px solid #fff; text-transform: none; }
   #mpCode { text-transform: uppercase !important; letter-spacing: 4px; width: 110px !important; }

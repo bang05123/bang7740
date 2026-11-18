@@ -3,16 +3,21 @@
 // 구조: 방장(호스트)이 방을 만들면 4글자 코드가 나옴 → 다른 사람은 코드로 접속 (P2P, 서버 없음)
 // 각자 자기 차는 자기 폰에서 물리 계산 → 초당 20번 위치를 보냄. 빈자리 라이벌 봇은 호스트가 몰고 위치를 보냄
 // 피해는 "맞은 차 주인"이 판정해서 알려줌 (총·미사일은 모든 화면에서 똑같이 쏴서 보여줌)
-const MP = { on: false, host: false, slot: 0, code: "", peer: null, conns: new Map(), conn: null, players: [], race: null, hold: 0.6, goRecv: false, sendT: 0, prevState: "", name: "", joinTimer: 0 };
+const MP = { on: false, host: false, slot: 0, code: "", peer: null, conns: new Map(), conn: null, players: [], race: null, hold: 0.6, goRecv: false, sendT: 0, prevState: "", name: "", joinTimer: 0, noBot: new Set() };
 const MP_MAX = 8, MP_PRE = "bgp7740-";
 const RIVAL_NAMES = ais.map(a => a.name), PLAYER_NAME0 = player.name;
-// 멀티 차 모델: 0 = Rook(0번), 1~7 = 라이벌 차. 판마다 호스트가 슬롯별로 랜덤 배정해서 모든 화면에 똑같이 보이게
-const MP_MODELS = [player.mesh, ...ais.map(a => a.mesh)], MP_MNAME = ["Rook", ...RIVAL_NAMES];
-MP_MODELS[0].userData.mcol = "#ff4a1a"; ais.forEach((a, i) => { MP_MODELS[i + 1].userData.mcol = "#" + new THREE.Color(RIVALS[i].sf[1]).getHexString(); });
-function mpApplyModels(car) { // car[s] = 슬롯 s가 탈 모델 번호, 없으면 원래대로
-  const all = [player, ...ais]; for (const c of all) pileMesh(c, false);
-  if (!car) { player.mesh = MP_MODELS[0]; ais.forEach((a, i) => { a.mesh = MP_MODELS[i + 1]; }); }
-  else for (let s = 0; s < MP_MAX; s++) { const c = carOfSlot(s); if (c && MP_MODELS[car[s]]) c.mesh = MP_MODELS[car[s]]; }
+// 멀티 차: 사람은 전부 Rook(0번) 모양 + 자리마다 다른 색, 봇은 원래 라이벌 차. 빈자리로 뺀 봇은 레이스에서 빠짐
+const AIS_ALL = ais.slice(), MP_MODELS = [player.mesh, ...ais.map(a => a.mesh)];
+const ROOK_COL = [0xff4a1a, 0x1f8fff, 0x2fd15a, 0xffd21a, 0xb04aff, 0xff3b8b, 0x19d6d6, 0xeeeeee], MP_ROOKS = [player.mesh];
+const hexOf = c => "#" + new THREE.Color(c).getHexString();
+MP_MODELS[0].userData.mcol = hexOf(ROOK_COL[0]); ais.forEach((a, i) => { MP_MODELS[i + 1].userData.mcol = hexOf(RIVALS[i].sf[1]); });
+function rookFor(s) { if (!MP_ROOKS[s]) { const m = makeCar({ len: 6.6, color: ROOK_COL[s], accent: 0x111111, wing: "spoiler", scoop: true, num: String(s), rim: 0xffd23a }); m.visible = false; m.userData.mcol = hexOf(ROOK_COL[s]); MP_ROOKS[s] = m; } return MP_ROOKS[s]; }
+function mpRestoreAis() { ais.length = 0; ais.push(...AIS_ALL); }
+function mpApplyModels(humans) { // humans: 사람 자리 목록, 없으면 원래대로
+  const all = [player, ...AIS_ALL]; for (const c of all) pileMesh(c, false);
+  for (const m of [...MP_MODELS, ...MP_ROOKS]) if (m) m.visible = false;
+  player.mesh = MP_MODELS[0]; AIS_ALL.forEach((a, i) => { a.mesh = MP_MODELS[i + 1]; });
+  if (humans) for (const s of humans) { const c = carOfSlot(s); if (c) c.mesh = rookFor(s); }
   for (const c of all) c.mesh.visible = true;
   if (camMode === "cockpit") player.mesh.visible = false;
 }
@@ -24,8 +29,8 @@ const r2 = v => Math.round((v || 0) * 100) / 100, r3 = v => Math.round((v || 0) 
 const $id = id => document.getElementById(id);
 
 // 슬롯(0=호스트) ↔ 이 화면의 차. 봇 자리는 어느 화면에서나 같은 차(ais[s-1])로 보이게
-function carOfSlot(s) { if (s === MP.slot) return player; if (s < 0 || s >= MP_MAX) return null; if (s === 0) return ais[MP.slot - 1]; return ais[s - 1]; }
-function slotOfCar(c) { if (!c) return -1; if (c === player) return MP.slot; const i = ais.indexOf(c); if (i < 0) return -1; if (MP.slot > 0 && i === MP.slot - 1) return 0; return i + 1; }
+function carOfSlot(s) { if (s === MP.slot) return player; if (s < 0 || s >= MP_MAX) return null; if (s === 0) return AIS_ALL[MP.slot - 1]; return AIS_ALL[s - 1]; }
+function slotOfCar(c) { if (!c) return -1; if (c === player) return MP.slot; const i = AIS_ALL.indexOf(c); if (i < 0) return -1; if (MP.slot > 0 && i === MP.slot - 1) return 0; return i + 1; }
 function owns(c) { return !MP.on || c === player || (MP.host && !c.human); }
 function netRemote(fn) { window.__netRemote = true; try { fn(); } finally { window.__netRemote = false; } }
 
@@ -118,13 +123,14 @@ function onGame(m) {
 function cleanName(n) { return String(n || "").replace(/[<>&"]/g, "").trim().slice(0, 10) || "Player"; }
 function mpCfg() { bcast({ t: "cfg", c: courseId, l: lapsTotal }); updatePanel(); }
 function applyCfg(m) { if (COURSES[m.c] && courseId !== m.c) { _buildCourse(m.c); placeGrid(false); gridFresh = true; } if (m.l > 0) _setLaps(m.l); updatePanel(); }
-function bcastPlayers() { MP.players.sort((a, b) => a.slot - b.slot); bcast({ t: "players", pl: MP.players }); updatePanel(); }
+function bcastPlayers() { MP.players.sort((a, b) => a.slot - b.slot); bcast({ t: "players", pl: MP.players, nb: [...MP.noBot] }); updatePanel(); }
 function updatePanel() {
   if (!MP.on) return; $id("mpCodeShow").textContent = MP.code;
   let h = ""; for (let s = 0; s < MP_MAX; s++) { const p = MP.players.find(q => q.slot === s);
-    h += p ? `<span class="${s === MP.slot ? "me" : ""}">${s === 0 ? "👑 " : ""}${cleanName(p.name)} · ${MP_WPN[p.wpn] || "?"}</span>` : `<span class="bot">봇</span>`; }
+    h += p ? `<span class="${s === MP.slot ? "me" : ""}">${s === 0 ? "👑 " : ""}${cleanName(p.name)} · ${MP_WPN[p.wpn] || "?"}</span>` : MP.noBot.has(s) ? `<span class="bot off" data-s="${s}">빈자리</span>` : `<span class="bot" data-s="${s}">봇 ${RIVAL_NAMES[s - 1]}</span>`; }
   $id("mpList").innerHTML = h;
-  $id("mpWait").textContent = MP.host ? `${MP.players.length}명 접속 · 출발 누르면 다 같이 시작 · 코드를 친구한테 알려줘` : `호스트가 출발 누르면 시작 · ${MP_COURSE[courseId] || courseId} · ${lapsTotal}바퀴`;
+  const nBot = MP_MAX - MP.players.length - [...MP.noBot].filter(s => !MP.players.some(p => p.slot === s)).length; $id("mpBots").style.display = MP.host ? "" : "none";
+  $id("mpWait").textContent = MP.host ? `${MP.players.length}명 · 봇 ${nBot}대 · 봇 칸을 누르면 넣고 뺄 수 있어 · 출발 누르면 다 같이 시작` : `호스트가 출발 누르면 시작 · ${MP_COURSE[courseId] || courseId} · ${lapsTotal}바퀴`;
 }
 function enterLobby() {
   MP.on = true; document.body.classList.add("mp"); document.body.classList.toggle("mpclient", !MP.host);
@@ -132,22 +138,24 @@ function enterLobby() {
   showScreen("startScreen"); updatePanel();
 }
 function mpSetupCars(names) {
-  ais.forEach((a, i) => { const s = slotOfCar(a), human = MP.players.some(p => p.slot === s); a.human = human; a.net = human || !MP.host; a.name = cleanName(names && names[s] || RIVAL_NAMES[i]); if (!human) a.name = names && names[s] || RIVAL_NAMES[i]; a.snap = null; a._fresh = true; });
+  AIS_ALL.forEach((a, i) => { const s = slotOfCar(a), human = MP.players.some(p => p.slot === s); a.human = human; a.net = human || !MP.host; a.name = cleanName(names && names[s] || RIVAL_NAMES[i]); if (!human) a.name = names && names[s] || RIVAL_NAMES[i]; a.snap = null; a._fresh = true; });
   player.name = cleanName(MP.name);
 }
 function mpStart() { // 호스트: 출발 순서·무기·이름 정해서 다 같이 시작
   if (!MP.host) return;
   const order = [...Array(MP_MAX).keys()]; for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
-  const car = [...Array(MP_MAX).keys()]; for (let i = car.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [car[i], car[j]] = [car[j], car[i]]; } // 차는 랜덤 (무기만 각자 고름)
-  const n = {}, w = {}; for (let s = 0; s < MP_MAX; s++) { const p = MP.players.find(q => q.slot === s), mn = MP_MNAME[car[s]]; n[s] = p ? cleanName(p.name) : mn; w[s] = p ? p.wpn : (RIVAL_WPN[mn] || "missile"); }
-  const m = { t: "start", c: courseId, l: lapsTotal, o: order, car, n, w, hold: 0.3 + Math.random() * 0.8, pl: MP.players };
+  const n = {}, w = {}; for (let s = 0; s < MP_MAX; s++) { const p = MP.players.find(q => q.slot === s); n[s] = p ? cleanName(p.name) : RIVAL_NAMES[s - 1]; w[s] = p ? p.wpn : (RIVAL_WPN[RIVAL_NAMES[s - 1]] || "missile"); }
+  const m = { t: "start", c: courseId, l: lapsTotal, o: order, nb: [...MP.noBot], n, w, hold: 0.3 + Math.random() * 0.8, pl: MP.players };
   bcast(m); mpBegin(m);
 }
 function mpBegin(m) {
   MP.players = m.pl; MP.hold = m.hold; MP.goRecv = false; MP.race = m;
   if (COURSES[m.c] && courseId !== m.c) _buildCourse(m.c); if (m.l > 0) _setLaps(m.l);
-  mpApplyModels(Array.isArray(m.car) ? m.car : null); mpSetupCars(m.n);
-  gridOrder = ais.map(a => m.o[slotOfCar(a)]).concat([m.o[MP.slot]]); gridFresh = true;
+  const humans = new Set(m.pl.map(p => p.slot)), nb = new Set(m.nb || []);
+  mpRestoreAis(); mpApplyModels(humans); mpSetupCars(m.n);
+  for (let s = 1; s < MP_MAX; s++) if (!humans.has(s) && nb.has(s)) { const c = carOfSlot(s), k = ais.indexOf(c); if (k >= 0) { c.mesh.visible = false; ais.splice(k, 1); } } // 뺀 봇
+  const vals = ais.map(a => m.o[slotOfCar(a)]).concat([m.o[MP.slot]]), srt = [...vals].sort((a, b) => a - b);
+  gridOrder = vals.map(v => srt.indexOf(v)); gridFresh = true; // 빈자리 없이 앞으로 당겨 출발
   startRace();
 }
 function mpToLobby() { toMenu(); for (const a of ais) { a.snap = null; a._fresh = true; } document.body.classList.add("mp"); updatePanel(); }
@@ -157,7 +165,7 @@ function mpLeave(why) {
   try { for (const info of MP.conns.values()) info.conn.close(); if (MP.conn) MP.conn.close(); if (MP.peer) MP.peer.destroy(); } catch (e) {}
   const was = MP.on; Object.assign(MP, { on: false, host: false, slot: 0, code: "", peer: null, conn: null, players: [], race: null }); MP.conns.clear();
   document.body.classList.remove("mp", "mpclient");
-  ais.forEach((a, i) => { a.net = false; a.human = false; a.snap = null; a.name = RIVAL_NAMES[i]; }); player.name = PLAYER_NAME0; mpApplyModels(null);
+  mpRestoreAis(); ais.forEach((a, i) => { a.net = false; a.human = false; a.snap = null; a.name = RIVAL_NAMES[i]; }); player.name = PLAYER_NAME0; mpApplyModels(null); MP.noBot.clear();
   if (was) toTitle();
   if (why) { showScreen("mpScreen"); mpStatus(why); }
 }
@@ -209,7 +217,7 @@ function mpJoin() {
 function clientRecv(m) {
   if (!m || typeof m !== "object") return;
   if (m.t === "welcome") { clearTimeout(MP.joinTimer); Object.assign(MP, { host: false, slot: m.slot, code: m.code }); MP.on = true; applyCfg(m); MP.conn.send({ t: "hello", n: MP.name, w: mySpecial }); mpStatus(""); enterLobby(); }
-  else if (m.t === "players") { MP.players = m.pl || []; updatePanel(); }
+  else if (m.t === "players") { MP.players = m.pl || []; MP.noBot = new Set(m.nb || []); updatePanel(); }
   else if (m.t === "cfg") applyCfg(m);
   else if (m.t === "start") mpBegin(m);
   else if (m.t === "go") MP.goRecv = true;
@@ -237,6 +245,9 @@ requestAnimationFrame(netTick);
 // ---- 버튼
 $id("mpName").value = MP.name;
 titleBtn("tmMulti", () => { mpStatus(""); showScreen("mpScreen"); });
+$id("mpList").onclick = e => { const b = e.target.closest("span.bot"); if (!b || !MP.host || state !== "menu") return; const s = +b.dataset.s; if (MP.noBot.has(s)) MP.noBot.delete(s); else MP.noBot.add(s); bcastPlayers(); };
+$id("mpBotAll").onclick = () => { if (!MP.host) return; MP.noBot.clear(); bcastPlayers(); };
+$id("mpBotNone").onclick = () => { if (!MP.host) return; for (let s = 1; s < MP_MAX; s++) MP.noBot.add(s); bcastPlayers(); };
 $id("mpCreate").onclick = mpCreate; $id("mpJoin").onclick = mpJoin; $id("mpCode").onkeydown = e => { if (e.key === "Enter") mpJoin(); };
 $id("mpBack").onclick = () => { if (MP.peer && !MP.on) try { MP.peer.destroy(); MP.peer = null; } catch (e) {} showScreen("titleScreen"); };
 { const o = $id("bStart").onclick; $id("bStart").onclick = () => { if (!MP.on) return o(); if (MP.host) { if (isTouch) goFull(true); mpStart(); } }; }

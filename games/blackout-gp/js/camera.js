@@ -74,7 +74,7 @@ function updateHud() {
     if (need !== p.needShown) { p.needShown = need; document.getElementById("tRet").classList.toggle("need", need); document.getElementById("bReset").classList.toggle("need", need); } }
   const st = standings(), pos = st.findIndex(r => r.me) + 1, lap = Math.min(lapsTotal, Math.max(1, player.laps.length + 1));
   const hp = Math.max(0, player.hp ?? 100), hc = hp > 70 ? "#7cff8a" : hp > 40 ? "#ffd23a" : hp > 15 ? "#ff8a2a" : (performance.now() % 400 < 200 ? "#ff2a2a" : "#5a1010");
-  setHTML("hudTL", `<b>${pos}</b> / ${TOTAL} 위${gapHtml(st)}<br>랩 ${lap} / ${lapsTotal}<br><span style="display:inline-block;width:96px;height:9px;background:rgba(0,0,0,.5);border:1px solid #fff4;vertical-align:middle"><i style="display:block;width:${hp}%;height:100%;background:${hc}"></i></span> <small>내구도</small><br>${player.slip ? '<span style="color:#39d4ff">슬립스트림</span>' : ""}`);
+  setHTML("hudTL", `<b>${pos}</b> / ${ais.length + 1} 위${gapHtml(st)}<br>랩 ${lap} / ${lapsTotal}<br><span style="display:inline-block;width:96px;height:9px;background:rgba(0,0,0,.5);border:1px solid #fff4;vertical-align:middle"><i style="display:block;width:${hp}%;height:100%;background:${hc}"></i></span> <small>내구도</small><br>${player.slip ? '<span style="color:#39d4ff">슬립스트림</span>' : ""}`);
   if (performance.now() - _hudT > 100) { _hudT = performance.now(); setHTML("hudTR", `시간 ${fmt(player.done ? player.finishT : raceT)}<br>이번 랩 ${player.done ? "-" : fmt(Math.max(0, raceT - player.lapStart))}<br>최고 랩 ${best ? fmt(best) : "-"}`); }
   const kmh = Math.round(Math.abs(player.vf) * 3.6);
   setHTML("speed", `${kmh}<small> km/h</small>`);
