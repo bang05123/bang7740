@@ -5,6 +5,16 @@
   .hud { position: fixed; pointer-events: none; text-shadow: 2px 2px 0 #000; }
   #hudTL { top: calc(12px + env(safe-area-inset-top)); left: calc(14px + env(safe-area-inset-left)); font-size: 15px; line-height: 1.5; }
   #hudTL b { font-size: 26px; }
+  #tower { top: calc(98px + env(safe-area-inset-top)); right: calc(14px + env(safe-area-inset-right)); display: none; font: 700 13px sans-serif; text-shadow: none; background: rgba(0,0,0,0.55); border-left: 3px solid #d85a30; padding: 4px 0; min-width: 168px; z-index: 5; }
+  #tower div { display: flex; align-items: center; gap: 6px; padding: 1px 8px; height: 18px; color: #e8e8e8; white-space: nowrap; }
+  #tower div.me { background: rgba(216,90,48,0.45); color: #fff; }
+  #tower div.out { color: #666; }
+  #tower b { width: 16px; text-align: right; font-style: italic; }
+  #tower i { width: 4px; height: 13px; flex: none; }
+  #tower span { flex: 1; overflow: hidden; text-overflow: ellipsis; max-width: 96px; }
+  #tower em { font-style: normal; color: #aab; font-size: 12px; min-width: 40px; text-align: right; }
+  body.touch #tower { top: calc(96px + env(safe-area-inset-top)); right: auto; left: calc(14px + min(22vh, 92px) + 8px + min(13vh, 46px) + 10px + env(safe-area-inset-left)); font-size: 11px; min-width: 132px; padding: 2px 0; background: rgba(0,0,0,0.4); }
+  body.touch #tower div { height: 15px; padding: 1px 6px; gap: 4px; } body.touch #tower span { max-width: 70px; } body.touch #tower em { font-size: 10px; min-width: 32px; }
   #hudTR { top: calc(12px + env(safe-area-inset-top)); right: calc(14px + env(safe-area-inset-right)); text-align: right; font-size: 15px; line-height: 1.5; }
   #hudBR { bottom: calc(16px + env(safe-area-inset-bottom)); right: calc(18px + env(safe-area-inset-right)); text-align: right; }
   #speed { font-size: 54px; font-weight: 900; font-style: italic; line-height: 1; }

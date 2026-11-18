@@ -12,7 +12,20 @@ const GAP_STEP = 20; /* 20m마다 지나간 시각을 적어둠 → 같은 지�
 function gapRec() { if (raceT <= 0) return; for (const c of [player, ...ais]) { if (!c.ghist || raceT < (c.ghistT0 ?? 1e9)) { c.ghist = []; c.ghistT0 = raceT; } if (c.dead || c.done) continue; const b = Math.floor(c.prog / GAP_STEP); if (b < 0) continue; const h = c.ghist; if (h.length === 0) { h[b] = raceT; continue; } let last = h.length - 1; while (last < b) { last++; h[last] = raceT; } } }
 function gapReset() { for (const c of [player, ...ais]) { c.ghist = []; c.ghistT0 = 0; } }
 function gapTAt(c, prog) { const h = c.ghist; if (!h) return null; const b = Math.floor(prog / GAP_STEP), f = prog / GAP_STEP - b, a = h[b], n = h[b + 1]; if (a === undefined) return null; return n === undefined ? a : a + (n - a) * f; }
-const GAPV = { t: 0, html: "" };
+const GAPV = { t: 0, html: "" }, TOWER = { t: 0, html: "" };
+function towerHtml(st) { /* 실시간 순위표 (0.25초마다): 순위·색·이름·선두와 간격. 폰은 내 앞뒤 2대씩만 */
+  if (performance.now() - TOWER.t < 250) return TOWER.html; TOWER.t = performance.now();
+  const lead = st.find(r => !r.ret), me = st.findIndex(r => r.me); let a = 0, b = st.length;
+  if (isTouch && st.length > 5) { a = Math.max(0, Math.min(me - 2, st.length - 5)); b = a + 5; }
+  let h = ""; for (let i = a; i < b; i++) { const r = st[i], c = r.car, col = c.mesh.userData.mcol || "#888";
+    let g = "";
+    if (r.ret) g = "OUT"; else if (r === lead) g = r.done ? "완주" : `${Math.min(lapsTotal, Math.floor(Math.max(0, r.prog) / L) + 1)}랩`;
+    else if (r.done) g = lead.done ? "+" + (r.t - lead.t).toFixed(1) : "완주";
+    else if (lead.prog - r.prog > L) g = `+${Math.floor((lead.prog - r.prog) / L)}랩`;
+    else { const t0 = gapTAt(lead.car, r.prog); g = t0 === null ? "-" : "+" + Math.max(0, raceT - t0).toFixed(1); }
+    h += `<div class="${r.me ? "me" : ""}${r.ret ? " out" : ""}"><b>${r.ret ? "-" : i + 1}</b><i style="background:${col}"></i><span>${r.name}</span><em>${g}</em></div>`; }
+  return TOWER.html = h;
+}
 function gapHtml(st) { /* 앞차·뒤차 간격 (0.25초마다) */
   if (performance.now() - GAPV.t < 250) return GAPV.html; GAPV.t = performance.now();
   const i = st.findIndex(r => r.me); let out = "";
