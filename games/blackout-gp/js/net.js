@@ -7,7 +7,8 @@ const MP = { on: false, host: false, slot: 0, code: "", peer: null, conns: new M
 const MP_MAX = 8, MP_PRE = "bgp7740-";
 const RIVAL_NAMES = ais.map(a => a.name), PLAYER_NAME0 = player.name;
 const MP_COURSE = { desert: "더스트 하이웨이", circuit: "메가 서킷", dam: "레드워터 댐" }, MP_WPN = { missile: "미사일", harpoon: "작살", rail: "대구경 포", pile: "파일벙커" };
-const MP_ICE = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }, { urls: "stun:global.stun.twilio.com:3478" }] };
+const MP_TURN = { username: "81e1d07276477fa7037157c4", credential: "YCCmOW88tS0m/QX/" };
+const MP_ICE = { iceServers: [{ urls: "stun:stun.relay.metered.ca:80" }, { urls: "stun:stun.l.google.com:19302" }, { urls: ["turn:global.relay.metered.ca:80", "turn:global.relay.metered.ca:80?transport=tcp", "turn:global.relay.metered.ca:443", "turns:global.relay.metered.ca:443?transport=tcp"], ...MP_TURN }] };
 try { MP.name = localStorage.getItem("bgp_name") || ""; } catch (e) {}
 const r2 = v => Math.round((v || 0) * 100) / 100, r3 = v => Math.round((v || 0) * 1000) / 1000;
 const $id = id => document.getElementById(id);

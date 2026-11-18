@@ -160,7 +160,7 @@
 <script>
 /* 게임 코드는 js·cars·courses 폴더에 기능별로 나뉘어 있음. 순서대로 이어 붙여 한 번에 실행 (원래 한 파일일 때와 똑같이 동작) */
 (() => {
-  const VER = "1186";
+  const VER = "1187";
   const FILES = ["js/core.js", "js/render.js", "courses/common.js", "courses/desert.js", "courses/dam.js", "courses/circuit.js", "js/optimize.js", "courses/build.js", "cars/kit.js", "cars/rook.js", "cars/rivals.js", "js/participants.js", "js/sound.js", "js/input.js", "js/state.js", "js/replay.js", "js/spectate.js", "js/physics.js", "js/rivals_ai.js", "js/damage.js", "js/props.js", "js/weapons.js", "js/race.js", "js/camera.js", "js/post.js", "js/net.js", "js/hud_loop.js"];
   Promise.all(FILES.map(f => fetch(f + "?v=" + VER).then(r => { if (!r.ok) throw new Error(f + " (" + r.status + ")"); return r.text(); })))
     .then(parts => { const s = document.createElement("script"); s.textContent = parts.join("") + "\n//# sourceURL=blackout-gp.js"; document.body.appendChild(s); })
