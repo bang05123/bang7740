@@ -127,9 +127,9 @@ function stretchTick(dt) {
 const DYN = { t: 0, n: 0, sum: 0, pr: 0 };
 function dynRes(realDt) {
   if (!isTouch || state !== "race") return; DYN.sum += realDt; DYN.n++; DYN.t += realDt; if (DYN.t < 2) return;
-  const avg = DYN.sum / DYN.n * 1000, base = SET.gfx === "low" ? Math.min(window.devicePixelRatio, 1) : Math.min(window.devicePixelRatio, 1.5); DYN.t = 0; DYN.n = 0; DYN.sum = 0;
+  const avg = DYN.sum / DYN.n * 1000, base = basePR(); DYN.t = 0; DYN.n = 0; DYN.sum = 0;
   if (!DYN.pr) DYN.pr = renderer.getPixelRatio();
-  let pr = DYN.pr; const floor = Math.max(0.7, base * 0.75); if (avg > 30) pr = Math.max(floor, pr - 0.05); else if (avg < 22) pr = Math.min(base, pr + 0.1); // 너무 흐려지지 않게 최소 75%까지만 낮춤
+  let pr = DYN.pr; const floor = GMIN() ? 0.45 : Math.max(0.7, base * 0.75); if (avg > 30) pr = Math.max(floor, pr - 0.05); else if (avg < 22) pr = Math.min(base, pr + 0.1); // 너무 흐려지지 않게 최소 75%까지만 낮춤
   if (Math.abs(pr - DYN.pr) > 0.001) { DYN.pr = pr; renderer.setPixelRatio(pr); resize(); postResize(); }
 }
 function renderMain(dt) {
@@ -144,14 +144,14 @@ function renderMain(dt) {
   const k = 1 - Math.exp(-5 * dt); POST.blur += (tBlur - POST.blur) * k; POST.warp += (tWarp - POST.warp) * k; POST.ca += (tCa - POST.ca) * k;
   stretchTick(dt); const stx = STRETCH.x * STRETCH.sc;
   const u = POST.mat.uniforms; u.blur.value = POST.blur + Math.max(0, stx) * 0.04 * SET.blur; u.warp.value = POST.warp + stx * 0.42; u.ca.value = POST.ca + Math.abs(stx) * 0.5; // 가장자리만 늘어나고 가운데는 선명 (줄어들 땐 반대로 오므라듦)
-  const bloomOn = SET.gfx !== "low"; u.lite.value = SET.gfx === "low" ? 1 : 0; u.aoK.value = SET.gfx === "low" ? 0 : 0.8; u.bloom.value = bloomOn ? (courseId === "circuit" ? 1.2 : 0.38) + boost * 0.25 : 0; BLOOM.bright.uniforms.th.value = courseId === "circuit" ? 0.93 : 0.965; // 낮 코스는 하늘·모래가 뿌옇게 번지지 않게 약하게 // 밤 서킷은 더 세게, 폰(그래픽 낮음)은 끔
+  const bloomOn = !GLOW(); u.lite.value = GLOW() ? 1 : 0; u.aoK.value = GLOW() ? 0 : 0.8; u.bloom.value = bloomOn ? (courseId === "circuit" ? 1.2 : 0.38) + boost * 0.25 : 0; BLOOM.bright.uniforms.th.value = courseId === "circuit" ? 0.93 : 0.965; // 낮 코스는 하늘·모래가 뿌옇게 번지지 않게 약하게 // 밤 서킷은 더 세게, 폰(그래픽 낮음)은 끔
   POST.vig = (POST.vig || 0) + ((active ? boost * 0.45 + Math.max(0, sr - 0.7) * 0.25 : 0) - (POST.vig || 0)) * k; u.vig.value = POST.vig;
   { const f = SUN_DIR, r = _shR.set(0, 1, 0).cross(f); if (r.lengthSq() < 1e-6) r.set(1, 0, 0); r.normalize(); const up = _shU.copy(f).cross(r), tex = 90 / sun.shadow.mapSize.x, P0 = _shP.set(player.x, player.y, player.z); // 그림자 픽셀 격자에 맞춰 스냅
     const a = Math.round(P0.dot(r) / tex) * tex, b = Math.round(P0.dot(up) / tex) * tex, c = P0.dot(f); P0.copy(r).multiplyScalar(a).addScaledVector(up, b).addScaledVector(f, c);
     sun.target.position.copy(P0); sun.position.copy(P0).addScaledVector(f, 120); } // 그림자 범위가 플레이어를 따라감
-  if (POST.on) {
+  if (POST.on && !GMIN()) {
     if (POST.mat.uniforms.aoK.value > 0) aoRender();
-    renderer.setRenderTarget(POST.rt); renderer.render(scene, camera); if (POST.mat.uniforms.bloom.value > 0) bloomRender(); if (SET.gfx === "low") { renderer.setRenderTarget(null); renderer.render(POST.scene, POST.cam); } else { renderer.setRenderTarget(POST.rt2); renderer.render(POST.scene, POST.cam); renderer.setRenderTarget(null); renderer.render(POST.fxScene, POST.cam); } // 폰은 FXAA 생략 (MSAA로 충분)
+    renderer.setRenderTarget(POST.rt); renderer.render(scene, camera); if (POST.mat.uniforms.bloom.value > 0) bloomRender(); if (GLOW()) { renderer.setRenderTarget(null); renderer.render(POST.scene, POST.cam); } else { renderer.setRenderTarget(POST.rt2); renderer.render(POST.scene, POST.cam); renderer.setRenderTarget(null); renderer.render(POST.fxScene, POST.cam); } // 폰은 FXAA 생략 (MSAA로 충분)
   } else renderer.render(scene, camera);
 }
 

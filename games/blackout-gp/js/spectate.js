@@ -63,11 +63,14 @@ document.getElementById("spChase").onclick = () => specMode("chase"); document.g
 function toMenu() { introCleanup(); repStop(); specOff(); clearTimeout(endTimer); state = "menu"; placeGrid(); gridFresh = true; showScreen("startScreen"); }
 function toTitle() { introCleanup(); repStop(); specOff(); clearTimeout(endTimer); state = "menu"; placeGrid(); gridFresh = true; showScreen("titleScreen"); }
 function isTouchDev() { return matchMedia("(pointer: coarse)").matches || "ontouchstart" in window; }
+function GLOW() { return SET.gfx === "low" || SET.gfx === "min"; } /* 낮음·최저 */
+function GMIN() { return SET.gfx === "min"; } /* 최저: 해상도 0.6배, 후처리·백미러·차 외곽선 끔, 시야 짧게 */
+function basePR() { return GMIN() ? 0.6 : GLOW() ? Math.min(window.devicePixelRatio, 1) : Math.min(window.devicePixelRatio, 1.5); }
 const SET = { vol: 60, shake: 1, blur: 0.5, gfx: isTouchDev() ? "low" : "high" }; try { Object.assign(SET, JSON.parse(localStorage.getItem("bgp_set") || "{}")); } catch (e) {}
 function applySet() {
   try { localStorage.setItem("bgp_set", JSON.stringify(SET)); } catch (e) {}
   if (SND.master) SND.master.gain.value = SND.on ? SET.vol / 100 : 0;
-  renderer.setPixelRatio(SET.gfx === "low" ? Math.min(window.devicePixelRatio, 1) : Math.min(window.devicePixelRatio, 1.5)); renderer.shadowMap.enabled = SET.gfx !== "low"; outlineMat.visible = SET.gfx !== "low"; /* 폰: 배경 외곽선은 화면 잉크선으로 대신 (차 외곽선은 유지) */ resize(); applyViewDist(); if (typeof DYN !== "undefined") DYN.pr = 0;
+  renderer.setPixelRatio(basePR()); renderer.shadowMap.enabled = !GLOW(); outlineMat.visible = !GLOW(); carOlMat.visible = !GMIN(); /* 폰: 배경 외곽선은 화면 잉크선으로 대신 (차 외곽선은 유지) */ resize(); applyViewDist(); if (typeof DYN !== "undefined") DYN.pr = 0;
   document.getElementById("sVol").value = SET.vol;
   document.querySelectorAll("[data-shk]").forEach(b => b.classList.toggle("on", +b.dataset.shk === SET.shake)); document.querySelectorAll("[data-blr]").forEach(b => b.classList.toggle("on", +b.dataset.blr === SET.blur)); document.querySelectorAll("[data-gfx]").forEach(b => b.classList.toggle("on", b.dataset.gfx === SET.gfx));
 }

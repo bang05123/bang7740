@@ -60,13 +60,13 @@ function unmergeCar(g) { /* 부서지기 시작하면 원래 부품들로 */
 function carLod() { // 멀리 있는 차는 외곽선을 끔 (어차피 안 보이고 그리기 횟수만 두 배)
   const p = camera.position;
   for (const c of [player, ...ais]) { const u = c.mesh.userData; if (!u.ols) { u.ols = []; c.mesh.traverse(o => { if (o.isMesh && o.material === carOlMat && (!u.mrg || o.userData.carMerged || !u.mrg.hid.has(o))) u.ols.push(o); }); }
-    const far = c.mesh.position.distanceTo(p) > (SET.gfx === "low" ? 90 : 160); if (u.olFar !== far) { u.olFar = far; for (const o of u.ols) o.visible = !far; } }
+    const far = c.mesh.position.distanceTo(p) > (GLOW() ? 90 : 160); if (u.olFar !== far) { u.olFar = far; for (const o of u.ols) o.visible = !far; } }
 }
 function distCull() { // 그래픽 낮음 1.5km, 높음 4.5km 밖의 소품 묶음(나무·관중·풍선 등)은 안 그림
-  const lim = SET.gfx === "low" ? 1100 : 4500, p = camera.position;
-  const limOl = SET.gfx === "low" ? 380 : 900; // 소품 외곽선 묶음은 더 가까이서만
+  const lim = GMIN() ? 650 : GLOW() ? 1100 : 4500, p = camera.position;
+  const limOl = GLOW() ? 380 : 900; // 소품 외곽선 묶음은 더 가까이서만
   for (const o of DCULL) { const sp = o.geometry.boundingSphere; o.visible = sp.center.distanceTo(p) - sp.radius < (o.material === outlineMat ? limOl : lim); }
-  const ol = SET.gfx === "low" ? 130 : 320, ol2 = ol * ol; for (const [o, q] of WOL) o.visible = q.distanceToSquared(p) < ol2;
+  const ol = GLOW() ? 130 : 320, ol2 = ol * ol; for (const [o, q] of WOL) o.visible = q.distanceToSquared(p) < ol2;
 }
 function mergeStatic() { // 안 움직이는 배경 메시(건물·관중석·간판 등)를 재질·구역별로 하나로 합쳐 그리기 횟수를 줄임
   const skip = new Set(); for (const pr of PROPS) if (pr.obj) pr.obj.traverse(o => skip.add(o)); // 부서지는 오브젝트는 그대로
@@ -114,7 +114,7 @@ function splitInstanced() {
   for (const pr of PROPS) if (pr.inst && remap.has(pr.inst.im)) { const r = remap.get(pr.inst.im)[pr.inst.i]; if (r) { pr.inst.im = r[0]; pr.inst.om = r[1]; pr.inst.i = r[2]; } }
 }
 function applyViewDist() { // 폰(그래픽 낮음)은 3.2km까지만 그리고 그 앞을 안개로 가림
-  if (!C) return; const low = SET.gfx === "low", far = low ? 3200 : 9000;
-  scene.fog.near = low ? Math.min(C.fog[1], 600) : C.fog[1]; scene.fog.far = low ? Math.min(C.fog[2], far - 200) : C.fog[2];
+  if (!C) return; const low = GLOW(), far = GMIN() ? 1500 : low ? 3200 : 9000;
+  scene.fog.near = low ? Math.min(C.fog[1], GMIN() ? 350 : 600) : C.fog[1]; scene.fog.far = low ? Math.min(C.fog[2], far - 200) : C.fog[2];
   camera.far = far; camera.updateProjectionMatrix(); sky.scale.setScalar(Math.min(1, far * 0.9 / 7000)); // 하늘 돔(과 구름)도 시야 안으로 줄임 (보이는 크기는 같음) if (typeof mirrorCam !== "undefined") { mirrorCam.far = low ? 1200 : 9000; mirrorCam.updateProjectionMatrix(); }
 }

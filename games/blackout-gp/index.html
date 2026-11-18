@@ -101,7 +101,7 @@
     <div class="setrow">전체 음량 <input type="range" id="sVol" min="0" max="100" step="5"></div>
     <div class="setrow">속도 흐림 <span><button class="lsel" data-blr="1">보통</button><button class="lsel" data-blr="0.5">약하게</button><button class="lsel" data-blr="0">끔</button></span></div>
     <div class="setrow">화면 흔들림 <span><button class="lsel" data-shk="1">보통</button><button class="lsel" data-shk="0.5">약하게</button><button class="lsel" data-shk="0">끔</button></span></div>
-    <div class="setrow">그래픽 <span><button class="lsel" data-gfx="high">높음</button><button class="lsel" data-gfx="low">낮음 (폰 추천)</button></span></div>
+    <div class="setrow">그래픽 <span><button class="lsel" data-gfx="high">높음</button><button class="lsel" data-gfx="low">낮음 (폰 추천)</button><button class="lsel" data-gfx="min">최저</button></span></div>
     <button class="ghost" id="bSetBack">뒤로</button>
   </div>
 </div>
@@ -160,7 +160,7 @@
 <script>
 /* 게임 코드는 js·cars·courses 폴더에 기능별로 나뉘어 있음. 순서대로 이어 붙여 한 번에 실행 (원래 한 파일일 때와 똑같이 동작) */
 (() => {
-  const VER = "1187";
+  const VER = "1188";
   const FILES = ["js/core.js", "js/render.js", "courses/common.js", "courses/desert.js", "courses/dam.js", "courses/circuit.js", "js/optimize.js", "courses/build.js", "cars/kit.js", "cars/rook.js", "cars/rivals.js", "js/participants.js", "js/sound.js", "js/input.js", "js/state.js", "js/replay.js", "js/spectate.js", "js/physics.js", "js/rivals_ai.js", "js/damage.js", "js/props.js", "js/weapons.js", "js/race.js", "js/camera.js", "js/post.js", "js/net.js", "js/hud_loop.js"];
   Promise.all(FILES.map(f => fetch(f + "?v=" + VER).then(r => { if (!r.ok) throw new Error(f + " (" + r.status + ")"); return r.text(); })))
     .then(parts => { const s = document.createElement("script"); s.textContent = parts.join("") + "\n//# sourceURL=blackout-gp.js"; document.body.appendChild(s); })

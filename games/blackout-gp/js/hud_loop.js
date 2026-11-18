@@ -63,11 +63,11 @@ function drawRadar() {
 }
 
 function renderMirror() {
-  const show = (state === "race" || state === "count" || state === "end") && !SPEC.on && !DEMO.on;
+  const show = (state === "race" || state === "count" || state === "end") && !SPEC.on && !DEMO.on && !GMIN();
   mirrorEl.style.display = show ? "block" : "none"; if (!show) return;
   const r = mirrorEl.getBoundingClientRect(), W = document.documentElement.clientWidth || innerWidth, H = document.documentElement.clientHeight || innerHeight;
   if (r.width < 10) return;
-  if ((mirrorTick++ % (SET.gfx === "low" ? 4 : isTouch ? 3 : 2)) === 0) { // 폰에선 두 프레임에 한 번만 새로 그림
+  if ((mirrorTick++ % (GLOW() ? 4 : isTouch ? 3 : 2)) === 0) { // 폰에선 두 프레임에 한 번만 새로 그림
     const p = player, fx = Math.sin(p.h), fz = Math.cos(p.h);
     mirrorCam.position.set(p.x - fx * 5.2, p.y + 2.3, p.z - fz * 5.2);
     mirrorCam.lookAt(p.x - fx * 40, p.y + 0.6, p.z - fz * 40);
