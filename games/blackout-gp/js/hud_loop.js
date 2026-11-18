@@ -55,8 +55,8 @@ function drawRadar() {
   ais.forEach((a, i) => {
     let [x, y] = toScr(a.x, a.z); const dx = x - c, dy = y - c, dist = Math.hypot(dx, dy);
     const rel = a.h - p.h; // 상대 방향
-    if (dist <= R - 4 * dpr) tri(x, y, -rel, 5.5 * dpr, rivalCol[i]);
-    else if (dist < R * 3) { x = c + dx / dist * (R - 4 * dpr); y = c + dy / dist * (R - 4 * dpr); g.beginPath(); g.arc(x, y, 3 * dpr, 0, Math.PI * 2); g.fillStyle = rivalCol[i]; g.fill(); }
+    if (dist <= R - 4 * dpr) tri(x, y, -rel, 5.5 * dpr, (a.mesh.userData.mcol || rivalCol[i]));
+    else if (dist < R * 3) { x = c + dx / dist * (R - 4 * dpr); y = c + dy / dist * (R - 4 * dpr); g.beginPath(); g.arc(x, y, 3 * dpr, 0, Math.PI * 2); g.fillStyle = (a.mesh.userData.mcol || rivalCol[i]); g.fill(); }
   });
   tri(c, c, 0, 7.5 * dpr, "#ff5a1f"); // 나
   g.beginPath(); g.arc(c, c, R, 0, Math.PI * 2); g.lineWidth = 2 * dpr; g.strokeStyle = "rgba(255,255,255,0.85)"; g.stroke();
@@ -125,5 +125,5 @@ function simulate(secs, driver) {
   for (let t = 0; t < secs; t += dt) { if (state !== "race" && state !== "end") break; const d = driver(player); Object.assign(input, d); raceT += dt; stepPlayer(dt); stepAI(dt); stepWeapons(dt); stepProps(); stepWreck(dt); lapLogic(); syncMeshes(dt); recFrame(); }
 }
 window.__cam = () => { updateCamera(1 / 30); return camera.position.distanceTo(new THREE.Vector3(player.x, player.y, player.z)); };
-window.__SND = SND; window.__upd = updateSound; window.__inp = input; window.__bgp = { get SFX() { return SFX; }, get renderer() { return renderer; }, get scene() { return scene; }, get camera() { return camera; }, get REC() { return REC; }, detachPart, ensureDmg, raySolid, get SOLIDS() { return SOLIDS; }, useSpecial, fireGun, PROJ, TETHERS, setSpecial, enterTumble, applyDamage, explode, hitLocal, repairAll, demoDrive, get REPLAY() { return REPLAY; }, WRECK, get GAP() { return GAP; }, player, ais, get state() { return state; }, get L() { return L; }, get HALF() { return HALF; }, P, startRace, simulate, get TRK() { return TRK; }, idxAtS, posAt, surfH, setCourse(id) { buildCourse(id); loadBest(); placeGrid(); }, skipCount() { if (state === "intro") introEnd(); countdown = 0.01; } };
+window.__SND = SND; window.__upd = updateSound; window.__inp = input; window.__bgp = { mp: { MP, apply: mpApplyModels, MODELS: MP_MODELS, carOfSlot, get player() { return player; }, get ais() { return ais; } }, get SFX() { return SFX; }, get renderer() { return renderer; }, get scene() { return scene; }, get camera() { return camera; }, get REC() { return REC; }, detachPart, ensureDmg, raySolid, get SOLIDS() { return SOLIDS; }, useSpecial, fireGun, PROJ, TETHERS, setSpecial, enterTumble, applyDamage, explode, hitLocal, repairAll, demoDrive, get REPLAY() { return REPLAY; }, WRECK, get GAP() { return GAP; }, player, ais, get state() { return state; }, get L() { return L; }, get HALF() { return HALF; }, P, startRace, simulate, get TRK() { return TRK; }, idxAtS, posAt, surfH, setCourse(id) { buildCourse(id); loadBest(); placeGrid(); }, skipCount() { if (state === "intro") introEnd(); countdown = 0.01; } };
 })();

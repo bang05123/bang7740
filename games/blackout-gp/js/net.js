@@ -6,6 +6,16 @@
 const MP = { on: false, host: false, slot: 0, code: "", peer: null, conns: new Map(), conn: null, players: [], race: null, hold: 0.6, goRecv: false, sendT: 0, prevState: "", name: "", joinTimer: 0 };
 const MP_MAX = 8, MP_PRE = "bgp7740-";
 const RIVAL_NAMES = ais.map(a => a.name), PLAYER_NAME0 = player.name;
+// 멀티 차 모델: 0 = Rook(0번), 1~7 = 라이벌 차. 판마다 호스트가 슬롯별로 랜덤 배정해서 모든 화면에 똑같이 보이게
+const MP_MODELS = [player.mesh, ...ais.map(a => a.mesh)], MP_MNAME = ["Rook", ...RIVAL_NAMES];
+MP_MODELS[0].userData.mcol = "#ff4a1a"; ais.forEach((a, i) => { MP_MODELS[i + 1].userData.mcol = "#" + new THREE.Color(RIVALS[i].sf[1]).getHexString(); });
+function mpApplyModels(car) { // car[s] = 슬롯 s가 탈 모델 번호, 없으면 원래대로
+  const all = [player, ...ais]; for (const c of all) pileMesh(c, false);
+  if (!car) { player.mesh = MP_MODELS[0]; ais.forEach((a, i) => { a.mesh = MP_MODELS[i + 1]; }); }
+  else for (let s = 0; s < MP_MAX; s++) { const c = carOfSlot(s); if (c && MP_MODELS[car[s]]) c.mesh = MP_MODELS[car[s]]; }
+  for (const c of all) c.mesh.visible = true;
+  if (camMode === "cockpit") player.mesh.visible = false;
+}
 const MP_COURSE = { desert: "더스트 하이웨이", circuit: "메가 서킷", dam: "레드워터 댐" }, MP_WPN = { missile: "미사일", harpoon: "작살", rail: "대구경 포", pile: "파일벙커" };
 const MP_TURN = { username: "81e1d07276477fa7037157c4", credential: "YCCmOW88tS0m/QX/" };
 const MP_ICE = { iceServers: [{ urls: "stun:stun.relay.metered.ca:80" }, { urls: "stun:stun.l.google.com:19302" }, { urls: ["turn:global.relay.metered.ca:80", "turn:global.relay.metered.ca:80?transport=tcp", "turn:global.relay.metered.ca:443", "turns:global.relay.metered.ca:443?transport=tcp"], ...MP_TURN }] };
@@ -128,14 +138,15 @@ function mpSetupCars(names) {
 function mpStart() { // 호스트: 출발 순서·무기·이름 정해서 다 같이 시작
   if (!MP.host) return;
   const order = [...Array(MP_MAX).keys()]; for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
-  const n = {}, w = {}; for (let s = 0; s < MP_MAX; s++) { const p = MP.players.find(q => q.slot === s); n[s] = p ? cleanName(p.name) : RIVAL_NAMES[s - 1]; w[s] = p ? p.wpn : (RIVAL_WPN[RIVAL_NAMES[s - 1]] || "missile"); }
-  const m = { t: "start", c: courseId, l: lapsTotal, o: order, n, w, hold: 0.3 + Math.random() * 0.8, pl: MP.players };
+  const car = [...Array(MP_MAX).keys()]; for (let i = car.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [car[i], car[j]] = [car[j], car[i]]; } // 차는 랜덤 (무기만 각자 고름)
+  const n = {}, w = {}; for (let s = 0; s < MP_MAX; s++) { const p = MP.players.find(q => q.slot === s), mn = MP_MNAME[car[s]]; n[s] = p ? cleanName(p.name) : mn; w[s] = p ? p.wpn : (RIVAL_WPN[mn] || "missile"); }
+  const m = { t: "start", c: courseId, l: lapsTotal, o: order, car, n, w, hold: 0.3 + Math.random() * 0.8, pl: MP.players };
   bcast(m); mpBegin(m);
 }
 function mpBegin(m) {
   MP.players = m.pl; MP.hold = m.hold; MP.goRecv = false; MP.race = m;
   if (COURSES[m.c] && courseId !== m.c) _buildCourse(m.c); if (m.l > 0) _setLaps(m.l);
-  mpSetupCars(m.n);
+  mpApplyModels(Array.isArray(m.car) ? m.car : null); mpSetupCars(m.n);
   gridOrder = ais.map(a => m.o[slotOfCar(a)]).concat([m.o[MP.slot]]); gridFresh = true;
   startRace();
 }
@@ -146,7 +157,7 @@ function mpLeave(why) {
   try { for (const info of MP.conns.values()) info.conn.close(); if (MP.conn) MP.conn.close(); if (MP.peer) MP.peer.destroy(); } catch (e) {}
   const was = MP.on; Object.assign(MP, { on: false, host: false, slot: 0, code: "", peer: null, conn: null, players: [], race: null }); MP.conns.clear();
   document.body.classList.remove("mp", "mpclient");
-  ais.forEach((a, i) => { a.net = false; a.human = false; a.snap = null; a.name = RIVAL_NAMES[i]; }); player.name = PLAYER_NAME0;
+  ais.forEach((a, i) => { a.net = false; a.human = false; a.snap = null; a.name = RIVAL_NAMES[i]; }); player.name = PLAYER_NAME0; mpApplyModels(null);
   if (was) toTitle();
   if (why) { showScreen("mpScreen"); mpStatus(why); }
 }
