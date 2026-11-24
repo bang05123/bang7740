@@ -113,12 +113,12 @@ function drawFx(dt) {
 }
 const FOCUS = { amt: 0, t: 0, list: [], was: false, kick: 0 };
 // 고속 주행: 3D 바람 줄기 (실제 공간에 떠 있어서 차가 스쳐 지나감, 가까운 건 빠르게 먼 건 느리게)
-const WIND = (() => { const n = isTouch ? 26 : 56, mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: true });
+const WIND = (() => { const n = isTouch ? 12 : 24, mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: true });
   const im = new THREE.InstancedMesh(new THREE.BoxGeometry(0.07, 0.07, 1), mat, n); im.frustumCulled = false; im.layers.set(1); scene.add(im);
   return { im, mat, n, p: Array.from({ length: n }, () => new THREE.Vector3()), live: false }; })();
 function windTick(dt) {
   const p = player, show = state === "race" && !SPEC.on && !REPLAY.on && !DEMO.on && !p.dead, sr = Math.abs(p.vf) / P.top, boost = p.boostT > 0;
-  const op = show ? clamp((sr - 0.4) * 1.3, 0, 0.55) + (boost ? 0.2 : 0) : 0; WIND.mat.opacity += (op - WIND.mat.opacity) * Math.min(1, 6 * dt); WIND.im.visible = WIND.mat.opacity > 0.01; if (!WIND.im.visible) { WIND.live = false; return; }
+  const op = show ? clamp((sr - 0.5) * 1.1, 0, 0.38) + (boost ? 0.14 : 0) : 0; WIND.mat.opacity += (op - WIND.mat.opacity) * Math.min(1, 6 * dt); WIND.im.visible = WIND.mat.opacity > 0.01; if (!WIND.im.visible) { WIND.live = false; return; }
   const sp = Math.hypot(p.vx, p.vz) || 1, fx_ = p.vx / sp, fz_ = p.vz / sp, rx = fz_, rz = -fx_, M = WIND._m || (WIND._m = new THREE.Matrix4()), Q = WIND._q || (WIND._q = new THREE.Quaternion()), S = WIND._s || (WIND._s = new THREE.Vector3()), up = WIND._u || (WIND._u = new THREE.Vector3(0, 0, 1)), d = WIND._d || (WIND._d = new THREE.Vector3());
   const spawn = (v, far) => { const side = Math.random() < 0.5 ? -1 : 1, lat = side * (1.8 + Math.random() * 8), fwd = far ? 20 + Math.random() * 55 : -10 + Math.random() * 70; v.set(p.x + fx_ * fwd + rx * lat, p.y + 0.3 + Math.random() * 4.2, p.z + fz_ * fwd + rz * lat); };
   const len = 1 + sp * 0.07 + (boost ? 3 : 0); d.set(fx_, 0, fz_); Q.setFromUnitVectors(up, d); S.set(1, 1, len);

@@ -281,7 +281,7 @@ function carFx(dt, lat, fx, fz, rx, rz, spd) {
   p.prevGas = input.gas;
   // 고속: 날개 끝·차체 모서리에서 흰 바람 줄기
   const sr = Math.abs(p.vf) / P.top;
-  if (sr > 0.5 || p.boostT > 0) { const n = p.boostT > 0 ? 3 : 1; for (let k = 0; k < n; k++) for (const sd of [-1, 1]) emit(streaks, p.x - fx * 4.6 + rx * sd * 1.65, p.y + 1.75 + (R() - 0.5) * 0.3, p.z - fz * 4.6 + rz * sd * 1.65, p.vx * 0.05, 0, p.vz * 0.05, 0.22 + sr * 0.2); }
+  if (sr > 0.65 || p.boostT > 0) { const n = p.boostT > 0 ? 2 : 1; for (let k = 0; k < n; k++) for (const sd of [-1, 1]) emit(streaks, p.x - fx * 4.6 + rx * sd * 1.65, p.y + 1.75 + (R() - 0.5) * 0.3, p.z - fz * 4.6 + rz * sd * 1.65, p.vx * 0.05, 0, p.vz * 0.05, 0.22 + sr * 0.2); }
 }
 function hitWall(t, sg, rest, mul = 1) {
   const p = CUR, ux = nx(t) * sg, uz = nz(t) * sg, vn = p.vx * ux + p.vz * uz;

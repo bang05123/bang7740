@@ -1,5 +1,5 @@
 // ================= 카메라와 그리기 =================
-const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), camOff = new THREE.Vector3(0, 3, -9), lookOffS = new THREE.Vector3(0, 1, 11); let camAcc = 0, camLag = 0;
+const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), camOff = new THREE.Vector3(0, 3, -9), lookOffS = new THREE.Vector3(0, 1, 11); let camAcc = 0, camLag = 0, camRoll = 0, camYawR = 0;
 let fov = 66, firstFrame = true, camH = 0;
 function updateCamera(dt) {
   if (state === "menu") { // 메뉴: 그리드 위를 천천히 도는 카메라
@@ -45,6 +45,12 @@ function updateCamera(dt) {
   camera.position.copy(camPos);
   if (shake > 0) { const sk = shake * SET.shake; camera.position.x += (Math.random() - 0.5) * sk; camera.position.y += (Math.random() - 0.5) * sk * 0.6; shake = Math.max(0, shake - dt * 1.8); }
   camera.lookAt(camLook);
+  { // 코너링 기울기: 도는 방향으로 화면이 살짝 기울어짐 (빠를수록, 드리프트일수록 더). 설정의 '흔들림'으로 같이 조절
+    let dhh = p.h - (p.camPrevH ?? p.h); while (dhh > Math.PI) dhh -= 2 * Math.PI; while (dhh < -Math.PI) dhh += 2 * Math.PI; p.camPrevH = p.h;
+    const yr = dt > 0 && !firstFrame ? clamp(dhh / dt, -3, 3) : 0; camYawR += (yr - camYawR) * Math.min(1, 5 * dt);
+    const slip = Math.abs(p.vl || 0) / Math.max(8, Math.abs(p.vf)), on = camMode === "chase" && !p.tumble && !p.dead && state !== "menu";
+    const tgt = on ? clamp(camYawR * clamp(spdR, 0, 1.3) * 0.11 * (1 + Math.min(1, slip * 2) * 0.6), -0.12, 0.12) * Math.min(1, SET.shake) : 0;
+    camRoll += (tgt - camRoll) * Math.min(1, 4 * dt); if (Math.abs(camRoll) > 1e-4) camera.rotateZ(camRoll); }
   const baseV = 62 + spdR * 12 + (boost ? 22 : 0);
   const asp = camera.aspect, H = 2 * Math.atan(Math.tan(baseV * Math.PI / 360) * (16 / 9));
   const targetFov = asp >= 16 / 9 ? baseV : Math.min(asp < 1 ? 88 : 100, 2 * Math.atan(Math.tan(H / 2) / asp) * 180 / Math.PI);
